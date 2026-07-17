@@ -2,7 +2,7 @@ import { FileChartColumn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const symphonyUrl =
-  process.env.NEXT_PUBLIC_SYMPHONY_URL ?? "https://s-ymphony.streamlit.app/";
+  process.env.NEXT_PUBLIC_SYMPHONY_URL || "https://s-ymphony.streamlit.app/";
 
 /** S.ymphony 리스크 리포트를 별도 탭에서 연다. */
 export default function SymphonyLaunchButton() {
