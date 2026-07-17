@@ -9,6 +9,7 @@ export default function SymphonyLaunchButton() {
   return (
     <Button
       asChild
+      variant="outline"
       className="shrink-0 border border-blue-200 bg-blue-50 font-bold text-blue-700 shadow-none hover:bg-blue-100 hover:text-blue-800"
     >
       <a
