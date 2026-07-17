@@ -33,15 +33,15 @@ function FloatInput({
         onChange={(e) => onChange(e.target.value)}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
-        className={`w-full rounded-lg border-2 px-4 pb-3 pt-7 text-[16px] font-medium text-gray-900 outline-none transition-colors ${
-          focused ? "border-brand" : "border-gray-200"
+        className={`w-full rounded-[14px] border-[1.5px] px-4 pb-3 pt-7 text-[16px] font-medium text-gray-900 outline-none transition-colors ${
+          focused ? "border-symphony-primary" : "border-symphony-border"
         } ${rightSlot ? "pr-11" : ""}`}
       />
       <label
         htmlFor={id}
         className={`pointer-events-none absolute left-3 bg-white px-0.5 font-bold transition-all ${
           lifted
-            ? `top-[-0.55rem] text-[11px] ${focused ? "text-brand" : "text-gray-400"}`
+            ? `top-[-0.55rem] text-[11px] ${focused ? "text-symphony-primary" : "text-gray-400"}`
             : "top-[1.05rem] text-[14px] text-gray-400"
         }`}
       >
@@ -82,12 +82,13 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-white">
-      <div className="w-full max-w-[460px] px-10">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-white before:pointer-events-none before:absolute before:left-1/2 before:top-1/2 before:size-[640px] before:-translate-x-1/2 before:-translate-y-[62%] before:rounded-full before:bg-[radial-gradient(circle,rgba(74,110,235,0.07)_0%,transparent_70%)] before:content-['']">
+      <div className="relative w-full max-w-[340px]">
         {/* 로고 */}
-        <div className="mb-12 flex flex-col items-center gap-4">
+        <div className="mb-[60px] flex flex-col items-center">
           <Image src="/logo.png" alt="S.upervisor" width={72} height={72} className="rounded-3xl object-cover shadow-sm" />
-          <h1 className="text-[28px] font-extrabold text-brand">S.upervisor</h1>
+          <h1 className="mt-[36px] text-[52px] font-extrabold leading-none text-symphony-primary">S.upervisor</h1>
+          <p className="mt-[36px] text-[19px] text-symphony-text-muted">PB 전용 VVIP Asset Advisor Hub</p>
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
@@ -125,7 +126,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={submitting}
-            className="mt-3 w-full rounded-xl bg-brand py-4 text-[17px] font-bold text-white transition-opacity hover:opacity-90 active:opacity-80 disabled:opacity-50"
+            className="mt-3 h-[58px] w-full rounded-[29px] bg-[linear-gradient(100deg,var(--color-symphony-primary),var(--color-symphony-gradient-to))] text-[18px] font-semibold text-white shadow-[0_10px_30px_rgba(15,90,224,0.22)] transition-all hover:bg-[linear-gradient(100deg,var(--color-symphony-hover-from),var(--color-symphony-hover-to))] active:opacity-90 disabled:pointer-events-none disabled:opacity-50"
           >
             {submitting ? "Signing in…" : "Sign in"}
           </button>
