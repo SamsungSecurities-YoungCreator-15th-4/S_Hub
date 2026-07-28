@@ -6,7 +6,7 @@ from app.nodes.approval_gate import approval_gate
 from app.nodes.assemble_report import assemble_report
 from app.nodes.conflict_check import conflict_check
 from app.nodes.extract_ips import extract_ips
-from app.nodes.judge_eval import MAX_JUDGE_RETRIES, judge_eval
+from app.nodes.judge_eval import judge_eval, resolve_max_judge_retries
 from app.nodes.load_inputs import load_inputs
 from app.nodes.rag_cite import rag_cite
 from app.nodes.var_engine import var_engine
@@ -27,10 +27,14 @@ def route_after_conflict_check(state: RiskState) -> str:
 
 
 def route_after_judge(state: RiskState) -> str:
-    """분기 ③: judge 통과 또는 재시도 소진 시 리포트 조립, 아니면 재작성 루프."""
+    """분기 ③: judge 통과 또는 재시도 소진 시 리포트 조립, 아니면 재작성 루프.
+
+    재시도를 소진한 리포트는 조립은 하되 확정되지 않는다. assemble_report가
+    미확정(pending_manual_review) 상태로 표시하며, 확정은 사람 검토를 거친다.
+    """
     judge = state.get("judge") or {}
     judge_retries = state.get("judge_retries") or 0
-    if judge.get("passed") or judge_retries >= MAX_JUDGE_RETRIES:
+    if judge.get("passed") or judge_retries >= resolve_max_judge_retries(state):
         return "assemble_report"
     return "rag_cite"
 

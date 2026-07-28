@@ -1289,12 +1289,14 @@ else:
     warnings = report.get("warnings") or []
     _governance = report["governance"]
     _judge_passed = _governance["judge_passed"]
+    _finalized = report.get("finalized") is True
     if _judge_passed and warnings:
         _judge_value, _judge_tone = "조건부 통과 (수동검토 필요)", "kpi-warn"
     elif _judge_passed:
         _judge_value, _judge_tone = "통과", "kpi-blue"
     else:
-        _judge_value, _judge_tone = "검토 필요", "kpi-gray"
+        # 미통과 리포트는 확정본이 아니라는 사실을 지표에서부터 드러낸다.
+        _judge_value, _judge_tone = "미통과 (미확정)", "kpi-gray"
 
     def _kpi(label: str, value: str, sub: str = "", tone: str = "") -> str:
         _sub = f'<div class="kpi-sub">{sub}</div>' if sub else ""
@@ -1337,6 +1339,16 @@ else:
         """,
         unsafe_allow_html=True,
     )
+
+    if not _finalized:
+        # judge 미통과 리포트는 확정본이 아니다 — 화면 최상단에서 먼저 알린다.
+        st.error(
+            f"**{report.get('status_label') or '미확정 — judge 미통과로 수동검토 대기'}**  \n"
+            "judge 품질 점검을 통과하지 못해 확정되지 않은 리포트입니다. "
+            "수치·근거는 검토용으로만 사용하고, 사람 검토와 재승인 전에는 "
+            "고객 제공·최종 판단 근거로 사용하지 않습니다.",
+            icon=":material/gpp_maybe:",
+        )
 
     if warnings:
         _warn_items = unique_review_warnings(warnings, report.get("citations") or [])
@@ -1631,16 +1643,31 @@ else:
         elif judge_passed:
             judge_label, judge_tone = "통과", "blue"
         else:
-            judge_label, judge_tone = "검토 필요", "gray"
+            judge_label, judge_tone = "미통과 (미확정)", "gray"
 
-        t1, t2 = st.columns(2)
+        retries_label = (
+            f"{governance.get('judge_retries') or 0}/"
+            f"{governance.get('judge_max_retries') or 0}회"
+        )
+        t1, t2, t3 = st.columns(3)
         t1.markdown(
             status_tile("리포트 신뢰성 검증", judge_label, judge_tone),
             unsafe_allow_html=True,
         )
         t2.markdown(
+            status_tile(
+                "리포트 확정 상태",
+                "확정" if governance.get("finalized") else "미확정 (수동검토 대기)",
+                "blue" if governance.get("finalized") else "gray",
+            ),
+            unsafe_allow_html=True,
+        )
+        t3.markdown(
             status_tile("검증 강도", "엄격" if gate_on else "표준", "blue" if gate_on else "gray"),
             unsafe_allow_html=True,
+        )
+        st.caption(
+            f"judge 재작성 시도 {retries_label} · 통과하지 못한 리포트는 확정되지 않습니다."
         )
         st.markdown("<br>", unsafe_allow_html=True)
         checks = judge.get("checks") or []

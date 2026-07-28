@@ -160,7 +160,14 @@ def main() -> None:
     print("\n  [report — governance]")
     print(json.dumps(final.get("report", {}).get("governance", {}), ensure_ascii=False, indent=2))
     print(f"\n  trace_id: {final.get('trace_id')}")
-    print(f"  report title: {final.get('report', {}).get('title')}")
+    _report = final.get("report", {}) or {}
+    print(f"  report title: {_report.get('title')}")
+    print(f"  report status: {_report.get('status')} ({_report.get('status_label')})")
+    if _report.get("finalized") is not True:
+        print(
+            "  ⚠ judge 미통과 — 리포트는 확정되지 않았습니다(수동검토 대기). "
+            "사람 검토 전에는 고객 제공·최종 판단 근거로 사용하지 않습니다."
+        )
 
     if args.validate_deployment:
         from app.deployment_validation import (

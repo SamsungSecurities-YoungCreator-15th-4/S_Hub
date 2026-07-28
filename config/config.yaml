@@ -16,3 +16,6 @@ var_lookback_days: 1250
 data_source: real
 # 제출·시연에서는 검증 통과 인용이 없으면 judge를 반드시 실패시킨다.
 strict_citation_gate: true
+# judge 재작성 루프(분기 ③)의 최대 시도 횟수. 소진해도 통과하지 못하면
+# 리포트는 미확정(pending_manual_review) 상태로 남고 사람 검토로 넘어간다.
+judge_max_retries: 3

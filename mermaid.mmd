@@ -47,7 +47,7 @@ flowchart TB
 
         N5 --> N6
         N6 --> N7
-        N7 -. "미통과 또는 judge_retries < 4<br/>RAG 재시도" .-> N6
+        N7 -. "미통과 & judge_retries < judge_max_retries(기본 3)<br/>RAG 재시도" .-> N6
     end
 
     %% 4단계: 최종 리스크 리포트 생성
@@ -62,7 +62,7 @@ flowchart TB
     %% 단계 간 기본 실행 경로
     N3 -->|"충돌 없음 또는 재추출 1회 소진"| PAUSE
     N4 -->|"승인 상태=locked"| N5
-    N7 -->|"통과 또는 judge_retries ≥ 4<br/>실패 지속 시 수동검토 표시"| N8
+    N7 -->|"통과 또는 judge_retries ≥ judge_max_retries(기본 3)<br/>미통과 시 미확정 리포트로 표시"| N8
 
     %% 그래프 외 공통 감사 요소: 단일 연결로 교차선을 최소화
     AUDIT["전 노드 RiskState 체크포인트<br/>[LangSmith]<br/>입력·충돌·계산 해시<br/>trace URL"]
