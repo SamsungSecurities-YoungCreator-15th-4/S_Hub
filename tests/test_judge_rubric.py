@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 
-from app.graph import MAX_JUDGE_RETRIES, route_after_judge
+from app.graph import route_after_judge
 from app.judge.rubric import (
     disclaimer,
     false_precision,
@@ -14,7 +14,11 @@ from app.judge.rubric import (
     source_validity,
 )
 from app.nodes.assemble_report import assemble_report
-from app.nodes.judge_eval import MANUAL_REVIEW_WARNING, judge_eval
+from app.nodes.judge_eval import (
+    DEFAULT_MAX_JUDGE_RETRIES,
+    MANUAL_REVIEW_WARNING,
+    judge_eval,
+)
 
 AS_OF_DATE = "2026-06-30"
 DISCLAIMER_TEXT = (
@@ -496,13 +500,21 @@ def test_judge_retry_limit_exits_with_manual_review_warning():
     state = _normal_state()
     failing_llm = _AxisLLM(hallucination_passed=False)
 
-    first = judge_eval(state, llm=failing_llm)
-    first_state = {**state, **first}
-    assert route_after_judge(first_state) == "rag_cite"
+    current_state = state
+    last_out = {}
+    for attempt in range(1, DEFAULT_MAX_JUDGE_RETRIES + 1):
+        last_out = judge_eval(current_state, llm=failing_llm)
+        current_state = {**current_state, **last_out}
+        expected = (
+            "assemble_report" if attempt == DEFAULT_MAX_JUDGE_RETRIES else "rag_cite"
+        )
+        assert route_after_judge(current_state) == expected
 
-    second = judge_eval(first_state, llm=failing_llm)
-    exhausted_state = {**first_state, **second}
-    assert exhausted_state["judge_retries"] == MAX_JUDGE_RETRIES
-    assert route_after_judge(exhausted_state) == "assemble_report"
-    assert MANUAL_REVIEW_WARNING in second["judge"]["manual_review_flags"]
-    assert MANUAL_REVIEW_WARNING in assemble_report(exhausted_state)["report"]["warnings"]
+    assert current_state["judge_retries"] == DEFAULT_MAX_JUDGE_RETRIES
+    assert MANUAL_REVIEW_WARNING in last_out["judge"]["manual_review_flags"]
+
+    # 재시도를 소진해도 리포트는 확정되지 않는다.
+    report = assemble_report(current_state)["report"]
+    assert MANUAL_REVIEW_WARNING in report["warnings"]
+    assert report["finalized"] is False
+    assert report["status"] == "pending_manual_review"

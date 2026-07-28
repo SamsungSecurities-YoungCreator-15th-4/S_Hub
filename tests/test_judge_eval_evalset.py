@@ -11,7 +11,11 @@ from dotenv import load_dotenv
 
 from app.graph import route_after_judge
 from app.llm.client import get_llm
-from app.nodes.judge_eval import MANUAL_REVIEW_WARNING, judge_eval
+from app.nodes.judge_eval import (
+    DEFAULT_MAX_JUDGE_RETRIES,
+    MANUAL_REVIEW_WARNING,
+    judge_eval,
+)
 
 AS_OF_DATE = "2026-06-30"
 RUN_AZURE_ENV = "RUN_AZURE_JUDGE_EVALSET"
@@ -201,7 +205,8 @@ def _case(case_id: str) -> dict:
     elif case_id == "EC-20":
         state["run_config"]["strict_citation_gate"] = True
         state["citations"] = []
-        state["judge_retries"] = 1
+        # 마지막 재시도에서 실패해 수동검토 플래그가 붙는 경계 케이스다.
+        state["judge_retries"] = DEFAULT_MAX_JUDGE_RETRIES - 1
         expected_passed = False
         expected_axes.add("source_validity")
         expected_flags.add(MANUAL_REVIEW_WARNING)
@@ -278,7 +283,7 @@ def test_deterministic_judge_evalset(case_id: str):
     elif case_id == "EC-19":
         assert result["judge_feedback"] == ""
     elif case_id == "EC-20":
-        assert result["judge_retries"] == 2
+        assert result["judge_retries"] == DEFAULT_MAX_JUDGE_RETRIES
         assert route_after_judge(result) == "assemble_report"
 
 

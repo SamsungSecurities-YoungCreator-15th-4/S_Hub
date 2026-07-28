@@ -148,6 +148,16 @@ def validate_deployment_state(final: dict, order: list[str]) -> list[DeploymentC
             ),
         ),
         _check(
+            "report finalized",
+            report.get("finalized") is True
+            and governance.get("report_status") == "confirmed",
+            (
+                "judge 통과로 확정"
+                if report.get("finalized") is True
+                else f"미확정: {governance.get('confirmation_blocked_reason') or 'judge 미통과'}"
+            ),
+        ),
+        _check(
             "HITL approval lock",
             approval.get("status") == "locked",
             str(approval.get("status")),

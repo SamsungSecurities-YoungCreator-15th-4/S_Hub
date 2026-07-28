@@ -21,8 +21,22 @@ from app.rag.contracts import EVIDENCE_ROLES, ROUTING_CONTRACT
 from app.state import RiskState
 
 FORCE_FAIL_ENV = "RISK_FORCE_JUDGE_FAIL"
-MAX_JUDGE_RETRIES = 2
+DEFAULT_MAX_JUDGE_RETRIES = 3
 MANUAL_REVIEW_WARNING = "검증 미통과 — 수동검토 필요"
+
+
+def resolve_max_judge_retries(state: RiskState) -> int:
+    """config.yaml의 judge_max_retries를 읽고, 값이 유효하지 않으면 기본값을 쓴다.
+
+    같은 config면 같은 상한이 나오도록 판정은 순수 함수로 유지한다.
+    """
+    run_config = state.get("run_config") or {}
+    if not isinstance(run_config, dict):
+        return DEFAULT_MAX_JUDGE_RETRIES
+    value = run_config.get("judge_max_retries")
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        return DEFAULT_MAX_JUDGE_RETRIES
+    return value
 
 
 class _AuditedLLM:
@@ -369,7 +383,7 @@ def judge_eval(state: RiskState, *, llm=None) -> dict:
         ]
 
     passed = not failures
-    if not passed and retries >= MAX_JUDGE_RETRIES:
+    if not passed and retries >= resolve_max_judge_retries(state):
         manual_review_flags.append(MANUAL_REVIEW_WARNING)
         manual_review_flags = list(dict.fromkeys(manual_review_flags))
 
