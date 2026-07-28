@@ -68,17 +68,22 @@ START
   → rag_cite  ◄──────────────────┐  (분기③ judge 재작성 루프)
   → judge_eval ───────────────────┘
         │  route_after_judge:
-        │   judge.passed 또는 judge_retries >= MAX_JUDGE_RETRIES(=2) → assemble_report
+        │   judge.passed 또는 judge_retries >= judge_max_retries(config, 기본 3) → assemble_report
         │   그 외 → rag_cite 재작성
         ▼
-  → assemble_report
+  → assemble_report   (judge 미통과면 미확정 상태로 조립)
   → END
 ```
 
 - 컴파일: `g.compile(checkpointer=MemorySaver(), interrupt_before=["approval_gate"])`
 - 노드는 순수 함수로, 바꾼 키만 반환한다(레포 구조의 `nodes/` 규약과 동일).
-- judge가 규칙 기반이므로 실패 사유가 구조적이며, 재시도 증가는 해결 확률을
-  높이지 않는다. 2회 시도 후 실패 시 수동검토로 전환한다.
+- 재시도 상한은 `config/config.yaml`의 `judge_max_retries`(기본 3)로 정한다.
+  judge가 규칙 기반이라 실패 사유가 구조적이므로 재시도를 늘려도 해결 확률이
+  크게 오르지는 않으며, 상한을 소진하면 수동검토로 전환한다.
+- **통과 없이 확정하지 않는다** — 재시도를 소진해도 judge를 통과하지 못하면
+  `assemble_report`는 리포트를 확정하지 않는다. `report.status`는
+  `pending_manual_review`, `report.finalized`는 `False`가 되고 제목·요약·거버넌스·
+  UI·CLI에 모두 미확정 사실이 표시된다. 확정본은 `judge.passed=True`일 때만 나온다.
 
 ## RiskState 데이터 계약 키
 
@@ -106,7 +111,7 @@ START
 | `explanations` | `list` | TBD |
 | `citations` | `list` | TBD |
 | `judge` | `dict` | `route_after_judge`가 `judge.passed`를 읽어 분기③ 판단 |
-| `judge_retries` | `int` | `route_after_judge`가 읽어 분기③ 판단 (MAX=2) |
+| `judge_retries` | `int` | `route_after_judge`가 읽어 분기③ 판단 (상한=config `judge_max_retries`, 기본 3) |
 | `judge_feedback` | `str` | TBD |
 | `report` | `dict` | TBD |
 

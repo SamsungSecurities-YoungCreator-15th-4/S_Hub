@@ -36,7 +36,11 @@ def _passing_state() -> dict:
             ],
         },
         "report": {
+            "status": "confirmed",
+            "finalized": True,
             "governance": {
+                "report_status": "confirmed",
+                "finalized": True,
                 "strict_citation_gate": True,
                 "langsmith_trace_urls": {
                     "input": "https://smith.example/input",
@@ -85,6 +89,16 @@ def test_deployment_validation_passes_complete_contract():
         (
             lambda state: state["judge"].update(checks=[]),
             "Judge required checks",
+        ),
+        (
+            lambda state: state["report"].update(finalized=False, status="pending_manual_review"),
+            "report finalized",
+        ),
+        (
+            lambda state: state["report"]["governance"].update(
+                report_status="pending_manual_review"
+            ),
+            "report finalized",
         ),
         (
             lambda state: state["report"]["governance"][

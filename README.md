@@ -47,7 +47,7 @@ flowchart TB
 
         N5 --> N6
         N6 --> N7
-        N7 -. "미통과 & judge_retries < 2<br/>RAG 재시도" .-> N6
+        N7 -. "미통과 & judge_retries < judge_max_retries(기본 3)<br/>RAG 재시도" .-> N6
     end
 
     subgraph STEP4["4. 리스크 리포트 생성"]
@@ -60,7 +60,7 @@ flowchart TB
 
     N3 -->|"충돌 없음 또는 재추출 1회 소진"| PAUSE
     N4 -->|"승인 상태=locked"| N5
-    N7 -->|"통과 또는 judge_retries ≥ 2<br/>실패 지속 시 수동검토 표시"| N8
+    N7 -->|"통과 또는 judge_retries ≥ judge_max_retries(기본 3)<br/>미통과 시 미확정 리포트로 표시"| N8
 
     AUDIT["전 노드 RiskState 체크포인트<br/>[LangSmith]<br/>입력·충돌·계산 해시<br/>trace URL"]
     N8 -. "전 과정 기록 및 추적" .-> AUDIT
@@ -125,8 +125,9 @@ START
   → approval_gate        ★ HITL: interrupt_before — PB 검토 후 승인(locked), block은 예외 승인 불가
   → var_engine           yfinance 실데이터, Historical VaR·CVaR·신뢰구간·스트레스 3종, 계산 해시
   → rag_cite  ◄────────┐ 코퍼스 21건 category 라우팅, 검증 통과 citation만 저장
-  → judge_eval ────────┘ 분기③ 6축 루브릭+인용 감사, 미통과 시 재작성(최대 3회 시도=재작성 2회), 이후 수동검토
+  → judge_eval ────────┘ 분기③ 6축 루브릭+인용 감사, 미통과 시 재작성(judge_max_retries=3회 시도=재작성 2회), 이후 수동검토
   → assemble_report      수치+출처 한 장 병기, 자동 메타(면책·기준일·출처·계산해시·judge 통과 여부)
+                         judge 미통과 시 확정하지 않고 미확정(pending_manual_review) 리포트로 표시
   → END
 ```
 
@@ -136,7 +137,9 @@ START
   `house_view`는 CVaR 기여 상위 자산군이 있을 때, `tax`는 IPS에 실질 세무 이슈가 있을 때만.
   Chroma metadata filter 적용 후 원문 부분문자열만 인용하고, 인용 역할·라우팅 사유·발행일을 기록한다.
 - `judge_eval`은 잘못된 역할·라우팅을 차단하고, 발행일 누락·6개월 초과 house view는
-  수동검토 경고로 남긴다. 재작성 2회 실패 시 수동검토로 전환한다.
+  수동검토 경고로 남긴다. `judge_max_retries`(기본 3회) 시도를 모두 실패하면 수동검토로
+  전환하고, **리포트를 확정하지 않는다** — `report.status=pending_manual_review`,
+  `report.finalized=False`로 조립해 제목·요약·거버넌스·UI·CLI에 미확정 사실을 표시한다.
 - LangSmith는 HITL 전후 trace와 감사정보(trace_id·입력·충돌·계산 해시·프롬프트 해시·
   모델 버전)를 기록해 judge 탈락 항목 역추적과 프롬프트/모델 변경 시 정답률 비교
   (형상관리)를 지원한다. 기본 설정은 입력·출력을 숨겨 상담정보를 외부 trace에 남기지 않는다.
@@ -233,6 +236,7 @@ pytest에는 위험↑→VaR↑ 방향성 검증(`tests/test_metrics_direction.p
 | `var_lookback_days` | 1250 | 관측 기간(약 5년) — 99% 꼬리 관측치 안정성 확보 |
 | `data_source` | real | yfinance 실데이터 (`dummy`=오프라인) |
 | `strict_citation_gate` | true | 검증 통과 인용 없으면 judge 강제 실패 (제출·시연 기본값) |
+| `judge_max_retries` | 3 | judge 재작성 루프 최대 시도 횟수 — 소진 시 리포트 미확정 |
 
 ## 코퍼스와 로컬 자산
 

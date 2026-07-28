@@ -1,5 +1,23 @@
-"""최종 리포트 조립 — 수치·근거·심사·재현성 정보를 한 덩어리로 구성."""
+"""최종 리포트 조립 — 수치·근거·심사·재현성 정보를 한 덩어리로 구성.
+
+judge를 통과하지 못한 리포트는 확정하지 않는다. 재작성 루프를 소진해도
+통과하지 못하면 리포트는 조립하되 미확정(pending_manual_review) 상태로 남기고,
+제목·요약·거버넌스에 모두 그 사실을 표시한다. 확정은 사람 검토를 거친다.
+"""
+from app.nodes.judge_eval import resolve_max_judge_retries
 from app.state import RiskState
+
+BASE_TITLE = "재현가능·설명가능 리스크 리포트"
+PENDING_TITLE_PREFIX = "[미확정 · 수동검토 대기] "
+STATUS_CONFIRMED = "confirmed"
+STATUS_PENDING_MANUAL_REVIEW = "pending_manual_review"
+PENDING_STATUS_LABEL = "미확정 — judge 미통과로 수동검토 대기"
+CONFIRMED_STATUS_LABEL = "확정 — judge 통과"
+PENDING_NOTICE = (
+    "judge 품질 점검을 통과하지 못해 확정되지 않은 리포트입니다. "
+    "수치·근거는 검토용으로만 사용하고, 사람 검토와 재승인 전에는 "
+    "고객 제공·최종 판단 근거로 사용하지 않습니다."
+)
 
 DISCLAIMER = (
     "본 리포트는 포트폴리오의 리스크 점검 목적으로 자동 생성된 자료이며, "
@@ -282,14 +300,24 @@ def assemble_report(state: RiskState) -> dict:
     judge = state.get("judge") or {}
     warnings = _warnings(state, evidence)
     audit_summary = _audit_summary(state)
+    # 통과 없이 확정하지 않는다 — judge.passed가 True인 경우에만 확정 리포트다.
+    finalized = judge.get("passed") is True
+    status = STATUS_CONFIRMED if finalized else STATUS_PENDING_MANUAL_REVIEW
+    if not finalized:
+        warnings = list(dict.fromkeys([PENDING_NOTICE, *warnings]))
     report = {
-        "title": "재현가능·설명가능 리스크 리포트",
+        "title": BASE_TITLE if finalized else PENDING_TITLE_PREFIX + BASE_TITLE,
+        "status": status,
+        "finalized": finalized,
+        "status_label": CONFIRMED_STATUS_LABEL if finalized else PENDING_STATUS_LABEL,
         "as_of_date": run_config.get("as_of_date"),
         "trace_id": state.get("trace_id"),
         "summary": {
             "portfolio": _portfolio_summary(portfolio),
             "risk": _risk_summary(metrics),
             "judge_passed": judge.get("passed"),
+            "status": status,
+            "finalized": finalized,
             "evidence_coverage": evidence["coverage"],
         },
         "client_summary": {
@@ -306,7 +334,13 @@ def assemble_report(state: RiskState) -> dict:
         "governance": {
             "approval_status": (state.get("approval") or {}).get("status"),
             "judge_retries": state.get("judge_retries") or 0,
+            "judge_max_retries": resolve_max_judge_retries(state),
             "judge_passed": judge.get("passed"),
+            "report_status": status,
+            "finalized": finalized,
+            "confirmation_blocked_reason": (
+                "" if finalized else judge.get("reason") or "judge 품질 점검 미통과"
+            ),
             "strict_citation_gate": run_config.get("strict_citation_gate") is True,
             "manual_review_required": bool(warnings),
             **audit_summary,
