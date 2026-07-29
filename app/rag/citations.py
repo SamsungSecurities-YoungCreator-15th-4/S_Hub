@@ -7,7 +7,12 @@ LLM은 인용 후보를 "만들" 수는 있어도, 이 검증을 "통과시킬" 
 """
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass, field
+from pathlib import PurePosixPath
+
+
+LOCATOR_KEYS = ("article", "clause", "section", "locator")
 
 
 @dataclass
@@ -37,6 +42,125 @@ def normalize_ws(text: str) -> str:
     return " ".join(text.split())
 
 
+def _sha256_text(text: str) -> str:
+    return hashlib.sha256(normalize_ws(text).encode("utf-8")).hexdigest()
+
+
+def _source_name(value: object) -> str:
+    if not isinstance(value, str):
+        return ""
+    return PurePosixPath(value.replace("\\", "/")).name.strip()
+
+
+def _chunk_source(chunk: dict) -> str:
+    source = _source_name(chunk.get("source"))
+    if source:
+        return source
+    chunk_id = chunk.get("chunk_id")
+    if not isinstance(chunk_id, str) or "::" not in chunk_id:
+        return ""
+    return _source_name(chunk_id.rsplit("::", 1)[0])
+
+
+def _locator_metadata(value: object) -> dict[str, str]:
+    if not isinstance(value, dict):
+        return {}
+    return {
+        key: normalize_ws(raw)
+        for key in LOCATOR_KEYS
+        if isinstance((raw := value.get(key)), str) and normalize_ws(raw)
+    }
+
+
+def _citation_provenance(citation: Citation, chunk: dict) -> dict:
+    """검색 원문과 검증된 인용의 결정론적 감사 지문을 만든다."""
+    chunk_text = chunk.get("text")
+    normalized_chunk_text = chunk_text if isinstance(chunk_text, str) else ""
+    return {
+        "source": _chunk_source(chunk),
+        "chunk_id": citation.chunk_id,
+        "claim": citation.claim,
+        "quote_sha256": _sha256_text(citation.quote),
+        "chunk_text_sha256": _sha256_text(normalized_chunk_text),
+        "locator": _locator_metadata(chunk),
+    }
+
+
+def citation_contract_issues(
+    citation: object,
+    *,
+    require_chunk_text: bool,
+) -> list[str]:
+    """Judge 직전 인용 payload의 원문·문서·조항·청크 일치를 검증한다.
+
+    `verify_citations`가 만든 provenance가 있으면 지문까지 다시 대조한다.
+    조항 메타데이터(article/clause/section/locator)는 코퍼스가 제공하는 경우에만
+    검사하되, 제공된 값은 한 글자라도 다르면 실패한다.
+    """
+    if not isinstance(citation, dict):
+        return ["인용 형식 오류"]
+
+    issues: list[str] = []
+    quote = citation.get("quote")
+    source = citation.get("source")
+    chunk_id = citation.get("chunk_id")
+    claim = citation.get("claim")
+    extra = citation.get("extra")
+    extra = extra if isinstance(extra, dict) else {}
+    chunk_text = extra.get("chunk_text")
+
+    if citation.get("verified") is not True:
+        issues.append("verified=true 아님")
+    if not isinstance(quote, str) or not normalize_ws(quote):
+        issues.append("인용문 누락")
+    if not isinstance(source, str) or not _source_name(source):
+        issues.append("문서명 누락")
+    if not isinstance(chunk_id, str) or not chunk_id.strip():
+        issues.append("chunk_id 누락")
+    if not isinstance(claim, str) or not normalize_ws(claim):
+        issues.append("인용 대상 조항/주장 누락")
+
+    if (
+        isinstance(source, str)
+        and isinstance(chunk_id, str)
+        and "::" in chunk_id
+        and _source_name(source) != _source_name(chunk_id.rsplit("::", 1)[0])
+    ):
+        issues.append("문서명과 chunk_id 불일치")
+
+    if not isinstance(chunk_text, str) or not normalize_ws(chunk_text):
+        if require_chunk_text:
+            issues.append("검증 원문 청크 누락")
+    elif isinstance(quote, str) and normalize_ws(quote) not in normalize_ws(chunk_text):
+        issues.append("인용문과 원문 청크 불일치")
+
+    provenance = extra.get("provenance")
+    if isinstance(provenance, dict):
+        if _source_name(source) != _source_name(provenance.get("source")):
+            issues.append("문서명 provenance 불일치")
+        if chunk_id != provenance.get("chunk_id"):
+            issues.append("chunk_id provenance 불일치")
+        if claim != provenance.get("claim"):
+            issues.append("인용 대상 조항/주장 provenance 불일치")
+        if isinstance(quote, str) and _sha256_text(quote) != provenance.get(
+            "quote_sha256"
+        ):
+            issues.append("인용문 provenance 지문 불일치")
+        if isinstance(chunk_text, str) and _sha256_text(chunk_text) != provenance.get(
+            "chunk_text_sha256"
+        ):
+            issues.append("원문 청크 provenance 지문 불일치")
+
+        expected_locator = _locator_metadata(provenance.get("locator"))
+        cited_locator = _locator_metadata(citation) or _locator_metadata(extra)
+        if expected_locator and not cited_locator:
+            issues.append("문서 조항/절/항 표기 누락")
+        elif cited_locator and cited_locator != expected_locator:
+            issues.append("문서 조항/절/항 provenance 불일치")
+
+    return list(dict.fromkeys(issues))
+
+
 def verify_citations(
     citations: list[Citation],
     chunks: list[dict],
@@ -54,10 +178,16 @@ def verify_citations(
 
     검증 규칙(순수 결정론):
     - chunk_id가 chunks에 존재해야 한다.
+    - 표시 문서명이 해당 청크 metadata의 source와 일치해야 한다.
     - 공백 정규화 후, 인용문이 청크 원문의 부분문자열이어야 한다.
+    - 조항 metadata가 함께 주어지면 원문 청크 metadata와 일치해야 한다.
     - 빈 인용문은 탈락.
     """
-    text_by_id = {c["chunk_id"]: c.get("text", "") for c in chunks if "chunk_id" in c}
+    chunk_by_id = {
+        c["chunk_id"]: c
+        for c in chunks
+        if isinstance(c, dict) and isinstance(c.get("chunk_id"), str)
+    }
 
     verified: list[Citation] = []
     rejected: list[dict] = []
@@ -68,13 +198,37 @@ def verify_citations(
 
         if not norm_quote:
             reason = "빈 인용문"
-        elif cit.chunk_id not in text_by_id:
+        elif cit.chunk_id not in chunk_by_id:
             reason = f"존재하지 않는 chunk_id: {cit.chunk_id}"
-        elif norm_quote not in normalize_ws(text_by_id[cit.chunk_id]):
-            reason = "인용문이 청크 원문에 없음(환각 의심)"
+        else:
+            chunk = chunk_by_id[cit.chunk_id]
+            expected_source = _chunk_source(chunk)
+            cited_source = _source_name(cit.source)
+            cited_locator = _locator_metadata(cit.extra)
+            expected_locator = _locator_metadata(chunk)
+
+        if reason is None and expected_source and cited_source != expected_source:
+            reason = (
+                "문서명과 chunk_id 원문 source 불일치"
+                f"({cited_source or '누락'} != {expected_source})"
+            )
+        elif reason is None and expected_locator and not cited_locator:
+            reason = "원문 청크에 존재하는 문서 조항/절/항 표기 누락"
+        elif reason is None and cited_locator and cited_locator != expected_locator:
+            reason = "문서 조항/절/항과 원문 청크 metadata 불일치"
+        elif reason is None:
+            chunk_text = chunk.get("text")
+            normalized_chunk = normalize_ws(chunk_text) if isinstance(chunk_text, str) else ""
+            if norm_quote not in normalized_chunk:
+                reason = "인용문이 청크 원문에 없음(환각 의심)"
 
         if reason is None:
             cit.verified = True
+            raw_extra = cit.extra if isinstance(cit.extra, dict) else {}
+            cit.extra = {
+                **raw_extra,
+                "provenance": _citation_provenance(cit, chunk),
+            }
             verified.append(cit)
         else:
             cit.verified = False

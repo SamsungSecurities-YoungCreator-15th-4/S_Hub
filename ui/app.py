@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.graph import build_graph
+from app.nodes.assemble_report import report_is_exportable
 from app.nodes.load_inputs import (
     ASSET_DEFINITIONS,
     DUMMY_PORTFOLIO,
@@ -1289,7 +1290,8 @@ else:
     warnings = report.get("warnings") or []
     _governance = report["governance"]
     _judge_passed = _governance["judge_passed"]
-    _finalized = report.get("finalized") is True
+    # Hard Stop 계약을 모두 만족한 확정본만 고객 제공 가능 상태로 취급한다.
+    _finalized = report_is_exportable(report)
     if _judge_passed and warnings:
         _judge_value, _judge_tone = "조건부 통과 (수동검토 필요)", "kpi-warn"
     elif _judge_passed:
