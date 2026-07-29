@@ -1,0 +1,286 @@
+"""감사 증거 묶음(evidence bundle)의 계약 SSOT.
+
+번들 파일명·필수 키·"근거 없음" 표기 방식을 이 파일 하나에서 정한다.
+스크립트(`scripts/make_evidence_bundle.py`)와 테스트는 여기 선언된 상수만 쓰고
+문자열을 따로 하드코딩하지 않는다.
+
+두 가지 원칙을 계약으로 못박는다.
+
+1. **없음과 안 채움을 구분한다** — 상태에 값이 없으면 조용히 비우지 않고
+   `unavailable(...)`로 사유와 원본 키 경로를 남긴다.
+2. **키 이름을 새로 만들지 않는다** — hard stop 관련 키는
+   `app/nodes/manual_review_gate.py`가 실제로 기록하는 이름을 그대로 옮긴다.
+   번들이 파생시킨 값(`blocked` 등)은 `derived_from`에 근거 경로를 함께 적는다.
+"""
+from __future__ import annotations
+
+from typing import Any, TypedDict
+
+from app.judge.axes import AXIS_EN_TO_KO
+
+BUNDLE_SCHEMA_VERSION = "1.0"
+
+# --- 파일명 ---------------------------------------------------------------
+MANIFEST_FILENAME = "manifest.json"
+SUMMARY_FILENAME = "summary.md"
+TRACE_FILENAME = "trace.json"
+JUDGE_RATIONALE_FILENAME = "judge_rationale.json"
+CITATION_VERIFICATION_FILENAME = "citation_verification.json"
+HARD_STOP_RECORD_FILENAME = "hard_stop_record.json"
+REPLAY_DIFF_FILENAME = "replay_diff.json"
+LLM_AUDIT_FILENAME = "llm_audit.json"
+BUNDLE_HASH_FILENAME = "bundle_hash.txt"
+
+#: manifest에 sha256이 기록되는 대상. manifest 자신과 bundle_hash는 제외한다
+#: (manifest는 이들을 담는 그릇이고, bundle_hash는 manifest의 해시라서 순환한다).
+HASHED_FILENAMES = (
+    SUMMARY_FILENAME,
+    TRACE_FILENAME,
+    JUDGE_RATIONALE_FILENAME,
+    CITATION_VERIFICATION_FILENAME,
+    HARD_STOP_RECORD_FILENAME,
+    REPLAY_DIFF_FILENAME,
+    LLM_AUDIT_FILENAME,
+)
+
+#: 번들 디렉터리에 반드시 생성되는 전체 파일 목록.
+BUNDLE_FILENAMES = (MANIFEST_FILENAME, *HASHED_FILENAMES, BUNDLE_HASH_FILENAME)
+
+
+# --- "근거 없음" 표기 -------------------------------------------------------
+def unavailable(source_path: str, **extra: Any) -> dict:
+    """상태에 값이 없음을 명시한다. 조용한 누락과 구분하기 위한 유일한 통로."""
+    return {"available": False, "reason": f"{source_path} 없음", **extra}
+
+
+# --- manifest --------------------------------------------------------------
+class GeneratedBy(TypedDict):
+    script: str
+    git_sha: Any  # str | dict — git 조회 실패 시 unavailable(...) 형태
+
+
+class Manifest(TypedDict):
+    schema_version: str
+    run_id: str
+    generated_at: str
+    generated_by: GeneratedBy
+    files: dict[str, str]
+
+
+MANIFEST_REQUIRED_KEYS = (
+    "schema_version",
+    "run_id",
+    "generated_at",
+    "generated_by",
+    "files",
+)
+
+
+# --- trace -----------------------------------------------------------------
+class TraceRecord(TypedDict):
+    trace_id: Any
+    langsmith_trace_url: Any
+    langsmith_trace_urls: Any
+    langsmith_project: Any
+    node_execution_order: Any
+
+
+TRACE_REQUIRED_KEYS = (
+    "trace_id",
+    "langsmith_trace_url",
+    "langsmith_trace_urls",
+    "langsmith_project",
+    "node_execution_order",
+)
+
+
+# --- judge 판정 사유 --------------------------------------------------------
+class JudgeRationale(TypedDict):
+    passed: Any
+    reason: Any
+    score: Any
+    judge_retries: Any
+    judge_max_retries: Any
+    checks: Any
+    rubric: Any
+    manual_review_flags: Any
+    judge_feedback: Any
+
+
+JUDGE_RATIONALE_REQUIRED_KEYS = (
+    "passed",
+    "reason",
+    "score",
+    "judge_retries",
+    "judge_max_retries",
+    "checks",
+    "rubric",
+    "manual_review_flags",
+    "judge_feedback",
+)
+
+
+# --- 인용 검증 --------------------------------------------------------------
+class CitationVerification(TypedDict):
+    citation_count: Any
+    verified_citation_count: Any
+    citations: Any
+    rejected_citations: Any
+
+
+CITATION_VERIFICATION_REQUIRED_KEYS = (
+    "citation_count",
+    "verified_citation_count",
+    "citations",
+    "rejected_citations",
+)
+
+
+# --- hard stop 기록 ---------------------------------------------------------
+#: `app/nodes/manual_review_gate.py`가 `report.governance.manual_review_gate`에
+#: 실제로 기록하는 키. 이름을 바꾸지 않고 그대로 옮긴다.
+MANUAL_REVIEW_GATE_KEYS = (
+    "status",
+    "trigger",
+    "trace_id",
+    "judge_passed",
+    "judge_retries",
+    "judge_max_retries",
+    "failed_axes",
+    "computation_hash",
+    "decision_hash",
+)
+
+#: hard stop 기록이 상태에서 값을 읽어오는 원본 경로. 감사자가 번들의 모든 값을
+#: 원본 state 키로 되짚을 수 있도록 파일에 함께 싣는다.
+HARD_STOP_SOURCE_PATHS = {
+    "report_status": "report.status",
+    "report_finalized": "report.finalized",
+    "confirmation_allowed": "report.governance.confirmation_allowed",
+    "export_allowed": "report.governance.export_allowed",
+    "manual_review_required": "report.governance.manual_review_required",
+    "confirmation_blocked_reason": "report.governance.confirmation_blocked_reason",
+    "manual_review_gate": "report.governance.manual_review_gate",
+}
+
+#: `blocked`은 상태에 존재하는 키가 아니라 번들이 파생시킨 값이다.
+#: 성공 실행에서도 파일을 반드시 만들기 위해 필요하며, 근거 경로를 함께 적는다.
+BLOCKED_DERIVED_FROM = "report.governance.manual_review_gate.status == 'blocked'"
+
+
+class HardStopRecord(TypedDict):
+    blocked: bool
+    blocked_derived_from: str
+    report_status: Any
+    report_finalized: Any
+    confirmation_allowed: Any
+    export_allowed: Any
+    manual_review_required: Any
+    confirmation_blocked_reason: Any
+    manual_review_gate: Any
+    source_paths: dict[str, str]
+
+
+HARD_STOP_RECORD_REQUIRED_KEYS = (
+    "blocked",
+    "blocked_derived_from",
+    "report_status",
+    "report_finalized",
+    "confirmation_allowed",
+    "export_allowed",
+    "manual_review_required",
+    "confirmation_blocked_reason",
+    "manual_review_gate",
+    "source_paths",
+)
+
+
+# --- 재실행 해시 대조 -------------------------------------------------------
+class ReplayDiff(TypedDict):
+    status: str
+    hashes: Any
+    note: str
+
+
+REPLAY_DIFF_REQUIRED_KEYS = ("status", "hashes", "note")
+
+#: 이번 단계는 1회 실행분의 해시만 싣는 자리표시다. 2회 실행 대조는
+#: run_graph.py 배선 PR에서 채운다.
+REPLAY_DIFF_PLACEHOLDER_STATUS = "single_run_only"
+REPLAY_DIFF_PLACEHOLDER_NOTE = (
+    "이번 단계는 1회 실행분 해시만 기록한다. 동일 입력 2회 실행 대조는 "
+    "run_graph.py 자동 호출 배선 PR에서 채운다."
+)
+
+
+# --- LLM 감사 ---------------------------------------------------------------
+class LLMAudit(TypedDict):
+    prompt_hash: Any
+    model_version: Any
+    ips_extraction_meta: Any
+    raw_prompt_and_response: Any
+
+
+LLM_AUDIT_REQUIRED_KEYS = (
+    "prompt_hash",
+    "model_version",
+    "ips_extraction_meta",
+    "raw_prompt_and_response",
+)
+
+#: 프롬프트·응답 원문이 상태에 없는 것은 결함이 아니라 `app/llm/audit.py`의
+#: 의도된 설계("비밀값 없이 기록")다. 번들은 그 사실과 복원 경로를 명시한다.
+RAW_LLM_UNAVAILABLE_REASON = (
+    "state에 LLM 프롬프트·응답 원문 미저장 (감사는 해시 기반)"
+)
+RAW_LLM_RECOVERY_NOTE = "레포의 해당 커밋에서 프롬프트 원문 복원 가능"
+RAW_LLM_OBSERVABILITY = "응답 원문 관측은 LangSmith trace 담당"
+
+
+# --- calibration 요약 (R2 계약 제안) ----------------------------------------
+#: R2(지은·다경)가 아직 미착수라 R4에서 먼저 제안하는 계약이다.
+#: 축 키는 문자열을 새로 만들지 않고 app/judge/axes.py의 영문 키를 그대로 쓴다.
+CALIBRATION_SUMMARY_REQUIRED_KEYS = (
+    "prompt_version",
+    "total",
+    "agreement",
+    "false_negative",
+    "false_positive",
+    "confusion_matrix",
+    "per_axis",
+)
+
+#: prompt_version이 필요한 이유 — 일치율은 프롬프트가 바뀌면 함께 움직인다.
+#: 어떤 프롬프트로 잰 수치인지 붙어 있지 않으면 개선 전후 비교가 성립하지 않고,
+#: LangSmith 감사 로그의 prompt_hash와 대조할 수도 없다.
+CALIBRATION_PROMPT_VERSION_RATIONALE = (
+    "일치율·혼동행렬은 프롬프트 버전에 종속된 수치다. 버전이 없으면 개선 전후 "
+    "비교와 LangSmith prompt_hash 대조가 불가능하다."
+)
+
+
+def calibration_summary_template() -> dict:
+    """R2에 전달할 calibration 요약의 빈 골격. per_axis 키를 SSOT에서 채운다."""
+    return {
+        "prompt_version": None,
+        "total": 0,
+        "agreement": None,
+        "false_negative": None,
+        "false_positive": None,
+        "confusion_matrix": {
+            "true_positive": 0,
+            "true_negative": 0,
+            "false_positive": 0,
+            "false_negative": 0,
+        },
+        "per_axis": {
+            axis_en: {
+                "axis_ko": axis_ko,
+                "total": 0,
+                "agreement": None,
+                "false_negative": None,
+                "false_positive": None,
+            }
+            for axis_en, axis_ko in AXIS_EN_TO_KO.items()
+        },
+    }
