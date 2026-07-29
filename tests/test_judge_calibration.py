@@ -39,14 +39,23 @@ def _human(case_id: str, label: str, fail_axes: list[str] | None = None) -> dict
     }
 
 
-def _judge(case_id: str, passed: bool, fail_axes_en: tuple[str, ...] = ()) -> dict:
+def _judge(
+    case_id: str,
+    passed: bool,
+    fail_axes_en: tuple[str, ...] = (),
+    *,
+    prompt_version: str = "v1",
+) -> dict:
     return {
         "case_id": case_id,
         "passed": passed,
         "reason": f"{case_id} judge reason",
         "rubric": _rubric(fail_axes_en),
-        "prompt_version": "v1",
-        "trace_id": f"trace-{case_id}",
+        "prompt_version": prompt_version,
+        "prompt_hash": f"hash-{prompt_version}",
+        "model_version": "gpt-mock-2026",
+        "trace_id": f"trace-{case_id}-{prompt_version}",
+        "code_sha": "deadbeef",
     }
 
 
@@ -110,13 +119,16 @@ class TestNormalizeHumanLabel:
 
 class TestNormalizeJudgeResult:
     def test_valid(self):
-        case_id, passed, fail_axes, reason, axis_reasons = normalize_judge_result(
-            _judge("c1", False, ("hallucination",))
-        )
-        assert case_id == "c1"
-        assert passed is False
-        assert fail_axes == ("hallucination",)
-        assert axis_reasons["hallucination"] == "mock"
+        result = normalize_judge_result(_judge("c1", False, ("hallucination",)))
+        assert result.case_id == "c1"
+        assert result.passed is False
+        assert result.fail_axes == ("hallucination",)
+        assert result.axis_reasons["hallucination"] == "mock"
+        assert result.prompt_version == "v1"
+        assert result.prompt_hash == "hash-v1"
+        assert result.model_version == "gpt-mock-2026"
+        assert result.trace_id == "trace-c1-v1"
+        assert result.code_sha == "deadbeef"
 
     def test_missing_axis_raises(self):
         raw = _judge("c1", True)
@@ -128,6 +140,24 @@ class TestNormalizeJudgeResult:
         raw = _judge("c1", True)
         raw["passed"] = "true"
         with pytest.raises(CalibrationSchemaError, match="bool"):
+            normalize_judge_result(raw)
+
+    @pytest.mark.parametrize(
+        "field", ["prompt_version", "prompt_hash", "model_version", "trace_id", "code_sha"]
+    )
+    def test_missing_metadata_field_raises(self, field):
+        raw = _judge("c1", True)
+        del raw[field]
+        with pytest.raises(CalibrationSchemaError, match=field):
+            normalize_judge_result(raw)
+
+    @pytest.mark.parametrize(
+        "field", ["prompt_version", "prompt_hash", "model_version", "trace_id", "code_sha"]
+    )
+    def test_blank_metadata_field_raises(self, field):
+        raw = _judge("c1", True)
+        raw[field] = "   "
+        with pytest.raises(CalibrationSchemaError, match=field):
             normalize_judge_result(raw)
 
 
@@ -143,6 +173,8 @@ class TestMergeRecords:
         assert record.human_passed is False
         assert record.judge_passed is False
         assert record.human_fail_axes == ("numeric_consistency",)
+        assert record.trace_id == "trace-case_004-v1"
+        assert record.code_sha == "deadbeef"
 
     def test_mismatched_ids_raise(self):
         with pytest.raises(CalibrationSchemaError, match="일치하지 않습니다"):
@@ -194,15 +226,28 @@ class TestAxisMetrics:
         assert disclaimer.false_positive == 1
         assert disclaimer.false_negative == 0
 
-    def test_untouched_axes_match_fully(self, records_v1):
+    def test_untouched_axes_match_fully_and_have_no_defect_support(self, records_v1):
         axis_metrics = calculate_axis_metrics(records_v1)
         for axis in ("hallucination", "false_precision", "prohibited_expression"):
             assert axis_metrics[axis].match == 4
             assert axis_metrics[axis].match_rate == 1.0
+            assert axis_metrics[axis].human_fail_support == 0
+            assert axis_metrics[axis].defect_recall is None
 
     def test_numeric_consistency_matches_on_true_positive(self, records_v1):
         axis_metrics = calculate_axis_metrics(records_v1)
-        assert axis_metrics["numeric_consistency"].match == 4
+        numeric = axis_metrics["numeric_consistency"]
+        assert numeric.match == 4
+        assert numeric.true_positive == 1
+        assert numeric.human_fail_support == 1
+        assert numeric.defect_recall == 1.0
+
+    def test_source_validity_defect_recall_is_zero_despite_high_match_rate(self, records_v1):
+        """match_rate만 보면 95%처럼 보이는 케이스도 defect_recall로 실제 탐지력을 드러낸다."""
+        source = calculate_axis_metrics(records_v1)["source_validity"]
+        assert source.match_rate == 0.75
+        assert source.human_fail_support == 1
+        assert source.defect_recall == 0.0
 
 
 class TestFindMismatches:
@@ -217,15 +262,20 @@ class TestFindMismatches:
         assert by_id["case_003"].error_type == "false_positive"
         assert by_id["case_003"].axis_mismatch == ("disclaimer",)
 
+    def test_includes_judge_reason_for_mismatched_axes_only(self, records_v1):
+        by_id = {m.case_id: m for m in find_mismatches(records_v1)}
+        assert by_id["case_002"].judge_axis_reasons == {"source_validity": "mock"}
+        assert by_id["case_003"].judge_axis_reasons == {"disclaimer": "mock"}
+
 
 class TestCompareVersions:
     def test_v2_fixes_false_negative(self, records_v1):
         human_v2 = HUMAN_LABELS_V1
         judge_v2 = [
-            _judge("case_001", True),
-            _judge("case_002", False, ("source_validity",)),  # v2에서 결함 탐지
-            _judge("case_003", False, ("disclaimer",)),  # 오탐은 그대로 남음
-            _judge("case_004", False, ("numeric_consistency",)),
+            _judge("case_001", True, prompt_version="v2"),
+            _judge("case_002", False, ("source_validity",), prompt_version="v2"),  # v2에서 탐지
+            _judge("case_003", False, ("disclaimer",), prompt_version="v2"),  # 오탐은 그대로
+            _judge("case_004", False, ("numeric_consistency",), prompt_version="v2"),
         ]
         records_v2 = merge_records(human_v2, judge_v2)
 
@@ -237,7 +287,27 @@ class TestCompareVersions:
         assert comparison.false_negative_delta == -1
         assert comparison.false_positive_delta == 0
         assert comparison.axis_after["source_validity"].false_negative == 0
+        assert comparison.axis_after["source_validity"].defect_recall == 1.0
 
     def test_mismatched_case_ids_raise(self, records_v1):
         with pytest.raises(ValueError, match="동일 case_id"):
             compare_versions(records_v1, records_v1[:-1])
+
+    def test_different_human_label_raises(self, records_v1):
+        """사람 정답이 v1·v2 사이에 달라지면 judge 개선 여부와 무관하게 비교를 거부한다."""
+        human_v2_relabeled = [
+            _human("case_001", "pass"),
+            _human("case_002", "pass"),  # v1에서는 fail이었는데 v2에서 정답이 바뀜
+            _human("case_003", "pass"),
+            _human("case_004", "fail", ["수치 정합"]),
+        ]
+        judge_v2 = [
+            _judge("case_001", True, prompt_version="v2"),
+            _judge("case_002", True, prompt_version="v2"),
+            _judge("case_003", False, ("disclaimer",), prompt_version="v2"),
+            _judge("case_004", False, ("numeric_consistency",), prompt_version="v2"),
+        ]
+        records_v2_relabeled = merge_records(human_v2_relabeled, judge_v2)
+
+        with pytest.raises(ValueError, match="사람 정답이 다릅니다"):
+            compare_versions(records_v1, records_v2_relabeled)

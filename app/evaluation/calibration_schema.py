@@ -9,10 +9,21 @@ CalibrationRecord만 소비한다. 필드명·표기를 바꾸면 양쪽이 함�
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable, Literal, TypedDict
+from typing import Iterable, Literal, NamedTuple, TypedDict
 
 from app.judge.axes import to_en
 from app.judge.rubric import AXIS_NAMES
+
+# judge 실행마다 반드시 남겨야 하는 재현성·감사 메타데이터 필드.
+# 하나라도 비어 있으면 이 결과가 어떤 프롬프트·모델·LangSmith trace·코드
+# 버전에서 나왔는지 나중에 역추적할 수 없다.
+_JUDGE_METADATA_FIELDS = (
+    "prompt_version",
+    "prompt_hash",
+    "model_version",
+    "trace_id",
+    "code_sha",
+)
 
 Label = Literal["pass", "fail"]
 
@@ -60,6 +71,11 @@ class CalibrationRecord:
     judge_fail_axes: tuple[str, ...]
     judge_reason: str
     judge_axis_reasons: dict[str, str]
+    prompt_version: str
+    prompt_hash: str
+    model_version: str
+    trace_id: str
+    code_sha: str
 
 
 class CalibrationSchemaError(ValueError):
@@ -97,10 +113,33 @@ def normalize_human_label(raw: dict) -> tuple[str, bool, tuple[str, ...], str]:
     return case_id, label == "pass", fail_axes, rationale
 
 
-def normalize_judge_result(
-    raw: dict,
-) -> tuple[str, bool, tuple[str, ...], str, dict[str, str]]:
-    """JudgeResult 원본 dict를 (case_id, passed, fail_axes_en, reason, axis_reasons)로 정규화한다."""
+class NormalizedJudgeResult(NamedTuple):
+    """normalize_judge_result()의 반환값. 필드가 10개라 위치 기반 tuple 대신 이름으로 접근한다."""
+
+    case_id: str
+    passed: bool
+    fail_axes: tuple[str, ...]
+    reason: str
+    axis_reasons: dict[str, str]
+    prompt_version: str
+    prompt_hash: str
+    model_version: str
+    trace_id: str
+    code_sha: str
+
+
+def _require_nonempty_str(raw: dict, key: str, *, case_id: str) -> str:
+    value = raw.get(key)
+    if not isinstance(value, str) or not value.strip():
+        raise CalibrationSchemaError(
+            f"{case_id}: {key}는 비어있지 않은 문자열이어야 합니다 "
+            "(재현성·감사 추적에 필요합니다)."
+        )
+    return value
+
+
+def normalize_judge_result(raw: dict) -> NormalizedJudgeResult:
+    """JudgeResult 원본 dict를 검증·정규화해 NormalizedJudgeResult로 반환한다."""
     case_id = raw.get("case_id")
     if not isinstance(case_id, str) or not case_id:
         raise CalibrationSchemaError("judge 결과에 case_id가 없습니다.")
@@ -120,7 +159,22 @@ def normalize_judge_result(
         if not entry["passed"]:
             fail_axes.append(axis)
     reason = str(raw.get("reason") or "")
-    return case_id, passed, tuple(fail_axes), reason, axis_reasons
+    metadata = {
+        field: _require_nonempty_str(raw, field, case_id=case_id)
+        for field in _JUDGE_METADATA_FIELDS
+    }
+    return NormalizedJudgeResult(
+        case_id=case_id,
+        passed=passed,
+        fail_axes=tuple(fail_axes),
+        reason=reason,
+        axis_reasons=axis_reasons,
+        prompt_version=metadata["prompt_version"],
+        prompt_hash=metadata["prompt_hash"],
+        model_version=metadata["model_version"],
+        trace_id=metadata["trace_id"],
+        code_sha=metadata["code_sha"],
+    )
 
 
 def merge_records(
@@ -139,12 +193,12 @@ def merge_records(
             raise CalibrationSchemaError(f"{case_id}: 사람 라벨이 중복됩니다.")
         human_by_id[case_id] = (human_passed, human_fail_axes, rationale)
 
-    judge_by_id: dict[str, tuple[bool, tuple[str, ...], str, dict[str, str]]] = {}
+    judge_by_id: dict[str, NormalizedJudgeResult] = {}
     for raw in judge_results:
-        case_id, judge_passed, judge_fail_axes, reason, axis_reasons = normalize_judge_result(raw)
-        if case_id in judge_by_id:
-            raise CalibrationSchemaError(f"{case_id}: judge 결과가 중복됩니다.")
-        judge_by_id[case_id] = (judge_passed, judge_fail_axes, reason, axis_reasons)
+        judge_result = normalize_judge_result(raw)
+        if judge_result.case_id in judge_by_id:
+            raise CalibrationSchemaError(f"{judge_result.case_id}: judge 결과가 중복됩니다.")
+        judge_by_id[judge_result.case_id] = judge_result
 
     human_ids = set(human_by_id)
     judge_ids = set(judge_by_id)
@@ -158,17 +212,22 @@ def merge_records(
     records = []
     for case_id in sorted(human_ids):
         human_passed, human_fail_axes, rationale = human_by_id[case_id]
-        judge_passed, judge_fail_axes, judge_reason, axis_reasons = judge_by_id[case_id]
+        judge_result = judge_by_id[case_id]
         records.append(
             CalibrationRecord(
                 case_id=case_id,
                 human_passed=human_passed,
                 human_fail_axes=human_fail_axes,
                 human_rationale=rationale,
-                judge_passed=judge_passed,
-                judge_fail_axes=judge_fail_axes,
-                judge_reason=judge_reason,
-                judge_axis_reasons=axis_reasons,
+                judge_passed=judge_result.passed,
+                judge_fail_axes=judge_result.fail_axes,
+                judge_reason=judge_result.reason,
+                judge_axis_reasons=judge_result.axis_reasons,
+                prompt_version=judge_result.prompt_version,
+                prompt_hash=judge_result.prompt_hash,
+                model_version=judge_result.model_version,
+                trace_id=judge_result.trace_id,
+                code_sha=judge_result.code_sha,
             )
         )
     return records
