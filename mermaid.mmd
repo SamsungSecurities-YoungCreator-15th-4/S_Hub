@@ -1,6 +1,6 @@
 %%{init: {"theme": "base", "flowchart": {"htmlLabels": true, "curve": "linear"}}}%%
 %% S.ymphony Mermaid 아키텍처
-%% 실제 LangGraph 노드 8개 · 실행 단계 4개 · 아키텍처 계층 3개 · 조건부 루프 2개 · HITL 1개
+%% 실제 LangGraph 노드 9개 · 실행 단계 4개 · 아키텍처 계층 3개 · 조건부 루프 2개 · HITL 1개
 flowchart TB
 
     %% 실행 흐름과 분리된 아키텍처 계층 범례
@@ -42,31 +42,35 @@ flowchart TB
     subgraph STEP3["3. 정량 리스크 및 스트레스 연산 · RAG 근거 · Judge LLM"]
         direction LR
         N5["⑤ var_engine<br/>yfinance 실데이터·Parquet 캐싱<br/>VaR·CVaR·스트레스 연산<br/>계산 해시 기록"]
-        N6["⑥ rag_cite<br/>방법론 문서 2개+인용 문서 19개 코퍼스 라우팅<br/>검증 통과 citation만 State에 저장"]
-        N7["⑦ judge_eval<br/>6축 Judge LLM 루브릭<br/>판정 사유·재시도 로그 기록"]
+        N6["⑥ rag_cite<br/>코퍼스 category 라우팅<br/>인용문·문서명·조항·청크 원문 검증<br/>검증 통과 citation+provenance 저장"]
+        N7["⑦ judge_eval<br/>6축 Judge LLM 루브릭+정밀 인용 재검증<br/>판정 사유·재시도 로그 기록"]
 
         N5 --> N6
         N6 --> N7
-        N7 -. "미통과 & judge_retries < judge_max_retries(기본 3)<br/>RAG 재시도" .-> N6
+        N7 -. "미통과 & judge_retries < judge_max_retries<br/>RAG 재시도" .-> N6
     end
 
-    %% 4단계: 최종 리스크 리포트 생성
-    subgraph STEP4["4. 리스크 리포트 생성"]
+    %% 4단계: Hard Stop 또는 최종 리스크 리포트 확정
+    subgraph STEP4["4. Hard Stop 또는 리스크 리포트 확정"]
         direction LR
-        N8["⑧ assemble_report<br/>전체 분석 결과를 리포트로 생성"]
+        N8["⑧ manual_review_gate<br/>Judge 재시도 상한 소진 시 Hard Stop<br/>확정·다운로드 차단<br/>실패 축·결정 지문 기록"]
+        N9["⑨ assemble_report<br/>Judge 통과 결과를 확정 리포트로 생성"]
         END((END))
 
         N8 --> END
+        N9 --> END
     end
 
     %% 단계 간 기본 실행 경로
     N3 -->|"충돌 없음 또는 재추출 1회 소진"| PAUSE
     N4 -->|"승인 상태=locked"| N5
-    N7 -->|"통과 또는 judge_retries ≥ judge_max_retries(기본 3)<br/>미통과 시 미확정 리포트로 표시"| N8
+    N7 -->|"미통과 & judge_retries ≥ judge_max_retries"| N8
+    N7 -->|"통과"| N9
 
     %% 그래프 외 공통 감사 요소: 단일 연결로 교차선을 최소화
     AUDIT["전 노드 RiskState 체크포인트<br/>[LangSmith]<br/>입력·충돌·계산 해시<br/>trace URL"]
-    N8 -. "전 과정 기록 및 추적" .-> AUDIT
+    N8 -. "차단 증거 기록" .-> AUDIT
+    N9 -. "전 과정 기록 및 추적" .-> AUDIT
 
     %% 3계층은 실행 순서를 유지한 채 노드 색상으로 구분
     classDef deterministic fill:#EDF4FC,stroke:#3B5CCC,color:#111827,stroke-width:2px;
@@ -77,7 +81,7 @@ flowchart TB
     classDef audit fill:#FFF7E6,stroke:#D97706,color:#7C2D12,stroke-width:1.5px,stroke-dasharray:5 3;
     classDef note fill:#F8FAFC,stroke:#64748B,color:#334155,stroke-width:1.5px,stroke-dasharray:5 3;
 
-    class KEY_DET,N1,N3,N5,N8 deterministic;
+    class KEY_DET,N1,N3,N5,N8,N9 deterministic;
     class KEY_LLM,N2,N6,N7 llmNode;
     class KEY_HITL,PAUSE,N4 hitlNode;
     class START,END terminal;

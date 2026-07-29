@@ -338,6 +338,8 @@ def assemble_report(state: RiskState) -> dict:
             "judge_passed": judge.get("passed"),
             "report_status": status,
             "finalized": finalized,
+            "confirmation_allowed": finalized,
+            "export_allowed": finalized,
             "confirmation_blocked_reason": (
                 "" if finalized else judge.get("reason") or "judge 품질 점검 미통과"
             ),
@@ -361,3 +363,21 @@ def assemble_report(state: RiskState) -> dict:
         "disclaimer": DISCLAIMER,
     }
     return {"report": report}
+
+
+def report_is_exportable(report: object) -> bool:
+    """고객 제공·다운로드 가능 여부의 단일 실패 폐쇄 계약."""
+    if not isinstance(report, dict):
+        return False
+    governance = report.get("governance")
+    governance = governance if isinstance(governance, dict) else {}
+    judge = report.get("judge")
+    judge = judge if isinstance(judge, dict) else {}
+    return (
+        report.get("status") == STATUS_CONFIRMED
+        and report.get("finalized") is True
+        and governance.get("report_status") == STATUS_CONFIRMED
+        and governance.get("confirmation_allowed") is True
+        and governance.get("export_allowed") is True
+        and judge.get("passed") is True
+    )

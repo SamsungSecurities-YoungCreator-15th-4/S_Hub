@@ -13,12 +13,12 @@ from app.judge.rubric import (
     prohibited_manual_flags,
     source_validity,
 )
-from app.nodes.assemble_report import assemble_report
 from app.nodes.judge_eval import (
     DEFAULT_MAX_JUDGE_RETRIES,
     MANUAL_REVIEW_WARNING,
     judge_eval,
 )
+from app.nodes.manual_review_gate import manual_review_gate
 
 AS_OF_DATE = "2026-06-30"
 DISCLAIMER_TEXT = (
@@ -506,7 +506,9 @@ def test_judge_retry_limit_exits_with_manual_review_warning():
         last_out = judge_eval(current_state, llm=failing_llm)
         current_state = {**current_state, **last_out}
         expected = (
-            "assemble_report" if attempt == DEFAULT_MAX_JUDGE_RETRIES else "rag_cite"
+            "manual_review_gate"
+            if attempt == DEFAULT_MAX_JUDGE_RETRIES
+            else "rag_cite"
         )
         assert route_after_judge(current_state) == expected
 
@@ -514,7 +516,8 @@ def test_judge_retry_limit_exits_with_manual_review_warning():
     assert MANUAL_REVIEW_WARNING in last_out["judge"]["manual_review_flags"]
 
     # 재시도를 소진해도 리포트는 확정되지 않는다.
-    report = assemble_report(current_state)["report"]
+    report = manual_review_gate(current_state)["report"]
     assert MANUAL_REVIEW_WARNING in report["warnings"]
     assert report["finalized"] is False
     assert report["status"] == "pending_manual_review"
+    assert report["governance"]["manual_review_gate"]["status"] == "blocked"

@@ -17,6 +17,7 @@ from datetime import date
 from app.judge.rubric import AXIS_NAMES, evaluate_rubric
 from app.llm.audit import with_llm_audit
 from app.observability.langsmith import annotate_current_run
+from app.rag.citations import citation_contract_issues
 from app.rag.contracts import EVIDENCE_ROLES, ROUTING_CONTRACT
 from app.state import RiskState
 
@@ -97,6 +98,28 @@ def _verified_citations(citations: list) -> list[dict]:
 
 def _invalid_citations(citations: list) -> list[dict]:
     return [citation for citation in citations if not _is_verified_citation(citation)]
+
+
+def _citation_content_check(citations: list, *, strict: bool) -> dict:
+    """인용문·문서명·조항/주장·청크 원문이 서로 일치하는지 실패 폐쇄로 검사한다."""
+    failures: list[str] = []
+    for index, citation in enumerate(citations, 1):
+        issues = citation_contract_issues(
+            citation,
+            require_chunk_text=strict,
+        )
+        if issues:
+            failures.append(f"#{index} " + ", ".join(issues))
+    return {
+        "name": "citation_content_contract",
+        "passed": not failures,
+        "required": True,
+        "detail": (
+            f"인용 {len(citations)}건의 인용문·문서명·조항/주장·청크 일치"
+            if not failures
+            else "; ".join(failures)
+        ),
+    }
 
 
 def _rag_routing_record(run_config: dict) -> dict | None:
@@ -257,6 +280,7 @@ def _build_checks(state: RiskState) -> list[dict]:
             "required": strict_citation_gate,
             "detail": f"인용 구조 확인: 검증 통과 인용 {len(verified)}건",
         },
+        _citation_content_check(citations, strict=strict_citation_gate),
         {
             "name": "approval_locked",
             "passed": approval.get("status") == "locked",

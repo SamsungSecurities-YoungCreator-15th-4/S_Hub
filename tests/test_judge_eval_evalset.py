@@ -284,7 +284,7 @@ def test_deterministic_judge_evalset(case_id: str):
         assert result["judge_feedback"] == ""
     elif case_id == "EC-20":
         assert result["judge_retries"] == DEFAULT_MAX_JUDGE_RETRIES
-        assert route_after_judge(result) == "assemble_report"
+        assert route_after_judge(result) == "manual_review_gate"
 
 
 @pytest.fixture(scope="module")

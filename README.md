@@ -50,20 +50,24 @@ flowchart TB
         N7 -. "미통과 & judge_retries < judge_max_retries(기본 3)<br/>RAG 재시도" .-> N6
     end
 
-    subgraph STEP4["4. 리스크 리포트 생성"]
+    subgraph STEP4["4. Hard Stop 또는 리스크 리포트 확정"]
         direction LR
-        N8["⑧ assemble_report<br/>전체 분석 결과를 리포트로 생성"]
+        N8["⑧ manual_review_gate<br/>Judge 재시도 소진 시 확정·다운로드 차단<br/>차단 사유·결정 지문 기록"]
+        N9["⑨ assemble_report<br/>Judge 통과 결과를 확정 리포트로 생성"]
         END((END))
 
         N8 --> END
+        N9 --> END
     end
 
     N3 -->|"충돌 없음 또는 재추출 1회 소진"| PAUSE
     N4 -->|"승인 상태=locked"| N5
-    N7 -->|"통과 또는 judge_retries ≥ judge_max_retries(기본 3)<br/>미통과 시 미확정 리포트로 표시"| N8
+    N7 -->|"미통과 & judge_retries ≥ judge_max_retries"| N8
+    N7 -->|"통과"| N9
 
     AUDIT["전 노드 RiskState 체크포인트<br/>[LangSmith]<br/>입력·충돌·계산 해시<br/>trace URL"]
-    N8 -. "전 과정 기록 및 추적" .-> AUDIT
+    N8 -. "차단 증거 기록" .-> AUDIT
+    N9 -. "전 과정 기록 및 추적" .-> AUDIT
 
     classDef deterministic fill:#EDF4FC,stroke:#3B5CCC,color:#111827,stroke-width:2px;
     classDef llmNode fill:#F6F0FF,stroke:#7440B8,color:#111827,stroke-width:2px;
@@ -73,7 +77,7 @@ flowchart TB
     classDef audit fill:#FFF7E6,stroke:#D97706,color:#7C2D12,stroke-width:1.5px,stroke-dasharray:5 3;
     classDef note fill:#F8FAFC,stroke:#64748B,color:#334155,stroke-width:1.5px,stroke-dasharray:5 3;
 
-    class KEY_DET,N1,N3,N5,N8 deterministic;
+    class KEY_DET,N1,N3,N5,N8,N9 deterministic;
     class KEY_LLM,N2,N6,N7 llmNode;
     class KEY_HITL,PAUSE,N4 hitlNode;
     class START,END terminal;
@@ -113,8 +117,8 @@ S.ymphony는 이 문제를 두 축으로 해결한다.
 
 ## 아키텍처
 
-노드 8개 · 조건부 3개(① 상충 재추출 분기 ② PB 승인 게이트 ③ judge 평가 루프) ·
-HITL 인터럽트 1개. LLM/결정론/HITL 3계층 표식이 포함된 전체 다이어그램은
+노드 9개 · 조건부 분기 2개(① 상충 재추출 ② Judge 재작성/Hard Stop) ·
+PB 승인용 HITL 인터럽트 1개. LLM/결정론/HITL 3계층 표식이 포함된 전체 다이어그램은
 [`mermaid.mmd`](mermaid.mmd) 참조.
 
 ```
@@ -125,10 +129,10 @@ START
   → approval_gate        ★ HITL: interrupt_before — PB 검토 후 승인(locked), block은 예외 승인 불가
   → var_engine           yfinance 실데이터, Historical VaR·CVaR·신뢰구간·스트레스 3종, 계산 해시
   → rag_cite  ◄────────┐ 코퍼스 21건 category 라우팅, 검증 통과 citation만 저장
-  → judge_eval ────────┘ 분기③ 6축 루브릭+인용 감사, 미통과 시 재작성(judge_max_retries=3회 시도=재작성 2회), 이후 수동검토
-  → assemble_report      수치+출처 한 장 병기, 자동 메타(면책·기준일·출처·계산해시·judge 통과 여부)
-                         judge 미통과 시 확정하지 않고 미확정(pending_manual_review) 리포트로 표시
-  → END
+  → judge_eval ────────┘ 분기③ 6축 루브릭+정밀 인용 감사, 미통과 시 SSOT 상한까지 재작성
+      ├─ 통과 → assemble_report → END
+      └─ 상한 소진 실패 → manual_review_gate → END
+                         미확정(pending_manual_review), 확정·다운로드 차단 및 결정 지문 기록
 ```
 
 - 컴파일: `g.compile(checkpointer=MemorySaver(), interrupt_before=["approval_gate"])`
@@ -136,10 +140,11 @@ START
 - `rag_cite`는 상태 기반으로 corpus category를 라우팅한다: `methodology`·`macro`는 항상,
   `house_view`는 CVaR 기여 상위 자산군이 있을 때, `tax`는 IPS에 실질 세무 이슈가 있을 때만.
   Chroma metadata filter 적용 후 원문 부분문자열만 인용하고, 인용 역할·라우팅 사유·발행일을 기록한다.
-- `judge_eval`은 잘못된 역할·라우팅을 차단하고, 발행일 누락·6개월 초과 house view는
-  수동검토 경고로 남긴다. `judge_max_retries`(기본 3회) 시도를 모두 실패하면 수동검토로
-  전환하고, **리포트를 확정하지 않는다** — `report.status=pending_manual_review`,
-  `report.finalized=False`로 조립해 제목·요약·거버넌스·UI·CLI에 미확정 사실을 표시한다.
+- `judge_eval`은 인용문·문서명·조항/주장·청크 원문과 역할·라우팅을 필수 검사하고,
+  발행일 누락·6개월 초과 house view는 수동검토 경고로 남긴다. `config/config.yaml`의
+  `judge_max_retries` 시도를 모두 실패하면 `manual_review_gate`에서
+  **확정·다운로드를 차단한다**. 상세 계약은
+  [`docs/hard_stop_contract.md`](docs/hard_stop_contract.md)를 따른다.
 - LangSmith는 HITL 전후 trace와 감사정보(trace_id·입력·충돌·계산 해시·프롬프트 해시·
   모델 버전)를 기록해 judge 탈락 항목 역추적과 프롬프트/모델 변경 시 정답률 비교
   (형상관리)를 지원한다. 기본 설정은 입력·출력을 숨겨 상담정보를 외부 trace에 남기지 않는다.
@@ -165,8 +170,8 @@ START
 Orchestration/
 ├── app/
 │   ├── state.py       # RiskState/IPSProfile — 팀 데이터 계약(SSOT), 임의 수정 금지
-│   ├── graph.py       # StateGraph 조립 (8노드 + 조건부 분기 2개 + HITL)
-│   ├── nodes/         # 그래프 노드 8개 (순수 함수, 바꾼 키만 반환)
+│   ├── graph.py       # StateGraph 조립 (9노드 + 조건부 분기 2개 + HITL)
+│   ├── nodes/         # 그래프 노드 9개 (순수 함수, 바꾼 키만 반환)
 │   ├── engine/        # 결정론 계층 — langchain/llm import 금지
 │   ├── llm/           # AzureChatOpenAI 팩토리, IPS 추출 체인, 감사
 │   ├── rag/           # ingest·retriever·citations·배포 검증
@@ -236,7 +241,7 @@ pytest에는 위험↑→VaR↑ 방향성 검증(`tests/test_metrics_direction.p
 | `var_lookback_days` | 1250 | 관측 기간(약 5년) — 99% 꼬리 관측치 안정성 확보 |
 | `data_source` | real | yfinance 실데이터 (`dummy`=오프라인) |
 | `strict_citation_gate` | true | 검증 통과 인용 없으면 judge 강제 실패 (제출·시연 기본값) |
-| `judge_max_retries` | 3 | judge 재작성 루프 최대 시도 횟수 — 소진 시 리포트 미확정 |
+| `judge_max_retries` | 3 | Judge 최대 시도 횟수 SSOT — 소진 실패 시 Hard Stop |
 
 ## 코퍼스와 로컬 자산
 
@@ -252,15 +257,15 @@ pytest에는 위험↑→VaR↑ 방향성 검증(`tests/test_metrics_direction.p
 
 | 요구사항 | 구현 |
 | --- | --- |
-| R0-1 StateGraph 8노드+조건부 3개 | `app/graph.py` — 상충 분기·승인 게이트(draft→reviewed→locked)·judge 루프(최대 3회) |
+| R0-1 StateGraph 9노드+조건부 분기 | `app/graph.py` — 상충 분기·승인 게이트·Judge 재작성·`manual_review_gate` Hard Stop |
 | R0-2 Mermaid 3계층 표식 | [`mermaid.mmd`](mermaid.mmd) — LLM/결정론/HITL 색상 분리 |
 | R0-3 LangSmith 풀스택 | trace·judge 역추적·평가셋 20건+정확도·감사 로그(trace_id+프롬프트 해시+모델 버전)·형상관리 |
 | R0-4 LangChain 표준 부품 | RAG retriever(langchain-chroma)·Structured Output, 원시 API 직접 호출 금지 |
 | R0-5 도구 적정 사용 정당화 | 위 "도구 적정 사용 정당화" 절 |
 | R1 정량 리스크 엔진 | Historical VaR 99% 1일/10일·CVaR·스트레스 3종, KRW 기준, 방향성 pytest |
-| R2 RAG 인용 | 코퍼스 21건(≥10), retriever 검색+출처 인용, 수치 옆 근거 병기, `strict_citation_gate` 환각 가드 |
-| R3 LLM-as-Judge | judge를 LangGraph 노드로, 6축 루브릭 자동평가, 결함 사유 로그, 평가 루프 |
-| R4 결합 리포트 | `assemble_report` — 수치+출처 한 장, 자동 메타(면책·기준일·출처·계산해시·judge 통과) |
+| R2 RAG 인용 | 코퍼스 21건, 원문·문서명·조항/주장·청크 정밀 대조, provenance 지문 |
+| R3 LLM-as-Judge | 6축 루브릭 자동평가, 결함 사유 로그, SSOT 재시도와 Hard Stop |
+| R4 결합 리포트 | Judge 통과본만 확정·내보내기 허용, 실패본은 차단 증거 기록 |
 | R5 재현성 | seed 고정+parquet 캐시, `computation_hash`(SHA256), LangSmith 감사 로그 병기 |
 | R6 3계층 분리 | `app/engine/` LLM import 금지(코드 강제) + mermaid 시각 분리 |
 | R7 제출·시연 | Streamlit 시연 — 재현성·승인 게이트·기준일·출처 화면 노출 |
@@ -271,6 +276,7 @@ pytest에는 위험↑→VaR↑ 방향성 검증(`tests/test_metrics_direction.p
 | --- | --- |
 | [`docs/ips_conflict_policy.md`](docs/ips_conflict_policy.md) | IPS 충돌·예외 승인 기준, 공식 근거, `draft → reviewed → locked` 계약 |
 | [`docs/ips_extraction_evaluation.md`](docs/ips_extraction_evaluation.md) | GPT-4o IPS 추출 20사례×3회 실제 평가 결과 |
+| [`docs/hard_stop_contract.md`](docs/hard_stop_contract.md) | Judge 재시도 SSOT·정밀 인용 검증·Hard Stop·R2/R4 상태 계약 |
 | [`docs/rag_index_deployment.md`](docs/rag_index_deployment.md) | Chroma 아티팩트 생성·업로드·Secrets 설정 |
 | [`docs/streamlit_deployment.md`](docs/streamlit_deployment.md) | Community Cloud 저장소·Python·Secrets·운영 확인 절차 |
 | [`AGENTS.md`](AGENTS.md) | AI 코딩 에이전트 공용 컨텍스트·불변 규칙 |
