@@ -10,6 +10,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.nodes.judge_eval import judge_eval
+from app.nodes.load_inputs import load_inputs
 from app.nodes.rag_cite import (
     _build_query,
     _evidence_rows,
@@ -25,6 +26,7 @@ from app.rag.ingest import CHUNK_SIZE
 from app.rag.retriever import retrieve_chunks
 
 REAL_SENTENCE = "스트레스 테스트는 역사적 VaR가 포착하지 못하는 꼬리 위험을 보완한다."
+JUDGE_MAX_RETRIES = load_inputs({})["run_config"]["judge_max_retries"]
 
 
 class _FakeDoc:
@@ -217,6 +219,7 @@ def test_rag_explanations_pass_judge_e2e_with_fake_llms():
         "run_config": {
             "as_of_date": "2026-07-03",
             "strict_citation_gate": True,
+            "judge_max_retries": JUDGE_MAX_RETRIES,
         },
         "approval": {"status": "locked"},
         "metrics": {
@@ -238,7 +241,11 @@ def test_rag_explanations_pass_judge_e2e_with_fake_llms():
 
 def test_judge_rejects_tampered_rag_routing_role():
     state = {
-        "run_config": {"as_of_date": "2026-07-03", "strict_citation_gate": True},
+        "run_config": {
+            "as_of_date": "2026-07-03",
+            "strict_citation_gate": True,
+            "judge_max_retries": JUDGE_MAX_RETRIES,
+        },
         "approval": {"status": "locked"},
         "metrics": {
             "confidence": 0.99,

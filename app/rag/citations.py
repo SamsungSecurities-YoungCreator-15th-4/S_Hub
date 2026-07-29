@@ -153,7 +153,9 @@ def citation_contract_issues(
 
         expected_locator = _locator_metadata(provenance.get("locator"))
         cited_locator = _locator_metadata(citation) or _locator_metadata(extra)
-        if cited_locator and cited_locator != expected_locator:
+        if expected_locator and not cited_locator:
+            issues.append("문서 조항/절/항 표기 누락")
+        elif cited_locator and cited_locator != expected_locator:
             issues.append("문서 조항/절/항 provenance 불일치")
 
     return list(dict.fromkeys(issues))
@@ -210,6 +212,8 @@ def verify_citations(
                 "문서명과 chunk_id 원문 source 불일치"
                 f"({cited_source or '누락'} != {expected_source})"
             )
+        elif reason is None and expected_locator and not cited_locator:
+            reason = "원문 청크에 존재하는 문서 조항/절/항 표기 누락"
         elif reason is None and cited_locator and cited_locator != expected_locator:
             reason = "문서 조항/절/항과 원문 청크 metadata 불일치"
         elif reason is None:

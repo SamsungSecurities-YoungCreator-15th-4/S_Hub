@@ -47,7 +47,7 @@ flowchart TB
 
         N5 --> N6
         N6 --> N7
-        N7 -. "미통과 & judge_retries < judge_max_retries(기본 3)<br/>RAG 재시도" .-> N6
+        N7 -. "미통과 & judge_retries < judge_max_retries(config SSOT)<br/>RAG 재시도" .-> N6
     end
 
     subgraph STEP4["4. Hard Stop 또는 리스크 리포트 확정"]
@@ -241,7 +241,7 @@ pytest에는 위험↑→VaR↑ 방향성 검증(`tests/test_metrics_direction.p
 | `var_lookback_days` | 1250 | 관측 기간(약 5년) — 99% 꼬리 관측치 안정성 확보 |
 | `data_source` | real | yfinance 실데이터 (`dummy`=오프라인) |
 | `strict_citation_gate` | true | 검증 통과 인용 없으면 judge 강제 실패 (제출·시연 기본값) |
-| `judge_max_retries` | 3 | Judge 최대 시도 횟수 SSOT — 소진 실패 시 Hard Stop |
+| `judge_max_retries` | `config.yaml` 참조 | Judge 최대 시도 횟수 유일 원천 — 소진 실패 시 Hard Stop |
 
 ## 코퍼스와 로컬 자산
 

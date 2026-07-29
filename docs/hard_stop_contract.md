@@ -12,7 +12,7 @@ Judge 필수 검사를 통과하지 못한 리포트가 확정본 또는 다운�
 - 해석: 최초 Judge 평가를 포함한 최대 **시도 횟수**
 - 코드 접근점: `app.nodes.judge_eval.resolve_max_judge_retries`
 - 환경변수나 그래프 상수로 별도 상한을 만들지 않는다.
-- 설정이 불리언·0 이하·정수가 아니면 코드의 보수적 기본값을 사용한다.
+- 누락·불리언·0 이하·비정수 값은 코드 기본값으로 대체하지 않고 즉시 실패한다.
 
 ## 3. 그래프 분기
 
@@ -55,9 +55,10 @@ R2 담당자와 아래 필드를 합의한다. 철자와 타입을 바꾸면 그
 1. `chunk_id`가 이번 검색 결과에 실제로 존재한다.
 2. 표시한 문서명이 청크 metadata의 `source`와 일치한다.
 3. 공백 정규화한 인용문이 청크 원문의 실제 부분문자열이다.
-4. `article`, `clause`, `section`, `locator` metadata가 제공된 문서는 표시
-   조항·절·항과 청크 metadata가 일치한다.
-5. 통과 결과에는 인용문·문서·청크·조항/주장의 SHA-256 provenance를 남긴다.
+4. `article`, `clause`, `section`, `locator` metadata가 제공된 문서는 조항
+   표기를 생략할 수 없고, 표시한 조항·절·항이 청크 metadata와 일치해야 한다.
+5. provenance에 문서명·청크·조항/주장을 고정하고, 인용문과 청크 원문은
+   SHA-256 지문으로 남긴다.
 
 ### Judge 직전 재검증
 
@@ -89,15 +90,30 @@ provenance 지문 대조에서 실패한다.
 UI와 향후 다운로드 기능은 `report_is_exportable(report)`가 `true`일 때만 고객 제공
 동작을 허용한다. 단순히 `report.finalized=true` 한 필드만 보고 허용하지 않는다.
 
-## 7. 검증 테스트
+## 7. 규칙-테스트 1:1 대응
 
-| 구분 | 테스트 |
+| R3 규칙 | 대응 테스트 |
 |---|---|
-| 단위 | 실제 문장이더라도 문서명·조항이 틀리면 인용 거부 |
-| 단위 | 검색 후 인용문·문서명·조항/주장 변조 시 provenance 불일치 탐지 |
-| 속성 | 모든 유효 상한에서 `상한 미만=재작성`, `상한 이상=manual_review_gate` |
-| 속성 | 어떤 선행 finalized 값이 와도 gate 출력은 미확정·내보내기 불가 |
-| E2E | StateGraph에서 상한 소진 실패가 `judge_eval → manual_review_gate → END`로 종료 |
+| 규칙 ① 상한 숫자 SSOT | `test_rule_1_retry_limit_requires_config_ssot` |
+| 규칙 ② 상한 소진 실패는 사람 검토 대기 | `test_graph_e2e_exhausted_judge_stops_at_manual_review_gate` |
+| 규칙 ③ 문장뿐 아니라 출처 표기도 일치 | `test_rule_3_starter_kit_source_marking_mismatch_is_rejected` |
+| 조항 표기 누락·불일치 차단 | `test_verify_citations_rejects_real_quote_with_wrong_source_and_article` |
+| 속성 ① 모든 유효 상한의 경계 | `test_property_retry_limit_routes_every_exhausted_failure_to_gate` |
+| 속성 ② 어떤 선행 상태에서도 Hard Stop | `test_property_manual_review_gate_is_always_fail_closed` |
+| 속성 ③ 인용 identity 변조 전부 차단 | `test_property_citation_identity_tampering_never_passes` |
+
+## 8. R1 사례집 20건 의존성
+
+R1 사례집은 `case_001`~`case_020`의 사람 라벨 20건(정상 10·결함 10)이며,
+R2가 동일한 사례집으로 Judge 개선 전·후를 평가해야 한다. 기존
+`tests/test_judge_eval_evalset.py`의 `EC-01`~`EC-20`은 7월 시스템 회귀용
+코드 생성 평가셋으로, R1 사례집을 대신하지 않는다.
+
+현재 저장소에는 스타터킷 견본 3건만 있고 R1 실제 20건은 아직 없다. 따라서 R3는
+제공된 FAIL 견본을 직접 사용하는 출처 회귀 테스트까지 수행하며, 실제 20건 기반
+Judge 테스트·일치율·혼동행렬은 R1 사례집 병합 후 R2 파이프라인에서 수행한다.
+R3 Hard Stop 테스트는 그 결과의 `judge.passed`, `judge.checks`,
+`judge_feedback`, `judge_retries` 계약을 소비한다.
 
 실행:
 

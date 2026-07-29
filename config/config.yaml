@@ -16,6 +16,7 @@ var_lookback_days: 1250
 data_source: real
 # 제출·시연에서는 검증 통과 인용이 없으면 judge를 반드시 실패시킨다.
 strict_citation_gate: true
-# judge 재작성 루프(분기 ③)의 최대 시도 횟수 SSOT. 소진해도 통과하지 못하면
+# judge 재작성 루프(분기 ③)의 최대 시도 횟수 유일 원천(SSOT).
+# 코드·문서·발표에는 이 숫자를 복제하지 않고 이 키를 참조한다. 소진 실패 시
 # manual_review_gate에서 확정·다운로드를 차단하고 사람 검토로 넘긴다.
 judge_max_retries: 3

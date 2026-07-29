@@ -22,21 +22,23 @@ from app.rag.contracts import EVIDENCE_ROLES, ROUTING_CONTRACT
 from app.state import RiskState
 
 FORCE_FAIL_ENV = "RISK_FORCE_JUDGE_FAIL"
-DEFAULT_MAX_JUDGE_RETRIES = 3
 MANUAL_REVIEW_WARNING = "검증 미통과 — 수동검토 필요"
 
 
 def resolve_max_judge_retries(state: RiskState) -> int:
-    """config.yaml의 judge_max_retries를 읽고, 값이 유효하지 않으면 기본값을 쓴다.
+    """run_config에 적재된 config.yaml의 judge_max_retries를 검증해 반환한다.
 
-    같은 config면 같은 상한이 나오도록 판정은 순수 함수로 유지한다.
+    상한 숫자의 유일한 원천은 config/config.yaml이다. 누락·오염된 값을 임의의
+    코드 기본값으로 대체하면 문서와 실행 규칙이 갈라질 수 있으므로 즉시 실패한다.
     """
     run_config = state.get("run_config") or {}
     if not isinstance(run_config, dict):
-        return DEFAULT_MAX_JUDGE_RETRIES
+        raise ValueError("run_config는 dict여야 합니다.")
     value = run_config.get("judge_max_retries")
     if isinstance(value, bool) or not isinstance(value, int) or value < 1:
-        return DEFAULT_MAX_JUDGE_RETRIES
+        raise ValueError(
+            "config/config.yaml의 judge_max_retries는 1 이상의 정수여야 합니다."
+        )
     return value
 
 

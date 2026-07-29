@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+import re
 from copy import deepcopy
+from pathlib import Path
 
 import pytest
 from langgraph.graph import END, START, StateGraph
 
 from app.graph import route_after_judge
 from app.nodes.assemble_report import report_is_exportable
+from app.nodes.judge_eval import resolve_max_judge_retries
+from app.nodes.load_inputs import load_inputs
 from app.nodes.manual_review_gate import manual_review_gate
 from app.rag.citations import (
     Citation,
@@ -17,8 +21,17 @@ from app.rag.citations import (
 )
 from app.state import RiskState
 
+ROOT = Path(__file__).resolve().parents[1]
+JUDGE_MAX_RETRIES = load_inputs({})["run_config"]["judge_max_retries"]
 
-def _failed_state(*, retries: int = 3, maximum: int = 3) -> dict:
+
+def _failed_state(
+    *,
+    retries: int | None = None,
+    maximum: int | None = None,
+) -> dict:
+    maximum = JUDGE_MAX_RETRIES if maximum is None else maximum
+    retries = maximum if retries is None else retries
     return {
         "run_config": {"judge_max_retries": maximum, "strict_citation_gate": True},
         "trace_id": "run-hard-stop",
@@ -62,15 +75,25 @@ def test_verify_citations_rejects_real_quote_with_wrong_source_and_article():
         chunk_id=chunk["chunk_id"],
         extra={"article": "제17조 제2항"},
     )
+    missing_article = Citation(
+        claim="설명의무",
+        quote=quote,
+        source=chunk["source"],
+        chunk_id=chunk["chunk_id"],
+    )
 
-    verified, rejected = verify_citations([wrong_source, wrong_article], [chunk])
+    verified, rejected = verify_citations(
+        [wrong_source, wrong_article, missing_article],
+        [chunk],
+    )
 
     assert verified == []
     assert "문서명" in rejected[0]["reason"]
     assert "조항" in rejected[1]["reason"]
+    assert "표기 누락" in rejected[2]["reason"]
 
 
-def test_verified_citation_provenance_detects_post_verification_tampering():
+def test_property_citation_identity_tampering_never_passes():
     quote = "스트레스 결과는 시나리오 가정과 함께 제시한다."
     chunk = {
         "chunk_id": "internal-rr.pdf::0007",
@@ -113,7 +136,7 @@ def test_verified_citation_provenance_detects_post_verification_tampering():
 
 
 @pytest.mark.parametrize("maximum", [1, 2, 3, 5, 20])
-def test_retry_limit_ssot_property_routes_every_exhausted_failure_to_gate(maximum):
+def test_property_retry_limit_routes_every_exhausted_failure_to_gate(maximum):
     before = _failed_state(retries=maximum - 1, maximum=maximum)
     exhausted = _failed_state(retries=maximum, maximum=maximum)
     beyond = _failed_state(retries=maximum + 7, maximum=maximum)
@@ -131,7 +154,10 @@ def test_retry_limit_ssot_property_routes_every_exhausted_failure_to_gate(maximu
         (True, {"finalized": True, "status": "confirmed"}),
     ],
 )
-def test_manual_review_gate_fail_closed_property(judge_passed, incoming_report):
+def test_property_manual_review_gate_is_always_fail_closed(
+    judge_passed,
+    incoming_report,
+):
     state = _failed_state()
     state["judge"]["passed"] = judge_passed
     state["report"] = incoming_report
@@ -146,6 +172,61 @@ def test_manual_review_gate_fail_closed_property(judge_passed, incoming_report):
     assert first["governance"]["export_allowed"] is False
     assert first["governance"]["manual_review_gate"]["decision_hash"]
     assert report_is_exportable(first) is False
+
+
+def test_rule_1_retry_limit_requires_config_ssot():
+    configured = load_inputs({})
+    maximum = configured["run_config"]["judge_max_retries"]
+
+    assert resolve_max_judge_retries(configured) == maximum
+    for invalid in (None, True, 0, -1, "3"):
+        state = {"run_config": {"judge_max_retries": invalid}}
+        with pytest.raises(ValueError, match="judge_max_retries"):
+            resolve_max_judge_retries(state)
+
+
+def test_rule_3_starter_kit_source_marking_mismatch_is_rejected():
+    """강사 제공 FAIL 견본의 실제 인용 블록을 사용해 출처 표기 오류를 회귀 검증한다."""
+    sample = (
+        ROOT / "starter-kit" / "sample-case-02-fail-citation.md"
+    ).read_text(encoding="utf-8")
+    match = re.search(
+        r'> "([^"]+)"\n> — 출처: (.+?), chunk_id: ([^\s]+)',
+        sample,
+    )
+    assert match is not None
+    quote, wrong_source, wrong_chunk_id = match.groups()
+    correct_source = "「금융소비자 보호에 관한 법률」 제19조(설명의무) 제1항"
+    correct_chunk_id = "kcfp-art19-001"
+    correct_chunk = {
+        "chunk_id": correct_chunk_id,
+        "source": correct_source,
+        "article": "제19조 제1항",
+        "text": quote,
+    }
+    as_written = Citation(
+        claim="설명의무",
+        quote=quote,
+        source=wrong_source,
+        chunk_id=wrong_chunk_id,
+        extra={"article": "제17조 제2항"},
+    )
+    wrong_label_on_correct_chunk = Citation(
+        claim="설명의무",
+        quote=quote,
+        source=wrong_source,
+        chunk_id=correct_chunk_id,
+        extra={"article": "제17조 제2항"},
+    )
+
+    verified, rejected = verify_citations(
+        [as_written, wrong_label_on_correct_chunk],
+        [correct_chunk],
+    )
+
+    assert verified == []
+    assert "존재하지 않는 chunk_id" in rejected[0]["reason"]
+    assert "문서명" in rejected[1]["reason"]
 
 
 def test_graph_e2e_exhausted_judge_stops_at_manual_review_gate():

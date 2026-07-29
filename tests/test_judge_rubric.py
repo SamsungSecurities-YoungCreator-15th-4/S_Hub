@@ -14,13 +14,14 @@ from app.judge.rubric import (
     source_validity,
 )
 from app.nodes.judge_eval import (
-    DEFAULT_MAX_JUDGE_RETRIES,
     MANUAL_REVIEW_WARNING,
     judge_eval,
 )
+from app.nodes.load_inputs import load_inputs
 from app.nodes.manual_review_gate import manual_review_gate
 
 AS_OF_DATE = "2026-06-30"
+JUDGE_MAX_RETRIES = load_inputs({})["run_config"]["judge_max_retries"]
 DISCLAIMER_TEXT = (
     f"기준일 {AS_OF_DATE}의 과거 데이터 기반 추정치이며 투자 권유가 아니고, "
     "원금 또는 수익을 보장하지 않습니다. 실제 결과와 다를 수 있습니다."
@@ -70,7 +71,11 @@ def _explanations(text: str) -> list[dict]:
 
 def _normal_state() -> dict:
     return {
-        "run_config": {"as_of_date": AS_OF_DATE, "strict_citation_gate": True},
+        "run_config": {
+            "as_of_date": AS_OF_DATE,
+            "strict_citation_gate": True,
+            "judge_max_retries": JUDGE_MAX_RETRIES,
+        },
         "approval": {"status": "locked"},
         "metrics": METRICS,
         "explanations": _explanations(DISCLAIMER_TEXT),
@@ -502,17 +507,17 @@ def test_judge_retry_limit_exits_with_manual_review_warning():
 
     current_state = state
     last_out = {}
-    for attempt in range(1, DEFAULT_MAX_JUDGE_RETRIES + 1):
+    for attempt in range(1, JUDGE_MAX_RETRIES + 1):
         last_out = judge_eval(current_state, llm=failing_llm)
         current_state = {**current_state, **last_out}
         expected = (
             "manual_review_gate"
-            if attempt == DEFAULT_MAX_JUDGE_RETRIES
+            if attempt == JUDGE_MAX_RETRIES
             else "rag_cite"
         )
         assert route_after_judge(current_state) == expected
 
-    assert current_state["judge_retries"] == DEFAULT_MAX_JUDGE_RETRIES
+    assert current_state["judge_retries"] == JUDGE_MAX_RETRIES
     assert MANUAL_REVIEW_WARNING in last_out["judge"]["manual_review_flags"]
 
     # 재시도를 소진해도 리포트는 확정되지 않는다.
