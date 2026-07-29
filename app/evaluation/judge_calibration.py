@@ -189,18 +189,20 @@ class VersionComparison:
     axis_after: dict[str, AxisMetrics]
 
 
-def _assert_matching_human_labels(
+def _assert_same_evaluation_target(
     before_records: list[CalibrationRecord],
     after_records: list[CalibrationRecord],
 ) -> None:
-    """v1·v2가 같은 정답지로 채점됐는지 확인한다.
+    """v1·v2가 같은 정답지·같은 사례 본문으로 채점됐는지 확인한다.
 
     사람 라벨이 v1·v2 사이에 달라지면, judge가 전혀 개선되지 않아도 라벨이
     바뀐 것만으로 match_rate가 오른 것처럼 계산돼 비교 자체가 무효가 된다.
+    사례 본문(case_content_sha256)이 달라지는 것도 같은 문제다 — judge
+    프롬프트가 아니라 "시험 문제 자체"가 바뀐 것일 수 있다.
     """
     before_by_id = {record.case_id: record for record in before_records}
     after_by_id = {record.case_id: record for record in after_records}
-    mismatched = sorted(
+    label_mismatched = sorted(
         case_id
         for case_id, before_record in before_by_id.items()
         if (
@@ -208,10 +210,20 @@ def _assert_matching_human_labels(
             or before_record.human_fail_axes != after_by_id[case_id].human_fail_axes
         )
     )
-    if mismatched:
+    if label_mismatched:
         raise ValueError(
             "v1·v2의 사람 정답이 다릅니다. 같은 case_id는 human_passed·"
-            f"human_fail_axes가 같아야 비교할 수 있습니다: {mismatched}"
+            f"human_fail_axes가 같아야 비교할 수 있습니다: {label_mismatched}"
+        )
+    content_mismatched = sorted(
+        case_id
+        for case_id, before_record in before_by_id.items()
+        if before_record.case_content_sha256 != after_by_id[case_id].case_content_sha256
+    )
+    if content_mismatched:
+        raise ValueError(
+            "v1·v2의 사례 본문(case_content_sha256)이 다릅니다. 같은 리포트를 "
+            f"채점했는지 확인하세요: {content_mismatched}"
         )
 
 
@@ -228,7 +240,7 @@ def compare_versions(
             f"v1에만 있음: {sorted(before_ids - after_ids)}, "
             f"v2에만 있음: {sorted(after_ids - before_ids)}"
         )
-    _assert_matching_human_labels(before_records, after_records)
+    _assert_same_evaluation_target(before_records, after_records)
     before = calculate_overall_metrics(before_records)
     after = calculate_overall_metrics(after_records)
     return VersionComparison(
