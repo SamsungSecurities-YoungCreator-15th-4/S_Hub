@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.evaluation.calibration_schema import CalibrationRecord
+from app.evaluation.calibration_schema import CalibrationRecord, validate_official_case_set
 from app.judge.axes import to_ko
 from app.judge.rubric import AXIS_NAMES
 
@@ -141,6 +141,8 @@ class Mismatch:
     judge_reason: str
     human_rationale: str
     judge_axis_reasons: dict[str, str]  # axis_mismatch 축만. 오판 원인 분석용
+    judge_failed_required_checks: tuple[str, ...]  # 6축 밖 시스템 검사 실패
+    judge_failed_check_reasons: dict[str, str]  # 위 검사들의 detail
 
 
 def find_mismatches(records: list[CalibrationRecord]) -> list[Mismatch]:
@@ -161,6 +163,11 @@ def find_mismatches(records: list[CalibrationRecord]) -> list[Mismatch]:
             error_type = "false_positive"
         else:
             error_type = "axis_mismatch_only"
+        failed_check_reasons = {
+            check["name"]: check["detail"]
+            for check in record.judge_checks
+            if check["name"] in record.judge_failed_required_checks
+        }
         mismatches.append(
             Mismatch(
                 case_id=record.case_id,
@@ -173,6 +180,8 @@ def find_mismatches(records: list[CalibrationRecord]) -> list[Mismatch]:
                 judge_axis_reasons={
                     axis: record.judge_axis_reasons[axis] for axis in axis_mismatch
                 },
+                judge_failed_required_checks=record.judge_failed_required_checks,
+                judge_failed_check_reasons=failed_check_reasons,
             )
         )
     return mismatches
@@ -252,3 +261,34 @@ def compare_versions(
         axis_before=calculate_axis_metrics(before_records),
         axis_after=calculate_axis_metrics(after_records),
     )
+
+
+def compare_official_versions(
+    before_records: list[CalibrationRecord],
+    after_records: list[CalibrationRecord],
+    *,
+    require_langsmith: bool = True,
+) -> VersionComparison:
+    """R2 공식 v1·v2 비교 — compare_versions()에 제출 요건 검증을 더한 wrapper.
+
+    각 실행이 validate_official_case_set()을 통과해야 하고(정확히 20건·1차
+    판정·run 내부 일관성), v1·v2 사이에서는 code_sha·model_version이 같고
+    prompt_version만 달라야 한다 — 그래야 "프롬프트만 바꿔서 나온 효과"라고
+    말할 수 있다. 코드까지 같이 바뀐 v1·v2는 이 함수로 비교하면 안 된다.
+    """
+    validate_official_case_set(before_records, require_langsmith=require_langsmith)
+    validate_official_case_set(after_records, require_langsmith=require_langsmith)
+    before_first, after_first = before_records[0], after_records[0]
+    if before_first.code_sha != after_first.code_sha:
+        raise ValueError(
+            "v1·v2는 동일한 code_sha로 실행해야 합니다(코드가 아니라 프롬프트만 "
+            f"바뀌어야 함): v1={before_first.code_sha}, v2={after_first.code_sha}"
+        )
+    if before_first.model_version != after_first.model_version:
+        raise ValueError(
+            f"v1·v2는 동일한 model_version으로 실행해야 합니다: "
+            f"v1={before_first.model_version}, v2={after_first.model_version}"
+        )
+    if before_first.prompt_version == after_first.prompt_version:
+        raise ValueError(f"v1·v2의 prompt_version이 같습니다({before_first.prompt_version}) — 비교할 변화가 없습니다.")
+    return compare_versions(before_records, after_records)

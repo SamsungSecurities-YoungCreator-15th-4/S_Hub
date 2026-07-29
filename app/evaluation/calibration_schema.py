@@ -216,6 +216,12 @@ def _require_model_version(raw: dict, *, case_id: str) -> dict:
     for key in ("deployment", "model", "api_version"):
         if key not in value:
             raise CalibrationSchemaError(f"{case_id}: model_version에 {key} 키가 없습니다.")
+        sub_value = value[key]
+        if sub_value is not None and (not isinstance(sub_value, str) or not sub_value.strip()):
+            raise CalibrationSchemaError(
+                f"{case_id}: model_version.{key}는 None이거나 비어있지 않은 문자열이어야 합니다 "
+                f"(받은 값: {sub_value!r})."
+            )
     if not value.get("deployment") and not value.get("model"):
         raise CalibrationSchemaError(f"{case_id}: model_version.deployment·model이 둘 다 비어 있습니다.")
     return value
@@ -273,6 +279,25 @@ def normalize_judge_result(raw: dict) -> NormalizedJudgeResult:
     fail_axes_t = tuple(fail_axes)
 
     checks = _normalize_checks(raw.get("checks"), case_id=case_id)
+    check_names = [check["name"] for check in checks]
+    if len(check_names) != len(set(check_names)):
+        duplicates = sorted({name for name in check_names if check_names.count(name) > 1})
+        raise CalibrationSchemaError(f"{case_id}: checks에 이름이 중복된 항목이 있습니다: {duplicates}")
+    checks_by_name = {check["name"]: check for check in checks}
+
+    # judge_eval()은 rubric과 checks를 같은 6축 결과로부터 함께 만들기 때문에
+    # 두 값은 항상 일치해야 한다. checks에 6축 항목이 없거나 rubric과
+    # 어긋나면(예: rubric은 통과인데 checks[축]은 실패) 입력이 손상된 것으로
+    # 보고 거부한다 — fail_axes만 보고 넘어가면 이 불일치를 놓친다.
+    for axis in AXIS_NAMES:
+        axis_check = checks_by_name.get(axis)
+        if axis_check is None:
+            raise CalibrationSchemaError(f"{case_id}: checks에 6축 검사 {axis}가 없습니다.")
+        if axis_check["required"] is not True:
+            raise CalibrationSchemaError(f"{case_id}: checks[{axis}]는 required=true여야 합니다.")
+        if axis_check["passed"] != rubric[axis]["passed"]:
+            raise CalibrationSchemaError(f"{case_id}: rubric[{axis}]와 checks[{axis}]의 판정이 다릅니다.")
+
     failed_required_checks = tuple(
         sorted(
             check["name"]
@@ -282,31 +307,35 @@ def normalize_judge_result(raw: dict) -> NormalizedJudgeResult:
     )
 
     # judge_eval()은 passed = (모든 required 검사 통과)로 정의한다(preflight +
-    # rubric 전부 포함). 그래서 passed와 fail_axes·failed_required_checks는
-    # 서로 모순될 수 없다 — 모순되면 입력이 조작·손상된 것으로 보고 거부한다.
-    if passed and (fail_axes_t or failed_required_checks):
+    # rubric 전부 포함, checks 전체 기준). 위에서 rubric·checks[축] 일치를 이미
+    # 확인했으므로, 여기서는 checks 전체로 기대 passed를 재계산해 raw passed와
+    # 대조한다 — fail_axes·failed_required_checks만 보면 6축 checks 항목이
+    # rubric과 다르게 조작된 경우를 못 잡는다.
+    expected_passed = not any(check["required"] and not check["passed"] for check in checks)
+    if passed != expected_passed:
         raise CalibrationSchemaError(
-            f"{case_id}: passed=true인데 실패한 축·필수 검사가 있습니다 "
-            f"(fail_axes={fail_axes_t}, failed_required_checks={failed_required_checks})."
+            f"{case_id}: passed({passed})가 checks의 필수 검사 결과({expected_passed})와 다릅니다."
         )
-    if not passed and not fail_axes_t and not failed_required_checks:
-        raise CalibrationSchemaError(f"{case_id}: passed=false인데 실패 원인(축·필수 검사)이 하나도 없습니다.")
 
     reason = raw.get("reason")
     if not isinstance(reason, str) or not reason.strip():
         raise CalibrationSchemaError(f"{case_id}: reason은 비어있지 않은 문자열이어야 합니다.")
 
     judge_feedback = raw.get("judge_feedback")
-    if passed:
-        judge_feedback = judge_feedback if isinstance(judge_feedback, str) else ""
-    elif not isinstance(judge_feedback, str) or not judge_feedback.strip():
+    if not isinstance(judge_feedback, str):
+        raise CalibrationSchemaError(
+            f"{case_id}: judge_feedback은 문자열이어야 합니다(judge_eval()은 항상 문자열을 반환합니다)."
+        )
+    if not passed and not judge_feedback.strip():
         raise CalibrationSchemaError(f"{case_id}: passed=false면 judge_feedback이 비어있지 않아야 합니다.")
 
-    manual_review_flags_raw = raw.get("manual_review_flags") or []
+    if "manual_review_flags" not in raw:
+        raise CalibrationSchemaError(f"{case_id}: manual_review_flags 필드가 없습니다.")
+    manual_review_flags_raw = raw["manual_review_flags"]
     if not isinstance(manual_review_flags_raw, list) or not all(
-        isinstance(flag, str) for flag in manual_review_flags_raw
+        isinstance(flag, str) and flag.strip() for flag in manual_review_flags_raw
     ):
-        raise CalibrationSchemaError(f"{case_id}: manual_review_flags는 문자열 list여야 합니다.")
+        raise CalibrationSchemaError(f"{case_id}: manual_review_flags는 비어있지 않은 문자열의 list여야 합니다.")
 
     judge_attempt = raw.get("judge_attempt")
     if isinstance(judge_attempt, bool) or not isinstance(judge_attempt, int) or judge_attempt < 1:
@@ -430,8 +459,15 @@ def validate_run_consistency(records: list[CalibrationRecord]) -> None:
         )
 
 
-def validate_official_case_set(records: list[CalibrationRecord]) -> None:
-    """R2 공식 제출 실행인지 엄격 검증한다. mock/부분 데이터 개발에는 쓰지 않는다."""
+def validate_official_case_set(records: list[CalibrationRecord], *, require_langsmith: bool = True) -> None:
+    """R2 공식 제출 실행인지 엄격 검증한다. mock/부분 데이터 개발에는 쓰지 않는다.
+
+    require_langsmith=True(기본값)면 모든 사례에 langsmith_run_id가 있어야
+    한다 — R2는 LangSmith 실행 기록 제출이 과제 요구사항이다. 개발 중
+    LangSmith 없이 돌린 mock 세트를 검증할 때만 False로 낮춘다.
+    """
+    if len(records) != len({record.case_id for record in records}):
+        raise CalibrationSchemaError("records에 case_id가 중복된 항목이 있습니다.")
     ids = {record.case_id for record in records}
     if ids != EXPECTED_CASE_IDS:
         raise CalibrationSchemaError(
@@ -450,3 +486,50 @@ def validate_official_case_set(records: list[CalibrationRecord]) -> None:
     ]
     if uncovered_axes:
         raise CalibrationSchemaError(f"6축 전부 결함 사례가 최소 1건 있어야 합니다. 누락된 축: {uncovered_axes}")
+    if require_langsmith:
+        missing_langsmith = sorted(record.case_id for record in records if not record.langsmith_run_id)
+        if missing_langsmith:
+            raise CalibrationSchemaError(f"LangSmith run ID가 없는 사례: {missing_langsmith}")
+
+
+def build_judge_result(
+    *,
+    case_id: str,
+    judge_output: dict,
+    trace_id: str,
+    prompt_version: str,
+    code_sha: str,
+    case_content_sha256: str,
+    langsmith_run_id: str | None = None,
+    langsmith_trace_url: str | None = None,
+) -> dict:
+    """judge_eval()의 실제 반환값을 JudgeResult 계약으로 변환하는 참조 구현.
+
+    judge_output은 app.nodes.judge_eval.judge_eval()의 반환값 그대로다
+    (judge_output["judge"], judge_output["judge_retries"],
+    judge_output["judge_feedback"], judge_output["run_config"] 중첩 구조).
+    trace_id는 judge_eval() 반환값에 없다 — state["trace_id"](그래프
+    load_inputs/observability 단계에서 설정)를 호출자가 그대로 넘긴다.
+    tests/test_judge_calibration.py의 통합 테스트가 이 함수를 실제
+    judge_eval() 출력에 대해 검증한다.
+    """
+    judge = judge_output["judge"]
+    audit = judge_output["run_config"]["audit"]["llm"]["judge_eval"]["latest"]
+    return {
+        "case_id": case_id,
+        "passed": judge["passed"],
+        "reason": judge["reason"],
+        "rubric": judge["rubric"],
+        "checks": judge["checks"],
+        "judge_attempt": judge_output["judge_retries"],
+        "judge_feedback": judge_output["judge_feedback"],
+        "manual_review_flags": judge["manual_review_flags"],
+        "prompt_version": prompt_version,
+        "prompt_hash": audit["prompt_hash"]["aggregate_sha256"],
+        "model_version": audit["model_version"],
+        "trace_id": trace_id,
+        "langsmith_run_id": langsmith_run_id,
+        "langsmith_trace_url": langsmith_trace_url,
+        "code_sha": code_sha,
+        "case_content_sha256": case_content_sha256,
+    }
