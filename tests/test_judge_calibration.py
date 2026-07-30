@@ -88,6 +88,7 @@ def _judge(
     case_content_seed: str | None = None,
     langsmith_run_id: str | None = None,
     langsmith_trace_url: str | None = None,
+    as_of_date: str = "2026-06-30",
 ) -> dict:
     return {
         "case_id": case_id,
@@ -106,6 +107,7 @@ def _judge(
         "langsmith_trace_url": langsmith_trace_url,
         "code_sha": code_sha,
         "case_content_sha256": _sha256_hex(case_content_seed or case_id),
+        "as_of_date": as_of_date,
     }
 
 
@@ -296,6 +298,39 @@ class TestNormalizeJudgeResult:
         raw = _judge("c1", True)
         del raw["checks"]
         with pytest.raises(CalibrationSchemaError, match="checks"):
+            normalize_judge_result(raw)
+
+    def test_as_of_date_missing_raises(self):
+        raw = _judge("c1", True)
+        del raw["as_of_date"]
+        with pytest.raises(CalibrationSchemaError, match="as_of_date"):
+            normalize_judge_result(raw)
+
+    def test_as_of_date_non_iso_format_raises(self):
+        raw = _judge("c1", True)
+        raw["as_of_date"] = "2026/06/30"
+        with pytest.raises(CalibrationSchemaError, match="YYYY-MM-DD"):
+            normalize_judge_result(raw)
+
+    def test_as_of_date_valid_iso_format_is_accepted(self):
+        result = normalize_judge_result(_judge("c1", True, as_of_date="2026-07-15"))
+        assert result.as_of_date == "2026-07-15"
+
+    @pytest.mark.parametrize("compact_or_week_form", ["20260715", "2026-W27-1"])
+    def test_as_of_date_rejects_non_dash_iso_forms(self, compact_or_week_form):
+        """date.fromisoformat()은 압축형·주차형도 받아들이지만, 이 필드는 문자열
+        동등 비교로만 쓰이므로 표기를 YYYY-MM-DD로 못박아야 한다 — 그렇지 않으면
+        같은 날짜가 "20260715"·"2026-07-15"처럼 다른 문자열로 들어와 v1·v2
+        일관성 검사가 실제로는 같은 날짜인데 다르다고 잘못 판단할 수 있다."""
+        raw = _judge("c1", True)
+        raw["as_of_date"] = compact_or_week_form
+        with pytest.raises(CalibrationSchemaError, match="YYYY-MM-DD"):
+            normalize_judge_result(raw)
+
+    def test_as_of_date_rejects_nonexistent_calendar_date(self):
+        raw = _judge("c1", True)
+        raw["as_of_date"] = "2026-02-30"
+        with pytest.raises(CalibrationSchemaError, match="실재하는 날짜"):
             normalize_judge_result(raw)
 
     def test_failed_required_check_outside_rubric_is_captured(self):
@@ -523,6 +558,17 @@ class TestRunConsistency:
         with pytest.raises(CalibrationSchemaError, match="한 실행"):
             validate_run_consistency(records)
 
+    def test_different_as_of_date_raises(self):
+        judge = [
+            _judge("case_001", True),
+            _judge("case_002", True),
+            _judge("case_003", False, ("disclaimer",)),
+            _judge("case_004", False, ("numeric_consistency",), as_of_date="2026-07-15"),
+        ]
+        records = merge_records(HUMAN_LABELS_V1, judge)
+        with pytest.raises(CalibrationSchemaError, match="as_of_date"):
+            validate_run_consistency(records)
+
 
 def _official_20_records(*, prompt_version: str = "v1") -> list[CalibrationRecord]:
     """6축 전부 최소 1건 결함을 포함하는 case_001~020 mock 세트. LangSmith 필드까지 채운다."""
@@ -667,6 +713,18 @@ class TestCompareVersions:
         with pytest.raises(ValueError, match="사례 본문"):
             compare_versions(records_v1, records_v2)
 
+    def test_different_as_of_date_raises(self, records_v1):
+        """기준일이 다르면 case_content_sha256이 같아도(내용이 우연히 동일해도) 잡아야 한다."""
+        judge_v2 = [
+            _judge("case_001", True, prompt_version="v2", as_of_date="2026-07-15"),
+            _judge("case_002", True, prompt_version="v2", as_of_date="2026-07-15"),
+            _judge("case_003", False, ("disclaimer",), prompt_version="v2", as_of_date="2026-07-15"),
+            _judge("case_004", False, ("numeric_consistency",), prompt_version="v2", as_of_date="2026-07-15"),
+        ]
+        records_v2 = merge_records(HUMAN_LABELS_V1, judge_v2)
+        with pytest.raises(ValueError, match="as_of_date"):
+            compare_versions(records_v1, records_v2)
+
 
 class TestCompareOfficialVersions:
     def test_valid_v1_v2_passes(self):
@@ -744,6 +802,7 @@ def test_build_judge_result_accepts_real_judge_eval_output(monkeypatch):
         prompt_version="v1",
         code_sha="deadbeef",
         case_content_sha256=_sha256_hex("case_smoke_ec01"),
+        as_of_date=case["state"]["run_config"]["as_of_date"],
     )
     result = normalize_judge_result(raw)
 

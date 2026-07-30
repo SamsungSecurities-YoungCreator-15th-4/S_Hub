@@ -23,11 +23,18 @@ judge_eval()의 실제 반환 계약(app/nodes/judge_eval.py)과 감사 기록
   (``app.observability.langsmith.prepare_trace_invocation``)다. 실제
   LangSmith 식별자는 별도 필드 ``langsmith_run_id``/``langsmith_trace_url``
   이며, LangSmith가 꺼져 있으면 비어 있을 수 있어 선택 필드로 둔다.
+- ``as_of_date``는 judge의 disclaimer/numeric_consistency 축이 쓰는
+  ``expected_dates``의 재료(``run_config.as_of_date``)다. 사례 본문
+  (``case_content_sha256``이 보는 metrics/explanations/citations)과 물리적으로
+  분리된 값이라, 기준일만 다른 채로 v1·v2를 돌려도 case_content_sha256으로는
+  못 잡을 수 있다. 그래서 명시 필드로 두고 실행 일관성·v1·v2 동일성을 직접
+  검사한다(→ ``validate_run_consistency``, ``compare_versions``).
 """
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from datetime import date
 from typing import Iterable, Literal, NamedTuple, TypedDict
 
 from app.judge.axes import to_en
@@ -37,6 +44,7 @@ Label = Literal["pass", "fail"]
 
 _SHA256_HEX_RE = re.compile(r"^[0-9a-fA-F]{64}$")
 _GIT_SHA_RE = re.compile(r"^[0-9a-fA-F]{7,40}$")
+_ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 EXPECTED_CASE_COUNT = 20
 EXPECTED_CASE_IDS = frozenset(f"case_{i:03d}" for i in range(1, EXPECTED_CASE_COUNT + 1))
@@ -82,6 +90,7 @@ class JudgeResult(TypedDict, total=False):
     langsmith_trace_url: str | None
     code_sha: str
     case_content_sha256: str
+    as_of_date: str
 
 
 @dataclass(frozen=True)
@@ -109,6 +118,7 @@ class CalibrationRecord:
     langsmith_trace_url: str | None
     code_sha: str
     case_content_sha256: str
+    as_of_date: str
 
 
 class CalibrationSchemaError(ValueError):
@@ -178,6 +188,7 @@ class NormalizedJudgeResult(NamedTuple):
     langsmith_trace_url: str | None
     code_sha: str
     case_content_sha256: str
+    as_of_date: str
 
 
 def _require_nonempty_str(raw: dict, key: str, *, case_id: str) -> str:
@@ -203,6 +214,25 @@ def _optional_nonempty_str(raw: dict, key: str, *, case_id: str) -> str | None:
     value = raw[key]
     if not isinstance(value, str) or not value.strip():
         raise CalibrationSchemaError(f"{case_id}: {key}는 None이거나 비어있지 않은 문자열이어야 합니다.")
+    return value
+
+
+def _require_iso_date(raw: dict, key: str, *, case_id: str) -> str:
+    """YYYY-MM-DD 형식만 허용한다.
+
+    date.fromisoformat()은 파이썬 3.11부터 ISO 8601 전체(압축형 '20260715',
+    주차형 '2026-W27-1' 등)를 받아들인다. 이 필드는 전부 문자열 동등 비교로
+    쓰이므로("2026-07-03" vs "20260703") 형식이 넓으면 같은 날짜가 다른
+    문자열로 들어와 불일치로 잘못 잡힌다. 정규식으로 표기를 먼저 고정하고,
+    fromisoformat은 2026-02-30처럼 존재하지 않는 날짜만 걸러내는 데 쓴다.
+    """
+    value = raw.get(key)
+    if not isinstance(value, str) or not _ISO_DATE_RE.fullmatch(value):
+        raise CalibrationSchemaError(f"{case_id}: {key}는 YYYY-MM-DD 형식의 날짜여야 합니다 (받은 값: {value!r}).")
+    try:
+        date.fromisoformat(value)
+    except ValueError as exc:
+        raise CalibrationSchemaError(f"{case_id}: {key}는 실재하는 날짜가 아닙니다 (받은 값: {value!r}).") from exc
     return value
 
 
@@ -364,6 +394,7 @@ def normalize_judge_result(raw: dict) -> NormalizedJudgeResult:
         case_content_sha256=_require_pattern(
             raw, "case_content_sha256", _SHA256_HEX_RE, case_id=case_id, hint="64자리 SHA-256 16진 문자열"
         ),
+        as_of_date=_require_iso_date(raw, "as_of_date", case_id=case_id),
     )
 
 
@@ -428,17 +459,24 @@ def merge_records(
                 langsmith_trace_url=j.langsmith_trace_url,
                 code_sha=j.code_sha,
                 case_content_sha256=j.case_content_sha256,
+                as_of_date=j.as_of_date,
             )
         )
     return records
 
 
 def validate_run_consistency(records: list[CalibrationRecord]) -> None:
-    """한 번의 공식 실행(run) 안에서 prompt_version·model_version·code_sha가 전부 같은지 확인한다.
+    """한 번의 공식 실행(run) 안에서 prompt_version·model_version·code_sha·as_of_date가 전부 같은지 확인한다.
 
     prompt_hash·case_content_sha256·trace_id는 사례마다 달라지는 게 정상이므로
     여기서 검사하지 않는다 — 이 함수는 "같은 실행인가"를 증명하고, 그 값들은
     compare_versions()가 "같은 사례인가"를 증명하는 데 쓴다.
+
+    as_of_date를 여기 둔 건 R1 사례집 20건이 서로 다른 기준일의 리포트를
+    섞지 않는다는 전제다 — config/config.yaml의 as_of_date가 포트폴리오별이
+    아니라 전역 단일값이므로, 한 번의 공식 실행은 하나의 기준일로 20건 전체를
+    채점한다고 본다. 사례별로 기준일이 달라야 하는 시나리오가 생기면 이 함수가
+    아니라 compare_versions()의 v1·v2 간 검사로 옮겨야 한다.
     """
     if not records:
         raise ValueError("records가 비어 있습니다.")
@@ -450,11 +488,12 @@ def validate_run_consistency(records: list[CalibrationRecord]) -> None:
             record.prompt_version != first.prompt_version
             or record.model_version != first.model_version
             or record.code_sha != first.code_sha
+            or record.as_of_date != first.as_of_date
         )
     )
     if mismatched:
         raise CalibrationSchemaError(
-            "한 실행(run) 안에서는 prompt_version·model_version·code_sha가 전부 같아야 합니다. "
+            "한 실행(run) 안에서는 prompt_version·model_version·code_sha·as_of_date가 전부 같아야 합니다. "
             f"{first.case_id}과(와) 다른 사례: {mismatched}"
         )
 
@@ -500,6 +539,7 @@ def build_judge_result(
     prompt_version: str,
     code_sha: str,
     case_content_sha256: str,
+    as_of_date: str,
     langsmith_run_id: str | None = None,
     langsmith_trace_url: str | None = None,
 ) -> dict:
@@ -510,6 +550,8 @@ def build_judge_result(
     judge_output["judge_feedback"], judge_output["run_config"] 중첩 구조).
     trace_id는 judge_eval() 반환값에 없다 — state["trace_id"](그래프
     load_inputs/observability 단계에서 설정)를 호출자가 그대로 넘긴다.
+    as_of_date도 judge_eval() 반환값에 없다 — 호출자가 실행에 쓴
+    state["run_config"]["as_of_date"]를 그대로 넘긴다.
     tests/test_judge_calibration.py의 통합 테스트가 이 함수를 실제
     judge_eval() 출력에 대해 검증한다.
     """
@@ -532,4 +574,5 @@ def build_judge_result(
         "langsmith_trace_url": langsmith_trace_url,
         "code_sha": code_sha,
         "case_content_sha256": case_content_sha256,
+        "as_of_date": as_of_date,
     }
