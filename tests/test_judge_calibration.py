@@ -8,6 +8,7 @@ merge_records에 들어간다.
 from __future__ import annotations
 
 import hashlib
+import re
 import uuid
 from dataclasses import replace
 
@@ -762,6 +763,22 @@ class TestCompareVersions:
         assert comparison.axis_after["source_validity"].false_negative == 0
         assert comparison.axis_after["source_validity"].defect_recall == 1.0
 
+    def test_code_sha_is_surfaced_even_when_different(self, records_v1):
+        """code_sha 동일성은 더 이상 강제하지 않지만, 값 자체는 결과에 남아야
+        v1·v2 코드가 실제로 달랐는지 산출물만 보고 알 수 있다."""
+        judge_v2 = [
+            _judge("case_001", True, prompt_version="v2", code_sha="cafef00d"),
+            _judge("case_002", False, ("source_validity",), prompt_version="v2", code_sha="cafef00d"),
+            _judge("case_003", False, ("disclaimer",), prompt_version="v2", code_sha="cafef00d"),
+            _judge("case_004", False, ("numeric_consistency",), prompt_version="v2", code_sha="cafef00d"),
+        ]
+        records_v2 = merge_records(HUMAN_LABELS_V1, judge_v2)
+
+        comparison = compare_versions(records_v1, records_v2)
+
+        assert comparison.before_code_sha == "deadbeef"
+        assert comparison.after_code_sha == "cafef00d"
+
     def test_mismatched_case_ids_raise(self, records_v1):
         with pytest.raises(ValueError, match="동일 case_id"):
             compare_versions(records_v1, records_v1[:-1])
@@ -846,6 +863,27 @@ class TestCompareOfficialVersions:
         v1_by_id = {record.case_id: record for record in v1}
         v2 = [replace(record, prompt_hash=v1_by_id[record.case_id].prompt_hash) for record in v2_raw]
         with pytest.raises(ValueError, match="prompt_hash"):
+            compare_official_versions(v1, v2)
+
+    def test_single_case_with_identical_prompt_hash_raises(self):
+        """20건 중 단 1건만 v1·v2의 prompt_hash가 같아도 거부해야 한다.
+
+        템플릿이 바뀌었다면 case_content_sha256이 이미 v1·v2 동일함을 보장하는
+        상태에서 렌더링 결과가 전부 달라지는 게 정상이다 — 일부만 같다는 건
+        "라벨만 바뀜"이 아니라 렌더링이 비결정적이라는 이상 신호이므로, 전부
+        동일한 경우와 마찬가지로 잡아야 한다(all()이 아니라 any() 논리).
+        """
+        v1 = _official_20_records(prompt_version="v1")
+        v2_raw = _official_20_records(prompt_version="v2")
+        v1_by_id = {record.case_id: record for record in v1}
+        target_case_id = v2_raw[0].case_id
+        v2 = [
+            replace(record, prompt_hash=v1_by_id[record.case_id].prompt_hash)
+            if record.case_id == target_case_id
+            else record
+            for record in v2_raw
+        ]
+        with pytest.raises(ValueError, match=re.escape(target_case_id)):
             compare_official_versions(v1, v2)
 
     def test_different_model_version_raises(self):
@@ -972,6 +1010,7 @@ def test_build_judge_result_accepts_real_judge_eval_output(monkeypatch):
     assert result.fail_axes == ()
     assert result.failed_required_checks == ()
     assert result.judge_attempt == 1
+    assert result.strict_citation_gate is False
 
 
 def test_build_judge_result_accepts_real_judge_eval_failure_output(monkeypatch):
@@ -1012,3 +1051,42 @@ def test_build_judge_result_accepts_real_judge_eval_failure_output(monkeypatch):
     assert "numeric_consistency" in result.fail_axes
     assert result.judge_feedback.strip() != ""
     assert result.judge_attempt == 1
+    assert result.strict_citation_gate is False
+
+
+def test_build_judge_result_extracts_strict_citation_gate_true_from_real_judge_eval(monkeypatch):
+    """strict_citation_gate=True 경로가 실제로 자동 추출·기록되는지 확인한다.
+
+    위 두 테스트(EC-01·EC-04)는 둘 다 _base_state()의 기본값(False)이라, 지금까지
+    "run_config에서 제대로 뽑아오는가"를 True 값으로는 검증한 적이 없었다. EC-03은
+    strict_citation_gate=True로 source_validity를 실패시키는 기존 회귀 평가셋
+    사례라, True 경로·자동 추출·엄격 게이트 실패를 한 번에 검증한다.
+    """
+    monkeypatch.setattr(
+        "app.llm.audit.model_version_record",
+        lambda llm=None, responses=(): {
+            "deployment": "test-deployment",
+            "model": "test-model",
+            "api_version": "2026-01-01",
+        },
+    )
+    from app.nodes.judge_eval import judge_eval
+    from tests.test_judge_eval_evalset import _PassingLLM, build_eval_case
+
+    case = build_eval_case("EC-03")
+    judge_output = judge_eval(case["state"], llm=_PassingLLM())
+
+    raw = build_judge_result(
+        case_id="case_smoke_ec03",
+        judge_output=judge_output,
+        trace_id="trace-smoke-ec03",
+        prompt_version="v1",
+        code_sha="deadbeef",
+        case_content_sha256=_sha256_hex("case_smoke_ec03"),
+        as_of_date=case["state"]["run_config"]["as_of_date"],
+    )
+    result = normalize_judge_result(raw)
+
+    assert result.strict_citation_gate is True
+    assert result.passed is False
+    assert "source_validity" in result.fail_axes

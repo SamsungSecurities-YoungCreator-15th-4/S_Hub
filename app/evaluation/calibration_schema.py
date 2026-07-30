@@ -16,7 +16,12 @@ judge_eval()의 실제 반환 계약(app/nodes/judge_eval.py)과 감사 기록
 - ``prompt_hash``는 사례 payload까지 포함해 렌더링한 프롬프트의 해시라
   같은 프롬프트 버전이어도 사례마다 값이 다른 게 정상이다. "같은 실행인가"는
   ``prompt_version``/``model_version``/``code_sha``로 확인하고(→
-  ``validate_run_consistency``), ``prompt_hash``로 확인하지 않는다.
+  ``validate_run_consistency``), ``prompt_hash``로 확인하지 않는다. 다만
+  v1·v2 비교(``compare_official_versions``)에서는 반대로 ``prompt_hash``가
+  "실제 프롬프트가 바뀌었는가"를 증명하는 유일한 신호다 — LLM축 프롬프트가
+  ``app/judge/rubric.py``에 하드코딩돼 있어 ``code_sha``는 v1·v2 사이에
+  달라지는 게 정상이라(진짜 개선이면 코드가 바뀐다), ``code_sha`` 동일성으로는
+  "프롬프트만 바뀌었다"를 증명할 수 없다.
 - ``model_version``은 문자열이 아니라 ``app.llm.audit.model_version_record()``
   가 반환하는 ``{deployment, model, api_version}`` dict다.
 - ``trace_id``는 LangSmith run ID가 아니라 내부 상관관계 ID
@@ -29,10 +34,16 @@ judge_eval()의 실제 반환 계약(app/nodes/judge_eval.py)과 감사 기록
   분리된 값이라, 기준일만 다른 채로 v1·v2를 돌려도 case_content_sha256으로는
   못 잡을 수 있다. 그래서 명시 필드로 두고 실행 일관성·v1·v2 동일성을 직접
   검사한다(→ ``validate_run_consistency``, ``compare_versions``).
+- ``strict_citation_gate``도 as_of_date와 같은 이유로 명시 필드다 —
+  ``app/nodes/judge_eval.py``에서 ``source_validity``/``citation_content_contract``
+  의 엄격도를 바꾸는 실행 조건이라 판정에 영향을 주지만, 사례 본문과
+  물리적으로 분리돼 있다. ``build_judge_result()``가 ``judge_output["run_config"]``
+  에서 자동으로 뽑으므로 호출자가 따로 넘길 필요는 없다.
 """
 from __future__ import annotations
 
 import re
+from collections import Counter
 from dataclasses import dataclass
 from datetime import date
 from typing import Iterable, Literal, NamedTuple, TypedDict
@@ -564,9 +575,9 @@ def validate_official_case_set(records: list[CalibrationRecord], *, require_lang
         missing_langsmith = sorted(record.case_id for record in records if not record.langsmith_run_id)
         if missing_langsmith:
             raise CalibrationSchemaError(f"LangSmith run ID가 없는 사례: {missing_langsmith}")
-        run_ids = [record.langsmith_run_id for record in records]
-        if len(run_ids) != len(set(run_ids)):
-            duplicated = sorted({run_id for run_id in run_ids if run_ids.count(run_id) > 1})
+        run_id_counts = Counter(record.langsmith_run_id for record in records)
+        duplicated = sorted(run_id for run_id, count in run_id_counts.items() if count > 1)
+        if duplicated:
             raise CalibrationSchemaError(
                 f"사례마다 서로 다른 LangSmith run이어야 합니다. 중복된 run ID: {duplicated}"
             )

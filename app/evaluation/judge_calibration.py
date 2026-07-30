@@ -196,6 +196,8 @@ class VersionComparison:
     false_positive_delta: int
     axis_before: dict[str, AxisMetrics]
     axis_after: dict[str, AxisMetrics]
+    before_code_sha: str
+    after_code_sha: str
 
 
 def _assert_same_evaluation_target(
@@ -280,7 +282,17 @@ def compare_versions(
     before_records: list[CalibrationRecord],
     after_records: list[CalibrationRecord],
 ) -> VersionComparison:
-    """동일 case_id·동일 사람 라벨 20건을 v1(before)·v2(after)로 재실행한 결과를 비교한다."""
+    """동일 case_id·동일 사람 라벨 20건을 v1(before)·v2(after)로 재실행한 결과를 비교한다.
+
+    before_code_sha/after_code_sha를 결과에 싣는 이유: compare_official_versions()
+    는 v1·v2의 code_sha 동일성을 더 이상 요구하지 않는다(judge LLM축 프롬프트가
+    app/judge/rubric.py에 하드코딩돼 있어, 진짜 프롬프트 개선이면 code_sha가
+    바뀌는 게 정상이라서). 그런데 code_sha가 다르면 "프롬프트만 바뀌었다"는
+    보장은 없다 — 결정론 축 로직 등 다른 코드가 같이 바뀌었어도 이 함수는
+    통과시킨다. 이 사실이 docstring에만 있고 산출물에 없으면 증거를 검토하는
+    사람이 v1·v2 코드가 달랐다는 것 자체를 알 수 없으므로, 두 code_sha를 결과에
+    그대로 남긴다.
+    """
     before_ids = {record.case_id for record in before_records}
     after_ids = {record.case_id for record in after_records}
     if before_ids != after_ids:
@@ -300,6 +312,8 @@ def compare_versions(
         false_positive_delta=after.false_positive - before.false_positive,
         axis_before=calculate_axis_metrics(before_records),
         axis_after=calculate_axis_metrics(after_records),
+        before_code_sha=before_records[0].code_sha,
+        after_code_sha=after_records[0].code_sha,
     )
 
 
@@ -322,8 +336,12 @@ def compare_official_versions(
     R2가 요구하는 "v1 측정 → 개선 → v2 재측정" 자체를 이 함수가 거부하게 된다.
     대신 prompt_hash가 case_id별로 전부 같은지 확인한다 — prompt_hash는 사례
     payload까지 포함해 렌더링한 프롬프트의 해시라, 템플릿이 조금이라도
-    바뀌면 사실상 항상 달라진다. 전부 동일하면 라벨(prompt_version)만
-    바뀌고 실제 프롬프트는 안 바뀐 것으로 보고 거부한다.
+    바뀌면 사실상 항상 달라진다. case_content_sha256(사례 본문)은 이미
+    v1·v2 동일성이 강제되므로, 템플릿이 바뀌었다면 20건 전부의 prompt_hash가
+    달라지는 게 정상이다 — 반대로 템플릿이 그대로면 20건 전부 같다. 그래서
+    "일부만 같음"도 "전부 같음"과 마찬가지로 이상 신호다(한 건이라도
+    prompt_hash가 우연히 같다면, 같은 본문·같은 조건에서 렌더링이 비결정적이라는
+    뜻일 수 있다) — 하나라도 같은 case_id가 있으면 거부한다.
     """
     validate_official_case_set(before_records, require_langsmith=require_langsmith)
     validate_official_case_set(after_records, require_langsmith=require_langsmith)
@@ -337,12 +355,14 @@ def compare_official_versions(
         raise ValueError(f"v1·v2의 prompt_version이 같습니다({before_first.prompt_version}) — 비교할 변화가 없습니다.")
     before_by_id = {record.case_id: record for record in before_records}
     after_by_id = {record.case_id: record for record in after_records}
-    unchanged_prompt_hash = all(
-        before_by_id[case_id].prompt_hash == after_by_id[case_id].prompt_hash for case_id in before_by_id
+    unchanged_prompt_hash_cases = sorted(
+        case_id
+        for case_id in before_by_id
+        if before_by_id[case_id].prompt_hash == after_by_id[case_id].prompt_hash
     )
-    if unchanged_prompt_hash:
+    if unchanged_prompt_hash_cases:
         raise ValueError(
-            "prompt_version은 다르지만 20건 전체의 prompt_hash가 v1·v2에서 전부 같습니다 — "
-            "실제 judge 프롬프트가 바뀌지 않고 버전 라벨만 바뀐 것으로 보입니다."
+            "prompt_version은 다르지만 다음 사례는 v1·v2의 prompt_hash가 같습니다 — "
+            f"실제 judge 프롬프트가 안 바뀌었거나 렌더링이 비결정적일 수 있습니다: {unchanged_prompt_hash_cases}"
         )
     return compare_versions(before_records, after_records)
