@@ -207,7 +207,10 @@ def _assert_same_evaluation_target(
     사람 라벨이 v1·v2 사이에 달라지면, judge가 전혀 개선되지 않아도 라벨이
     바뀐 것만으로 match_rate가 오른 것처럼 계산돼 비교 자체가 무효가 된다.
     사례 본문(case_content_sha256)이 달라지는 것도 같은 문제다 — judge
-    프롬프트가 아니라 "시험 문제 자체"가 바뀐 것일 수 있다.
+    프롬프트가 아니라 "시험 문제 자체"가 바뀐 것일 수 있다. as_of_date(기준일)도
+    같은 이유로 검사한다 — judge의 disclaimer/numeric_consistency 축이 쓰는
+    expected_dates의 재료라 판정에 영향을 주지만, metrics/explanations/citations
+    와 물리적으로 분리된 값이라 case_content_sha256만으로는 못 잡을 수 있다.
     """
     before_by_id = {record.case_id: record for record in before_records}
     after_by_id = {record.case_id: record for record in after_records}
@@ -233,6 +236,15 @@ def _assert_same_evaluation_target(
         raise ValueError(
             "v1·v2의 사례 본문(case_content_sha256)이 다릅니다. 같은 리포트를 "
             f"채점했는지 확인하세요: {content_mismatched}"
+        )
+    as_of_date_mismatched = sorted(
+        case_id
+        for case_id, before_record in before_by_id.items()
+        if before_record.as_of_date != after_by_id[case_id].as_of_date
+    )
+    if as_of_date_mismatched:
+        raise ValueError(
+            f"v1·v2의 as_of_date(기준일)가 다릅니다: {as_of_date_mismatched}"
         )
 
 
