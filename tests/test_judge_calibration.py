@@ -316,6 +316,23 @@ class TestNormalizeJudgeResult:
         result = normalize_judge_result(_judge("c1", True, as_of_date="2026-07-15"))
         assert result.as_of_date == "2026-07-15"
 
+    @pytest.mark.parametrize("compact_or_week_form", ["20260715", "2026-W27-1"])
+    def test_as_of_date_rejects_non_dash_iso_forms(self, compact_or_week_form):
+        """date.fromisoformat()은 압축형·주차형도 받아들이지만, 이 필드는 문자열
+        동등 비교로만 쓰이므로 표기를 YYYY-MM-DD로 못박아야 한다 — 그렇지 않으면
+        같은 날짜가 "20260715"·"2026-07-15"처럼 다른 문자열로 들어와 v1·v2
+        일관성 검사가 실제로는 같은 날짜인데 다르다고 잘못 판단할 수 있다."""
+        raw = _judge("c1", True)
+        raw["as_of_date"] = compact_or_week_form
+        with pytest.raises(CalibrationSchemaError, match="YYYY-MM-DD"):
+            normalize_judge_result(raw)
+
+    def test_as_of_date_rejects_nonexistent_calendar_date(self):
+        raw = _judge("c1", True)
+        raw["as_of_date"] = "2026-02-30"
+        with pytest.raises(CalibrationSchemaError, match="실재하는 날짜"):
+            normalize_judge_result(raw)
+
     def test_failed_required_check_outside_rubric_is_captured(self):
         """citation_content_contract처럼 6축 밖의 필수 검사 실패가 소실되면 안 된다."""
         raw = _judge("c1", False, failed_required_checks=("citation_content_contract",))

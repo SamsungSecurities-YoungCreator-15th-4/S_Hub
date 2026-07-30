@@ -44,6 +44,7 @@ Label = Literal["pass", "fail"]
 
 _SHA256_HEX_RE = re.compile(r"^[0-9a-fA-F]{64}$")
 _GIT_SHA_RE = re.compile(r"^[0-9a-fA-F]{7,40}$")
+_ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 EXPECTED_CASE_COUNT = 20
 EXPECTED_CASE_IDS = frozenset(f"case_{i:03d}" for i in range(1, EXPECTED_CASE_COUNT + 1))
@@ -217,13 +218,21 @@ def _optional_nonempty_str(raw: dict, key: str, *, case_id: str) -> str | None:
 
 
 def _require_iso_date(raw: dict, key: str, *, case_id: str) -> str:
+    """YYYY-MM-DD 형식만 허용한다.
+
+    date.fromisoformat()은 파이썬 3.11부터 ISO 8601 전체(압축형 '20260715',
+    주차형 '2026-W27-1' 등)를 받아들인다. 이 필드는 전부 문자열 동등 비교로
+    쓰이므로("2026-07-03" vs "20260703") 형식이 넓으면 같은 날짜가 다른
+    문자열로 들어와 불일치로 잘못 잡힌다. 정규식으로 표기를 먼저 고정하고,
+    fromisoformat은 2026-02-30처럼 존재하지 않는 날짜만 걸러내는 데 쓴다.
+    """
     value = raw.get(key)
-    if not isinstance(value, str):
-        raise CalibrationSchemaError(f"{case_id}: {key}는 문자열이어야 합니다.")
+    if not isinstance(value, str) or not _ISO_DATE_RE.fullmatch(value):
+        raise CalibrationSchemaError(f"{case_id}: {key}는 YYYY-MM-DD 형식의 날짜여야 합니다 (받은 값: {value!r}).")
     try:
         date.fromisoformat(value)
     except ValueError as exc:
-        raise CalibrationSchemaError(f"{case_id}: {key}는 YYYY-MM-DD 형식의 날짜여야 합니다 (받은 값: {value!r}).") from exc
+        raise CalibrationSchemaError(f"{case_id}: {key}는 실재하는 날짜가 아닙니다 (받은 값: {value!r}).") from exc
     return value
 
 
@@ -462,6 +471,12 @@ def validate_run_consistency(records: list[CalibrationRecord]) -> None:
     prompt_hash·case_content_sha256·trace_id는 사례마다 달라지는 게 정상이므로
     여기서 검사하지 않는다 — 이 함수는 "같은 실행인가"를 증명하고, 그 값들은
     compare_versions()가 "같은 사례인가"를 증명하는 데 쓴다.
+
+    as_of_date를 여기 둔 건 R1 사례집 20건이 서로 다른 기준일의 리포트를
+    섞지 않는다는 전제다 — config/config.yaml의 as_of_date가 포트폴리오별이
+    아니라 전역 단일값이므로, 한 번의 공식 실행은 하나의 기준일로 20건 전체를
+    채점한다고 본다. 사례별로 기준일이 달라야 하는 시나리오가 생기면 이 함수가
+    아니라 compare_versions()의 v1·v2 간 검사로 옮겨야 한다.
     """
     if not records:
         raise ValueError("records가 비어 있습니다.")
