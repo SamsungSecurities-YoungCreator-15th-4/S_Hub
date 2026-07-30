@@ -414,6 +414,7 @@ def _calibration_records(
                 "langsmith_trace_url": None,
                 "code_sha": "deadbeef",
                 "case_content_sha256": hashlib.sha256(body_seed.encode()).hexdigest(),
+                "as_of_date": "2026-07-03",
             }
         )
     return merge_records(human, judge)
