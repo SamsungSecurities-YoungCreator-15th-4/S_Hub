@@ -25,6 +25,11 @@ data/rag-index-cache/
 /corpus/**/*.pdf
 !/corpus/**/.gitkeep
 
+# judge 실행·기록 러너 산출물 — 실행마다 생기는 로컬 리허설/결과 파일이라
+# 커밋하지 않는다. 공식 v1/v2 결과 파일 공유 방식은 팀 합의 후 별도로 정한다.
+/out/
+judge_v*_results.json
+
 # 에디터/OS
 .idea/
 .vscode/
