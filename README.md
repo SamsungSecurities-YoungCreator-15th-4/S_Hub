@@ -241,7 +241,7 @@ pytest에는 위험↑→VaR↑ 방향성 검증(`tests/test_metrics_direction.p
 | `var_lookback_days` | 1250 | 관측 기간(약 5년) — 99% 꼬리 관측치 안정성 확보 |
 | `data_source` | real | yfinance 실데이터 (`dummy`=오프라인) |
 | `strict_citation_gate` | true | 검증 통과 인용 없으면 judge 강제 실패 (제출·시연 기본값) |
-| `judge_max_retries` | `config.yaml` 참조 | Judge 최대 시도 횟수 유일 원천 — 소진 실패 시 Hard Stop |
+| `judge_max_retries` | `config.yaml` 참조 | Judge 최대 시도 횟수 유일 원천 — 소진 실패 시 Hard Stop. 폴백 기본값 없음(설정 부재·오염 시 실행 거부) |
 
 ## 코퍼스와 로컬 자산
 
@@ -266,7 +266,7 @@ pytest에는 위험↑→VaR↑ 방향성 검증(`tests/test_metrics_direction.p
 | R2 RAG 인용 | 코퍼스 21건, 원문·문서명·조항/주장·청크 정밀 대조, provenance 지문 |
 | R3 LLM-as-Judge | 6축 루브릭 자동평가, 결함 사유 로그, SSOT 재시도와 Hard Stop |
 | R4 결합 리포트 | Judge 통과본만 확정·내보내기 허용, 실패본은 차단 증거 기록 |
-| R5 재현성 | seed 고정+parquet 캐시, `computation_hash`(SHA256), LangSmith 감사 로그 병기 |
+| R5 재현성 | seed 고정+parquet 캐시, `computation_hash`(SHA256), LangSmith 감사 로그 병기. 재현성 경계: `config_hash`·`computation_hash`는 결정론 계층 산출물이라 리포트 문구 변경에 불변이고, 문구 변경은 이미 비결정론이던 judge 축 입력 표면(`prompt_hashes.judge_eval`)만 움직인다 |
 | R6 3계층 분리 | `app/engine/` LLM import 금지(코드 강제) + mermaid 시각 분리 |
 | R7 제출·시연 | Streamlit 시연 — 재현성·승인 게이트·기준일·출처 화면 노출 |
 

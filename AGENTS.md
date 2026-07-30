@@ -77,8 +77,13 @@ START
 - 노드는 순수 함수로, 바꾼 키만 반환한다(레포 구조의 `nodes/` 규약과 동일).
 - 재시도 상한 SSOT는 `config/config.yaml`의 `judge_max_retries`이며
   `resolve_max_judge_retries`를 통해서만 읽는다.
+  **폴백 기본값은 없다** — 설정이 없거나 1 이상의 정수가 아니면 코드 기본값으로
+  대체하지 않고 `ValueError`로 실행을 거부한다. 그래프를 직접 호출하는 스크립트도
+  `run_config`에 이 값을 반드시 넣어야 한다.
   judge가 규칙 기반이라 실패 사유가 구조적이므로 재시도를 늘려도 해결 확률이
   크게 오르지는 않으며, 상한을 소진하면 수동검토로 전환한다.
+  문서에 적힌 횟수가 설정과 갈라지지 않도록 `tests/test_docs_config_consistency.py`가
+  대조한다.
 - **통과 없이 확정·다운로드하지 않는다** — 재시도 소진 실패는
   `manual_review_gate`에서 종료한다. `report.status=pending_manual_review`,
   `report.finalized=False`, `governance.export_allowed=False`이며 차단 사유와
