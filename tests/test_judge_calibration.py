@@ -336,6 +336,14 @@ class TestNormalizeJudgeResult:
         with pytest.raises(CalibrationSchemaError, match="UUID"):
             normalize_judge_result(raw)
 
+    def test_langsmith_run_id_is_normalized_to_lowercase_standard_form(self):
+        """대소문자·하이픈 유무만 다른 동일 UUID가 문자열 비교로 중복 검사를
+        우회하지 않도록, 표준형(소문자, 하이픈 포함)으로 정규화해서 저장한다."""
+        raw = _judge("c1", True)
+        raw["langsmith_run_id"] = "B6F1C9D0-6E2E-4A3B-9B1A-7F2A6A0C9E11"
+        result = normalize_judge_result(raw)
+        assert result.langsmith_run_id == "b6f1c9d0-6e2e-4a3b-9b1a-7f2a6a0c9e11"
+
     def test_checks_missing_raises(self):
         raw = _judge("c1", True)
         del raw["checks"]
@@ -935,6 +943,22 @@ class TestBuildJudgeResultCrossChecks:
                 as_of_date="2026-07-15",  # 실제 실행값(2026-06-30)과 다름
             )
 
+    def test_as_of_date_missing_from_judge_output_raises(self):
+        """judge_output.run_config에 as_of_date가 아예 없으면, 호출자 값만
+        조용히 신뢰하지 않고 거부한다."""
+        judge_output = _fake_judge_output()
+        del judge_output["run_config"]["as_of_date"]
+        with pytest.raises(CalibrationSchemaError, match="as_of_date가 없습니다"):
+            build_judge_result(
+                case_id="c1",
+                judge_output=judge_output,
+                trace_id="trace-c1",
+                prompt_version="v1",
+                code_sha="deadbeef",
+                case_content_sha256=_sha256_hex("c1"),
+                as_of_date="2026-06-30",
+            )
+
 
 class TestJudgeCheckNamesConsistency:
     def test_different_check_names_raises(self, records_v1):
@@ -958,8 +982,49 @@ class TestJudgeCheckNamesConsistency:
             else record
             for record in records_v2
         ]
-        with pytest.raises(ValueError, match="검사 항목 집합이 다릅니다"):
+        with pytest.raises(ValueError, match="이름·required·passed 중"):
             compare_versions(records_v1, records_v2)
+
+    def test_same_check_name_different_passed_raises(self, records_v1):
+        """이름은 같아도 시스템 검사의 passed 값이 v1·v2 사이에 다르면 잡아야 한다.
+
+        예: citation_routing_contract가 v1·v2 모두 존재하지만, run_config의
+        RAG routing record 내용이 달라져 한쪽만 실패하는 경우. 이름 집합
+        비교만으로는 이 차이를 놓친다.
+        """
+
+        def _with_routing_check(passed: bool) -> dict:
+            return {
+                "name": "citation_routing_contract",
+                "passed": passed,
+                "required": True,
+                "detail": "mock routing detail",
+            }
+
+        judge_v1 = [
+            _judge("case_001", True),
+            _judge("case_002", True),
+            _judge("case_003", False, ("disclaimer",)),
+            _judge("case_004", False, ("numeric_consistency",)),
+        ]
+        records_v1_with_routing = merge_records(HUMAN_LABELS_V1, judge_v1)
+        records_v1_with_routing = [
+            replace(record, judge_checks=(*record.judge_checks, _with_routing_check(True)))
+            for record in records_v1_with_routing
+        ]
+        judge_v2 = [
+            _judge("case_001", True, prompt_version="v2"),
+            _judge("case_002", True, prompt_version="v2"),
+            _judge("case_003", False, ("disclaimer",), prompt_version="v2"),
+            _judge("case_004", False, ("numeric_consistency",), prompt_version="v2"),
+        ]
+        records_v2 = merge_records(HUMAN_LABELS_V1, judge_v2)
+        records_v2 = [
+            replace(record, judge_checks=(*record.judge_checks, _with_routing_check(False)))
+            for record in records_v2
+        ]
+        with pytest.raises(ValueError, match="이름·required·passed 중"):
+            compare_versions(records_v1_with_routing, records_v2)
 
 
 def test_expected_case_ids_constant_has_20_entries():

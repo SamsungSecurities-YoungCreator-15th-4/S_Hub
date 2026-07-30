@@ -200,6 +200,19 @@ class VersionComparison:
     after_code_sha: str
 
 
+def _system_check_signature(record: CalibrationRecord) -> dict[str, tuple[bool, bool]]:
+    """judge_checks 중 6축(rubric) 밖의 시스템 검사만 (required, passed)로 요약한다.
+
+    6축 검사는 fail_axes/judge_axis_reasons가 이미 R2의 본 관심사(judge가
+    무엇을 놓쳤는가)로 비교하므로 여기서 다시 보지 않는다.
+    """
+    return {
+        check["name"]: (check["required"], check["passed"])
+        for check in record.judge_checks
+        if check["name"] not in AXIS_NAMES
+    }
+
+
 def _assert_same_evaluation_target(
     before_records: list[CalibrationRecord],
     after_records: list[CalibrationRecord],
@@ -215,10 +228,13 @@ def _assert_same_evaluation_target(
     와 물리적으로 분리된 값이라 case_content_sha256만으로는 못 잡을 수 있다.
     strict_citation_gate도 같은 성격이다 — source_validity/citation_content_contract
     의 엄격도를 바꾸는 판정 기준이라, 이게 v1·v2 사이에 달라지면 프롬프트를
-    안 고쳐도 PASS 비율이 변한다. judge_checks의 검사 이름 집합도 비교한다 —
-    RAG routing audit 존재 여부에 따라 citation_routing_contract 같은 필수
-    검사 자체가 생기거나 사라질 수 있는데, 이건 새 필드 하나로 추적할 수 있는
-    값이 아니라 이미 기록된 judge_checks에서 직접 비교하는 게 정확하다.
+    안 고쳐도 PASS 비율이 변한다. 6축 밖 judge_checks(시스템 검사)도 이름·
+    required·passed까지 비교한다 — 이름만 같다고 조건이 같다는 보장은 없다.
+    예를 들어 citation_routing_contract는 v1·v2 모두 존재하면서도 run_config에
+    보존된 RAG routing record 내용이 달라지면 PASS/FAIL이 바뀔 수 있다. 이건
+    새 포괄 해시 필드를 만드는 대신 이미 기록된 judge_checks에서 직접
+    비교한다(6축 자체는 fail_axes/judge_axis_reasons로 이미 비교하므로 여기서는
+    AXIS_NAMES에 속하지 않는 검사만 본다).
     """
     before_by_id = {record.case_id: record for record in before_records}
     after_by_id = {record.case_id: record for record in after_records}
@@ -263,18 +279,19 @@ def _assert_same_evaluation_target(
         raise ValueError(
             f"v1·v2의 strict_citation_gate가 다릅니다: {strict_gate_mismatched}"
         )
-    check_names_mismatched = sorted(
+    system_checks_mismatched = sorted(
         case_id
         for case_id, before_record in before_by_id.items()
         if (
-            {check["name"] for check in before_record.judge_checks}
-            != {check["name"] for check in after_by_id[case_id].judge_checks}
+            _system_check_signature(before_record)
+            != _system_check_signature(after_by_id[case_id])
         )
     )
-    if check_names_mismatched:
+    if system_checks_mismatched:
         raise ValueError(
-            "v1·v2에서 judge가 수행한 검사 항목 집합이 다릅니다(예: RAG routing audit "
-            f"존재 여부 변화). 같은 조건에서 실행했는지 확인하세요: {check_names_mismatched}"
+            "v1·v2에서 6축 밖 시스템 검사(judge_checks)의 이름·required·passed 중 "
+            "하나라도 다릅니다(예: RAG routing audit 존재 여부·내용 변화). 같은 조건에서 "
+            f"실행했는지 확인하세요: {system_checks_mismatched}"
         )
 
 
