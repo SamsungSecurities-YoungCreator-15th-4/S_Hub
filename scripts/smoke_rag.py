@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from app.llm.client import get_llm  # noqa: E402
+from app.nodes.load_inputs import load_inputs  # noqa: E402
 from app.nodes.rag_cite import rag_cite  # noqa: E402
 from app.rag.retriever import build_retriever, retrieve_chunks  # noqa: E402
 
@@ -89,6 +90,11 @@ def main() -> None:
         "run_config": {
             "as_of_date": "2026-07-03",
             "strict_citation_gate": True,
+            # 상한의 유일한 원천은 config/config.yaml이다. 스크립트에 숫자를
+            # 하드코딩하면 설정과 갈라진다. resolve_max_judge_retries는 폴백
+            # 기본값 없이 즉시 실패하므로, 이 키가 빠지면 judge 경로를 타는
+            # 순간 ValueError가 난다.
+            "judge_max_retries": load_inputs({})["run_config"]["judge_max_retries"],
         },
         "ips": {"Tax": "금융소득 종합과세 및 이자·배당소득 확인 필요"},
         "metrics": {
