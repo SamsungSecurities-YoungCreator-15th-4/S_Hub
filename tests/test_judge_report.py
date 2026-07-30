@@ -427,7 +427,10 @@ def test_report_is_finalized_only_when_judge_passed():
 
 
 def test_judge_max_retries_comes_from_config():
-    """상한은 config.yaml의 judge_max_retries를 따르고, 값이 없으면 기본값을 쓴다."""
+    """상한은 config.yaml의 judge_max_retries를 따르고, 값이 오염되면 즉시 실패한다.
+
+    폴백 기본값은 없다 — #135로 코드 기본값이 제거됐다.
+    """
     failed_state = {
         **BASE_STATE,
         "judge": {"passed": False, "manual_review_flags": []},
