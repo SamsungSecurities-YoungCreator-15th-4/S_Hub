@@ -1,6 +1,7 @@
 """감사 증거 묶음(evidence bundle) 골격·계약 테스트."""
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import subprocess
@@ -13,6 +14,7 @@ from app.evidence.schema import (
     BUNDLE_FILENAMES,
     BUNDLE_HASH_FILENAME,
     BUNDLE_SCHEMA_VERSION,
+    CALIBRATION_DERIVED_KEYS,
     CALIBRATION_SUMMARY_REQUIRED_KEYS,
     CITATION_VERIFICATION_FILENAME,
     HARD_STOP_RECORD_FILENAME,
@@ -23,9 +25,10 @@ from app.evidence.schema import (
     MANIFEST_FILENAME,
     SUMMARY_FILENAME,
     TRACE_FILENAME,
-    calibration_summary_template,
+    calibration_summary,
+    evalset_hash,
 )
-from app.judge.axes import AXIS_EN_TO_KO
+from app.judge.axes import AXIS_EN_TO_KO, KOREAN_AXIS_NAMES, to_en
 from app.utils.hashing import sha256_of_file
 from scripts.make_evidence_bundle import make_bundle
 
@@ -342,10 +345,157 @@ def test_judge_rationale_labels_axes_in_both_languages(tmp_path):
     assert set(judge["rubric"]) == set(AXIS_EN_TO_KO)
 
 
-def test_calibration_template_axis_keys_come_from_axes_ssot():
-    template = calibration_summary_template()
+def _calibration_records(
+    *,
+    flip_label_of: str | None = None,
+    change_body_of: str | None = None,
+    extra_case: bool = False,
+):
+    """calibration 요약 검증용 합성 CalibrationRecord 20건.
 
-    assert set(CALIBRATION_SUMMARY_REQUIRED_KEYS) <= set(template)
-    assert set(template["per_axis"]) == set(AXIS_EN_TO_KO)
+    6축 각각에 fail 사례 1건을 두고 나머지는 pass로 채운다. judge는 사람 라벨과
+    완전히 일치시켜 두고, 개별 테스트가 필요한 부분만 어긋나게 한다.
+    """
+    from app.evaluation.calibration_schema import merge_records
+
+    axes_ko = list(KOREAN_AXIS_NAMES)
+    human: list[dict] = []
+    judge: list[dict] = []
+    count = 21 if extra_case else 20
+    for index in range(1, count + 1):
+        case_id = f"case_{index:03d}"
+        fail_axis = axes_ko[index - 1] if index <= len(axes_ko) else None
+        label = "fail" if fail_axis else "pass"
+        fail_axes = [fail_axis] if fail_axis else []
+        if case_id == flip_label_of:
+            label, fail_axes = ("pass", []) if label == "fail" else ("fail", [axes_ko[0]])
+        human.append(
+            {"id": case_id, "label": label, "fail_axes": fail_axes, "rationale": "합성 근거"}
+        )
+
+        judge_fail_ko = set(fail_axes)
+        rubric = {
+            to_en(axis_ko): {
+                "passed": axis_ko not in judge_fail_ko,
+                "reason": "합성 판정",
+            }
+            for axis_ko in axes_ko
+        }
+        checks = [
+            {
+                "name": to_en(axis_ko),
+                "passed": axis_ko not in judge_fail_ko,
+                "required": True,
+                "detail": "합성 검사",
+            }
+            for axis_ko in axes_ko
+        ]
+        passed = not judge_fail_ko
+        body_seed = f"{case_id}-changed" if case_id == change_body_of else case_id
+        judge.append(
+            {
+                "case_id": case_id,
+                "passed": passed,
+                "reason": "합성 사유",
+                "rubric": rubric,
+                "checks": checks,
+                "judge_attempt": 1,
+                "judge_feedback": "" if passed else "합성 피드백",
+                "manual_review_flags": [],
+                "prompt_version": "v1",
+                "prompt_hash": hashlib.sha256(case_id.encode()).hexdigest(),
+                "model_version": {
+                    "deployment": "d",
+                    "model": "m",
+                    "api_version": "2026-01-01",
+                },
+                "trace_id": f"trace-{case_id}",
+                "langsmith_run_id": f"run-{case_id}",
+                "langsmith_trace_url": None,
+                "code_sha": "deadbeef",
+                "case_content_sha256": hashlib.sha256(body_seed.encode()).hexdigest(),
+            }
+        )
+    return merge_records(human, judge)
+
+
+def test_calibration_summary_axis_keys_come_from_axes_ssot():
+    summary = calibration_summary(_calibration_records(), prompt_version="v1")
+
+    assert set(CALIBRATION_SUMMARY_REQUIRED_KEYS) <= set(summary)
+    assert set(summary["per_axis"]) == set(AXIS_EN_TO_KO)
     for axis_en, axis_ko in AXIS_EN_TO_KO.items():
-        assert template["per_axis"][axis_en]["axis_ko"] == axis_ko
+        assert summary["per_axis"][axis_en]["axis_ko"] == axis_ko
+
+
+def test_calibration_summary_has_no_hand_filled_placeholder():
+    """사람이 채우는 빈 칸(None 자리표시)이 남아 있으면 안 된다 (#137 리뷰 지적)."""
+    summary = calibration_summary(_calibration_records(), prompt_version="v1")
+
+    assert summary["total"] == 20
+    assert summary["derived"]["match"] == 20
+    assert summary["derived"]["match_rate"] == 1.0
+    # top-level에 파생값을 중복해서 두지 않는다 — 원본은 confusion_matrix 하나다.
+    for key in CALIBRATION_DERIVED_KEYS:
+        assert key not in summary, f"{key}가 top-level에 중복돼 있습니다."
+
+
+def test_calibration_derived_values_always_match_confusion_matrix():
+    """파생값이 matrix에서 계산되므로 둘이 어긋날 수 없다."""
+    summary = calibration_summary(
+        _calibration_records(flip_label_of="case_001"), prompt_version="v1"
+    )
+    matrix = summary["confusion_matrix"]
+    derived = summary["derived"]
+
+    assert derived["match"] == matrix["true_positive"] + matrix["true_negative"]
+    assert derived["false_negative"] == matrix["false_negative"]
+    assert derived["false_positive"] == matrix["false_positive"]
+    assert derived["match_rate"] == round(derived["match"] / summary["total"], 4)
+    for axis_summary in summary["per_axis"].values():
+        axis_matrix = axis_summary["confusion_matrix"]
+        assert axis_summary["derived"]["match"] == (
+            axis_matrix["true_positive"] + axis_matrix["true_negative"]
+        )
+
+
+def test_evalset_hash_is_stable_for_same_evalset():
+    assert evalset_hash(_calibration_records()) == evalset_hash(_calibration_records())
+
+
+def test_evalset_hash_changes_when_case_body_changes():
+    """사례 본문이 바뀌면 같은 평가셋이 아니다 — 시험 문제가 바뀐 것."""
+    assert evalset_hash(_calibration_records()) != evalset_hash(
+        _calibration_records(change_body_of="case_007")
+    )
+
+
+def test_evalset_hash_changes_when_human_label_changes():
+    """본문이 같아도 라벨이 바뀌면 같은 정답지가 아니다.
+
+    case_content_sha256만 해시했다면 이 경우를 놓친다 — judge가 전혀 변하지
+    않아도 일치율이 움직이므로 반드시 잡혀야 한다.
+    """
+    assert evalset_hash(_calibration_records()) != evalset_hash(
+        _calibration_records(flip_label_of="case_003")
+    )
+
+
+def test_evalset_hash_changes_when_case_is_added():
+    """어려운 사례가 추가되면 일치율이 떨어져도 judge 성능 저하가 아니다."""
+    assert evalset_hash(_calibration_records()) != evalset_hash(
+        _calibration_records(extra_case=True)
+    )
+
+
+def test_evalset_hash_ignores_judge_run_metadata():
+    """평가셋 해시는 '무엇을 쟀는가'다 — 프롬프트 버전이 달라도 같아야 한다.
+
+    이게 깨지면 프롬프트만 바꾼 v1·v2 비교에서 평가셋이 달라진 것처럼 보인다.
+    """
+    records = _calibration_records()
+    v1 = calibration_summary(records, prompt_version="v1")
+    v2 = calibration_summary(records, prompt_version="v2")
+
+    assert v1["evalset_hash"] == v2["evalset_hash"]
+    assert v1["prompt_version"] != v2["prompt_version"]

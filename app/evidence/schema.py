@@ -17,6 +17,7 @@ from __future__ import annotations
 from typing import Any, TypedDict
 
 from app.judge.axes import AXIS_EN_TO_KO
+from app.utils.hashing import sha256_of_dict
 
 BUNDLE_SCHEMA_VERSION = "1.0"
 
@@ -237,18 +238,28 @@ RAW_LLM_RECOVERY_NOTE = "레포의 해당 커밋에서 프롬프트 원문 복�
 RAW_LLM_OBSERVABILITY = "응답 원문 관측은 LangSmith trace 담당"
 
 
-# --- calibration 요약 (R2 계약 제안) ----------------------------------------
-#: R2(지은·다경)가 아직 미착수라 R4에서 먼저 제안하는 계약이다.
+# --- calibration 요약 (R2 계약) ---------------------------------------------
 #: 축 키는 문자열을 새로 만들지 않고 app/judge/axes.py의 영문 키를 그대로 쓴다.
+#:
+#: #137 최초 제안은 사람이 채우는 빈 골격(`None` 자리표시)이었고 top-level에
+#: agreement·false_negative·false_positive를 따로 뒀다. #137 리뷰(다경) 지적대로
+#: 이 값들은 confusion_matrix의 파생값이라 두 곳에 손으로 적으면 한쪽만 고쳐져
+#: 어긋날 수 있다 — 감사 증거에서는 치명적이다. 그래서 빈 골격을 없애고,
+#: `calibration_summary()`가 #136이 병합한 `app/evaluation/`의 집계 결과에서
+#: 전량 계산해 채우는 구조로 바꿨다. 사람이 채울 칸은 남기지 않는다.
 CALIBRATION_SUMMARY_REQUIRED_KEYS = (
     "prompt_version",
+    "evalset_hash",
+    "evalset_case_count",
     "total",
-    "agreement",
-    "false_negative",
-    "false_positive",
     "confusion_matrix",
+    "derived",
     "per_axis",
 )
+
+#: confusion_matrix가 유일한 원본이고, 아래 키는 전부 거기서 계산된 파생값이다.
+#: 사람이 적는 값이 아니라는 것을 계약으로 못박는다.
+CALIBRATION_DERIVED_KEYS = ("match", "match_rate", "false_negative", "false_positive")
 
 #: prompt_version이 필요한 이유 — 일치율은 프롬프트가 바뀌면 함께 움직인다.
 #: 어떤 프롬프트로 잰 수치인지 붙어 있지 않으면 개선 전후 비교가 성립하지 않고,
@@ -258,29 +269,101 @@ CALIBRATION_PROMPT_VERSION_RATIONALE = (
     "비교와 LangSmith prompt_hash 대조가 불가능하다."
 )
 
+#: evalset_hash가 필요한 이유 — 일치율은 (프롬프트 × 평가셋)의 함수다.
+#: 프롬프트가 그대로여도 평가셋에 어려운 사례가 추가되거나 라벨이 바뀌면
+#: 일치율이 움직이는데, 평가셋 정체성이 없으면 그것을 "judge 성능 저하"로
+#: 오진한다. 손으로 관리하는 버전 문자열은 사례를 바꾸고 버전을 올리는 걸
+#: 잊는 drift가 생기므로 쓰지 않고, 내용 해시로 자동·위변조 감지되게 한다.
+CALIBRATION_EVALSET_HASH_RATIONALE = (
+    "일치율은 (프롬프트 × 평가셋)의 함수다. 평가셋 정체성이 없으면 사례 추가·"
+    "라벨 변경으로 인한 변동을 judge 성능 변화로 오진한다. 수동 버전 문자열은 "
+    "drift가 생기므로 내용 해시로 고정한다."
+)
 
-def calibration_summary_template() -> dict:
-    """R2에 전달할 calibration 요약의 빈 골격. per_axis 키를 SSOT에서 채운다."""
+
+def evalset_hash(records: list) -> str:
+    """평가셋의 정체성 해시 — 사례 집합·본문·사람 라벨을 함께 고정한다.
+
+    `records`는 `app.evaluation.calibration_schema.CalibrationRecord` 목록이다.
+
+    해시 대상에 사람 라벨(`human_passed`·`human_fail_axes`)을 포함하는 이유:
+    사례 본문(`case_content_sha256`)만 고정하면 **같은 본문을 다시 라벨링해
+    정답을 바꾼 경우**를 못 잡는다. 그 경우 judge가 전혀 변하지 않아도 일치율이
+    움직이므로, 라벨까지 해시에 넣어야 "같은 시험지·같은 정답지"가 증명된다.
+
+    judge 실행 쪽 메타데이터(prompt_version·model_version·code_sha)는 넣지
+    않는다 — 그건 "무엇으로 쟀는가"이고, 이 해시는 "무엇을 쟀는가"다. 둘을
+    섞으면 프롬프트만 바꾼 v1·v2 비교에서 평가셋이 달라진 것처럼 보인다.
+    """
+    payload = {
+        "cases": [
+            {
+                "case_id": record.case_id,
+                "case_content_sha256": record.case_content_sha256,
+                "human_passed": record.human_passed,
+                "human_fail_axes": list(record.human_fail_axes),
+            }
+            for record in sorted(records, key=lambda record: record.case_id)
+        ]
+    }
+    return sha256_of_dict(payload)
+
+
+def calibration_summary(records: list, *, prompt_version: str) -> dict:
+    """calibration 요약을 records에서 전량 계산한다. 사람이 채우는 칸은 없다.
+
+    `records`는 `app.evaluation.calibration_schema.merge_records()`의 결과다.
+    집계는 #136이 병합한 `app.evaluation.judge_calibration`에 위임하고, 이
+    함수는 번들 파일 모양으로 옮기기만 한다 — 계산 로직을 두 벌로 만들지 않는다.
+
+    필드명은 `OverallMetrics`/`AxisMetrics`를 그대로 따른다(`match`·`match_rate`).
+    #137 최초 제안의 `agreement`는 쓰지 않는다 — 병합된 코드가 SSOT다.
+    """
+    from app.evaluation.judge_calibration import (
+        calculate_axis_metrics,
+        calculate_overall_metrics,
+    )
+
+    overall = calculate_overall_metrics(records)
+    axis_metrics = calculate_axis_metrics(records)
     return {
-        "prompt_version": None,
-        "total": 0,
-        "agreement": None,
-        "false_negative": None,
-        "false_positive": None,
+        "prompt_version": prompt_version,
+        "evalset_hash": evalset_hash(records),
+        "evalset_case_count": overall.total,
+        "total": overall.total,
         "confusion_matrix": {
-            "true_positive": 0,
-            "true_negative": 0,
-            "false_positive": 0,
-            "false_negative": 0,
+            "true_positive": overall.true_positive,
+            "true_negative": overall.true_negative,
+            "false_positive": overall.false_positive,
+            "false_negative": overall.false_negative,
+        },
+        "derived": {
+            "match": overall.match,
+            "match_rate": overall.match_rate,
+            "false_negative": overall.false_negative,
+            "false_positive": overall.false_positive,
         },
         "per_axis": {
             axis_en: {
-                "axis_ko": axis_ko,
-                "total": 0,
-                "agreement": None,
-                "false_negative": None,
-                "false_positive": None,
+                "axis_ko": AXIS_EN_TO_KO[axis_en],
+                "total": metrics.total,
+                "confusion_matrix": {
+                    "true_positive": metrics.true_positive,
+                    "true_negative": metrics.true_negative,
+                    "false_positive": metrics.false_positive,
+                    "false_negative": metrics.false_negative,
+                },
+                "derived": {
+                    "match": metrics.match,
+                    "match_rate": metrics.match_rate,
+                    "false_negative": metrics.false_negative,
+                    "false_positive": metrics.false_positive,
+                },
+                # 결함이 드문 축은 match_rate가 과장된다 — 20건 중 1건 결함을
+                # 놓치면 match_rate 95%인데 defect_recall 0%다. 함께 싣는다.
+                "human_fail_support": metrics.human_fail_support,
+                "defect_recall": metrics.defect_recall,
             }
-            for axis_en, axis_ko in AXIS_EN_TO_KO.items()
+            for axis_en, metrics in axis_metrics.items()
         },
     }
