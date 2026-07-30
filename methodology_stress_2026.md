@@ -228,7 +228,7 @@ PR #17 병합으로 **VaR 경로에도 대칭 진단 지표**가 도입되었다
 | 자산군 | 프록시 티커 | 설명 | 통화 |
 | --- | --- | --- | --- |
 | 국내주식 (domestic_equity) | `^KS11` | KOSPI 지수 | KRW |
-| 국내채권 (domestic_bond) | `114260.KS` | KODEX 국고채10년 | KRW |
+| 국내채권 (domestic_bond) | `114260.KS` | KODEX 국고채3년 | KRW |
 | 해외주식 (global_equity) | `ACWI` | iShares MSCI ACWI | USD → KRW 환산 |
 | 해외채권 (global_bond) | `IGOV` | iShares International Treasury (무헤지) | USD → KRW 환산 |
 | 대체투자 (alternatives) | `GLD` | SPDR Gold Shares | USD → KRW 환산 |

@@ -1,0 +1,753 @@
+"""R2 캘리브레이션 스키마·계산 로직 테스트 — 전부 mock 데이터로 검증한다.
+
+실제 R1 사례 20건은 생성형 AI에 입력하지 않는다는 팀 방침에 따라, 이 테스트는
+실제 사례 내용을 전혀 참조하지 않는다. case_001~case_004 등은 여기서만 쓰는
+가상 사례이며, 실제 사례집이 도착하면 이 테스트가 아니라 실행 결과 파일이
+merge_records에 들어간다.
+"""
+from __future__ import annotations
+
+import hashlib
+from dataclasses import replace
+
+import pytest
+
+from app.evaluation.calibration_schema import (
+    CalibrationRecord,
+    CalibrationSchemaError,
+    EXPECTED_CASE_IDS,
+    build_judge_result,
+    merge_records,
+    normalize_human_label,
+    normalize_judge_result,
+    validate_official_case_set,
+    validate_run_consistency,
+)
+from app.evaluation.judge_calibration import (
+    build_confusion_matrix,
+    calculate_axis_metrics,
+    calculate_overall_metrics,
+    compare_official_versions,
+    compare_versions,
+    find_mismatches,
+)
+from app.judge.axes import to_ko
+from app.judge.rubric import AXIS_NAMES
+
+
+def _sha256_hex(seed: str) -> str:
+    return hashlib.sha256(seed.encode()).hexdigest()
+
+
+def _rubric(fail_axes: tuple[str, ...] = ()) -> dict:
+    return {axis: {"passed": axis not in fail_axes, "reason": "mock reason"} for axis in AXIS_NAMES}
+
+
+def _checks(*, rubric_fail_axes: tuple[str, ...] = (), failed_required_checks: tuple[str, ...] = ()) -> list[dict]:
+    checks = [
+        {"name": axis, "passed": axis not in rubric_fail_axes, "required": True, "detail": "mock axis detail"}
+        for axis in AXIS_NAMES
+    ]
+    system_checks = {
+        "metrics_present": True,
+        "computation_hash_present": True,
+        "citations_all_verified": True,
+        "citation_content_contract": True,
+    }
+    for name in failed_required_checks:
+        system_checks[name] = False
+    checks.extend(
+        {"name": name, "passed": passed, "required": True, "detail": "mock system detail"}
+        for name, passed in system_checks.items()
+    )
+    return checks
+
+
+def _human(case_id: str, label: str, fail_axes: list[str] | None = None) -> dict:
+    return {
+        "id": case_id,
+        "label": label,
+        "fail_axes": fail_axes or [],
+        "rationale": f"{case_id} rationale",
+    }
+
+
+def _model_version(deployment: str = "gpt-mock") -> dict:
+    return {"deployment": deployment, "model": "gpt-mock-2026", "api_version": "2026-01-01"}
+
+
+def _judge(
+    case_id: str,
+    passed: bool,
+    fail_axes_en: tuple[str, ...] = (),
+    *,
+    prompt_version: str = "v1",
+    code_sha: str = "deadbeef",
+    judge_attempt: int = 1,
+    failed_required_checks: tuple[str, ...] = (),
+    case_content_seed: str | None = None,
+    langsmith_run_id: str | None = None,
+    langsmith_trace_url: str | None = None,
+) -> dict:
+    return {
+        "case_id": case_id,
+        "passed": passed,
+        "reason": f"{case_id} judge reason",
+        "rubric": _rubric(fail_axes_en),
+        "checks": _checks(rubric_fail_axes=fail_axes_en, failed_required_checks=failed_required_checks),
+        "judge_attempt": judge_attempt,
+        "judge_feedback": "" if passed else f"{case_id} rewrite feedback",
+        "manual_review_flags": [],
+        "prompt_version": prompt_version,
+        "prompt_hash": _sha256_hex(f"{prompt_version}-{case_id}"),
+        "model_version": _model_version(),
+        "trace_id": f"trace-{case_id}-{prompt_version}",
+        "langsmith_run_id": langsmith_run_id,
+        "langsmith_trace_url": langsmith_trace_url,
+        "code_sha": code_sha,
+        "case_content_sha256": _sha256_hex(case_content_seed or case_id),
+    }
+
+
+def _ko_for(axis_en: str) -> str:
+    return to_ko(axis_en)
+
+
+def _no_langsmith(record: CalibrationRecord) -> CalibrationRecord:
+    return replace(record, langsmith_run_id=None, langsmith_trace_url=None)
+
+
+# case_001: 사람 pass, judge pass → TN
+# case_002: 사람 fail(출처=source_validity), judge pass → FN (결함 놓침)
+# case_003: 사람 pass, judge fail(면책=disclaimer) → FP (오탐)
+# case_004: 사람 fail(수치 정합=numeric_consistency), judge도 동일 축 fail → TP
+HUMAN_LABELS_V1 = [
+    _human("case_001", "pass"),
+    _human("case_002", "fail", ["출처"]),
+    _human("case_003", "pass"),
+    _human("case_004", "fail", ["수치 정합"]),
+]
+JUDGE_RESULTS_V1 = [
+    _judge("case_001", True),
+    _judge("case_002", True),
+    _judge("case_003", False, ("disclaimer",)),
+    _judge("case_004", False, ("numeric_consistency",)),
+]
+
+
+@pytest.fixture
+def records_v1() -> list[CalibrationRecord]:
+    return merge_records(HUMAN_LABELS_V1, JUDGE_RESULTS_V1)
+
+
+class TestNormalizeHumanLabel:
+    def test_valid_pass(self):
+        case_id, human_passed, fail_axes, rationale = normalize_human_label(_human("c1", "pass"))
+        assert case_id == "c1"
+        assert human_passed is True
+        assert fail_axes == ()
+
+    def test_valid_fail_translates_korean_axis(self):
+        _, human_passed, fail_axes, _ = normalize_human_label(
+            _human("c1", "fail", ["출처", "면책"])
+        )
+        assert human_passed is False
+        assert fail_axes == ("source_validity", "disclaimer")
+
+    def test_fail_axes_order_is_normalized(self):
+        """입력 순서가 달라도 같은 정답이면 같은 tuple이 나와야 v1·v2 비교가 안정적이다."""
+        _, _, fail_axes_a, _ = normalize_human_label(_human("c1", "fail", ["면책", "출처"]))
+        _, _, fail_axes_b, _ = normalize_human_label(_human("c2", "fail", ["출처", "면책"]))
+        assert fail_axes_a == fail_axes_b
+
+    def test_missing_id_raises(self):
+        with pytest.raises(CalibrationSchemaError, match="id가 없습니다"):
+            normalize_human_label({"label": "pass"})
+
+    def test_invalid_label_raises(self):
+        with pytest.raises(CalibrationSchemaError, match="pass\\|fail"):
+            normalize_human_label(_human("c1", "FAIL"))
+
+    def test_missing_fail_axes_key_raises(self):
+        raw = _human("c1", "pass")
+        del raw["fail_axes"]
+        with pytest.raises(CalibrationSchemaError, match="fail_axes 필드가 없습니다"):
+            normalize_human_label(raw)
+
+    def test_non_list_fail_axes_does_not_silently_become_empty(self):
+        """fail_axes=0처럼 falsy인 잘못된 타입이 `or []`로 조용히 통과하면 안 된다."""
+        raw = _human("c1", "pass")
+        raw["fail_axes"] = 0
+        with pytest.raises(CalibrationSchemaError, match="list여야 합니다"):
+            normalize_human_label(raw)
+
+    def test_duplicate_axis_raises(self):
+        with pytest.raises(CalibrationSchemaError, match="중복"):
+            normalize_human_label(_human("c1", "fail", ["출처", "출처"]))
+
+    def test_pass_with_fail_axes_raises(self):
+        with pytest.raises(CalibrationSchemaError, match="label=pass"):
+            normalize_human_label(_human("c1", "pass", ["출처"]))
+
+    def test_fail_without_fail_axes_raises(self):
+        with pytest.raises(CalibrationSchemaError, match="label=fail"):
+            normalize_human_label(_human("c1", "fail", []))
+
+    def test_unknown_axis_name_raises(self):
+        with pytest.raises(CalibrationSchemaError, match="알 수 없는"):
+            normalize_human_label(_human("c1", "fail", ["출 처"]))
+
+    def test_non_string_rationale_raises(self):
+        raw = _human("c1", "pass")
+        raw["rationale"] = {"not": "a string"}
+        with pytest.raises(CalibrationSchemaError, match="rationale"):
+            normalize_human_label(raw)
+
+
+class TestNormalizeJudgeResult:
+    def test_valid(self):
+        result = normalize_judge_result(_judge("c1", False, ("hallucination",)))
+        assert result.case_id == "c1"
+        assert result.passed is False
+        assert result.fail_axes == ("hallucination",)
+        assert result.axis_reasons["hallucination"] == "mock reason"
+        assert result.prompt_version == "v1"
+        assert result.model_version == _model_version()
+        assert result.trace_id == "trace-c1-v1"
+        assert result.code_sha == "deadbeef"
+        assert result.judge_attempt == 1
+        assert result.langsmith_run_id is None
+
+    def test_missing_axis_raises(self):
+        raw = _judge("c1", True)
+        del raw["rubric"]["disclaimer"]
+        with pytest.raises(CalibrationSchemaError, match="6축"):
+            normalize_judge_result(raw)
+
+    def test_non_bool_passed_raises(self):
+        raw = _judge("c1", True)
+        raw["passed"] = "true"
+        with pytest.raises(CalibrationSchemaError, match="bool"):
+            normalize_judge_result(raw)
+
+    @pytest.mark.parametrize("field", ["prompt_version", "trace_id"])
+    def test_missing_metadata_field_raises(self, field):
+        raw = _judge("c1", True)
+        del raw[field]
+        with pytest.raises(CalibrationSchemaError, match=field):
+            normalize_judge_result(raw)
+
+    def test_blank_prompt_version_raises(self):
+        raw = _judge("c1", True)
+        raw["prompt_version"] = "   "
+        with pytest.raises(CalibrationSchemaError, match="prompt_version"):
+            normalize_judge_result(raw)
+
+    def test_non_hex_prompt_hash_raises(self):
+        raw = _judge("c1", True)
+        raw["prompt_hash"] = "not-a-hash"
+        with pytest.raises(CalibrationSchemaError, match="prompt_hash"):
+            normalize_judge_result(raw)
+
+    def test_non_hex_case_content_sha256_raises(self):
+        raw = _judge("c1", True)
+        raw["case_content_sha256"] = "short"
+        with pytest.raises(CalibrationSchemaError, match="case_content_sha256"):
+            normalize_judge_result(raw)
+
+    def test_short_code_sha_is_accepted(self):
+        """git short SHA(7자)는 sha256이 아니라 별도 검증 규칙을 쓴다."""
+        result = normalize_judge_result(_judge("c1", True, code_sha="abc1234"))
+        assert result.code_sha == "abc1234"
+
+    def test_model_version_must_be_dict(self):
+        raw = _judge("c1", True)
+        raw["model_version"] = "gpt-mock-2026"
+        with pytest.raises(CalibrationSchemaError, match="model_version은 dict"):
+            normalize_judge_result(raw)
+
+    def test_model_version_missing_key_raises(self):
+        raw = _judge("c1", True)
+        del raw["model_version"]["api_version"]
+        with pytest.raises(CalibrationSchemaError, match="api_version"):
+            normalize_judge_result(raw)
+
+    def test_model_version_all_blank_raises(self):
+        raw = _judge("c1", True)
+        raw["model_version"] = {"deployment": None, "model": None, "api_version": None}
+        with pytest.raises(CalibrationSchemaError, match="deployment·model"):
+            normalize_judge_result(raw)
+
+    def test_optional_langsmith_fields_pass_through(self):
+        raw = _judge("c1", True)
+        raw["langsmith_run_id"] = "abc-123"
+        raw["langsmith_trace_url"] = "https://smith.langchain.com/runs/abc-123"
+        result = normalize_judge_result(raw)
+        assert result.langsmith_run_id == "abc-123"
+        assert result.langsmith_trace_url == "https://smith.langchain.com/runs/abc-123"
+
+    def test_blank_langsmith_field_raises(self):
+        raw = _judge("c1", True)
+        raw["langsmith_run_id"] = "   "
+        with pytest.raises(CalibrationSchemaError, match="langsmith_run_id"):
+            normalize_judge_result(raw)
+
+    def test_checks_missing_raises(self):
+        raw = _judge("c1", True)
+        del raw["checks"]
+        with pytest.raises(CalibrationSchemaError, match="checks"):
+            normalize_judge_result(raw)
+
+    def test_failed_required_check_outside_rubric_is_captured(self):
+        """citation_content_contract처럼 6축 밖의 필수 검사 실패가 소실되면 안 된다."""
+        raw = _judge("c1", False, failed_required_checks=("citation_content_contract",))
+        result = normalize_judge_result(raw)
+        assert result.fail_axes == ()  # 6축 rubric은 전부 통과
+        assert result.failed_required_checks == ("citation_content_contract",)
+
+    def test_rubric_and_checks_axis_mismatch_raises(self):
+        """rubric[축]과 checks[축]이 서로 다른 손상된 입력은 거부해야 한다.
+
+        6축 이름과 같은 checks 항목만 있으면 failed_required_checks에서
+        제외되기 때문에, rubric만 보고 fail_axes를 판단하면 이 불일치를
+        놓친다 — 그래서 rubric과 checks[축]을 직접 대조해야 한다.
+        """
+        raw = _judge("c1", True)
+        raw["rubric"]["hallucination"]["passed"] = False  # checks[hallucination]은 여전히 True
+        with pytest.raises(CalibrationSchemaError, match="판정이 다릅니다"):
+            normalize_judge_result(raw)
+
+    def test_duplicate_check_name_raises(self):
+        raw = _judge("c1", True)
+        raw["checks"].append(dict(raw["checks"][0]))
+        with pytest.raises(CalibrationSchemaError, match="중복"):
+            normalize_judge_result(raw)
+
+    def test_axis_check_missing_from_checks_raises(self):
+        raw = _judge("c1", True)
+        raw["checks"] = [c for c in raw["checks"] if c["name"] != "disclaimer"]
+        with pytest.raises(CalibrationSchemaError, match="6축 검사 disclaimer가 없습니다"):
+            normalize_judge_result(raw)
+
+    def test_hidden_failed_system_check_with_passed_true_raises(self):
+        """6축은 전부 일치해도, 6축 밖 시스템 검사 실패를 숨기고 passed=true라 주장하면 거부한다."""
+        raw = _judge("c1", False, failed_required_checks=("citation_content_contract",))
+        raw["passed"] = True
+        with pytest.raises(CalibrationSchemaError, match="checks의 필수 검사 결과"):
+            normalize_judge_result(raw)
+
+    def test_passed_false_with_no_failure_reason_raises(self):
+        raw = _judge("c1", True)  # 모든 축·검사가 통과 상태
+        raw["passed"] = False  # 그런데 passed만 거짓으로 조작
+        with pytest.raises(CalibrationSchemaError, match="checks의 필수 검사 결과"):
+            normalize_judge_result(raw)
+
+    def test_judge_feedback_required_when_failed(self):
+        raw = _judge("c1", False, ("hallucination",))
+        raw["judge_feedback"] = ""
+        with pytest.raises(CalibrationSchemaError, match="judge_feedback"):
+            normalize_judge_result(raw)
+
+    def test_judge_feedback_non_string_raises_even_when_passed(self):
+        """PASS 사례라도 judge_feedback 타입이 잘못되면 조용히 ""로 바꾸지 않고 거부한다."""
+        raw = _judge("c1", True)
+        raw["judge_feedback"] = {"unexpected": "dict"}
+        with pytest.raises(CalibrationSchemaError, match="judge_feedback은 문자열"):
+            normalize_judge_result(raw)
+
+    def test_manual_review_flags_missing_key_raises(self):
+        raw = _judge("c1", True)
+        del raw["manual_review_flags"]
+        with pytest.raises(CalibrationSchemaError, match="manual_review_flags 필드가 없습니다"):
+            normalize_judge_result(raw)
+
+    def test_manual_review_flags_falsy_non_list_does_not_silently_pass(self):
+        """manual_review_flags=0처럼 falsy인 잘못된 타입이 조용히 []로 통과하면 안 된다."""
+        raw = _judge("c1", True)
+        raw["manual_review_flags"] = 0
+        with pytest.raises(CalibrationSchemaError, match="manual_review_flags는"):
+            normalize_judge_result(raw)
+
+    def test_manual_review_flags_blank_entry_raises(self):
+        raw = _judge("c1", True)
+        raw["manual_review_flags"] = ["   "]
+        with pytest.raises(CalibrationSchemaError, match="manual_review_flags는"):
+            normalize_judge_result(raw)
+
+    def test_model_version_non_string_subvalue_raises(self):
+        raw = _judge("c1", True)
+        raw["model_version"]["deployment"] = 123
+        with pytest.raises(CalibrationSchemaError, match="model_version.deployment"):
+            normalize_judge_result(raw)
+
+    @pytest.mark.parametrize("bad_attempt", [0, -1, True, "1"])
+    def test_invalid_judge_attempt_raises(self, bad_attempt):
+        raw = _judge("c1", True)
+        raw["judge_attempt"] = bad_attempt
+        with pytest.raises(CalibrationSchemaError, match="judge_attempt"):
+            normalize_judge_result(raw)
+
+
+class TestMergeRecords:
+    def test_merges_by_case_id(self, records_v1):
+        assert [r.case_id for r in records_v1] == [
+            "case_001",
+            "case_002",
+            "case_003",
+            "case_004",
+        ]
+        record = records_v1[3]
+        assert record.human_passed is False
+        assert record.judge_passed is False
+        assert record.human_fail_axes == ("numeric_consistency",)
+        assert record.trace_id == "trace-case_004-v1"
+        assert record.code_sha == "deadbeef"
+        assert record.judge_attempt == 1
+        assert record.judge_failed_required_checks == ()
+
+    def test_mismatched_ids_raise(self):
+        with pytest.raises(CalibrationSchemaError, match="일치하지 않습니다"):
+            merge_records(HUMAN_LABELS_V1, JUDGE_RESULTS_V1[:-1])
+
+    def test_duplicate_id_raises(self):
+        with pytest.raises(CalibrationSchemaError, match="중복"):
+            merge_records(HUMAN_LABELS_V1 + [_human("case_001", "pass")], JUDGE_RESULTS_V1)
+
+
+class TestOverallMetrics:
+    def test_counts_and_rate(self, records_v1):
+        metrics = calculate_overall_metrics(records_v1)
+        assert metrics.total == 4
+        assert metrics.true_positive == 1
+        assert metrics.true_negative == 1
+        assert metrics.false_negative == 1
+        assert metrics.false_positive == 1
+        assert metrics.match == 2
+        assert metrics.match_rate == 0.5
+
+    def test_empty_records_raise(self):
+        with pytest.raises(ValueError):
+            calculate_overall_metrics([])
+
+
+class TestConfusionMatrix:
+    def test_matrix_shape(self, records_v1):
+        matrix = build_confusion_matrix(records_v1)
+        assert matrix == {
+            "human_pass": {"judge_pass": 1, "judge_fail": 1},
+            "human_fail": {"judge_pass": 1, "judge_fail": 1},
+        }
+
+
+class TestAxisMetrics:
+    def test_source_validity_has_one_false_negative(self, records_v1):
+        axis_metrics = calculate_axis_metrics(records_v1)
+        source = axis_metrics["source_validity"]
+        assert source.match == 3
+        assert source.false_negative == 1
+        assert source.false_positive == 0
+        assert source.axis_ko == "출처"
+
+    def test_disclaimer_has_one_false_positive(self, records_v1):
+        axis_metrics = calculate_axis_metrics(records_v1)
+        disclaimer = axis_metrics["disclaimer"]
+        assert disclaimer.match == 3
+        assert disclaimer.false_positive == 1
+        assert disclaimer.false_negative == 0
+
+    def test_untouched_axes_match_fully_and_have_no_defect_support(self, records_v1):
+        axis_metrics = calculate_axis_metrics(records_v1)
+        for axis in ("hallucination", "false_precision", "prohibited_expression"):
+            assert axis_metrics[axis].match == 4
+            assert axis_metrics[axis].match_rate == 1.0
+            assert axis_metrics[axis].human_fail_support == 0
+            assert axis_metrics[axis].defect_recall is None
+
+    def test_numeric_consistency_matches_on_true_positive(self, records_v1):
+        axis_metrics = calculate_axis_metrics(records_v1)
+        numeric = axis_metrics["numeric_consistency"]
+        assert numeric.match == 4
+        assert numeric.true_positive == 1
+        assert numeric.human_fail_support == 1
+        assert numeric.defect_recall == 1.0
+
+    def test_source_validity_defect_recall_is_zero_despite_high_match_rate(self, records_v1):
+        """match_rate만 보면 75%처럼 보여도 defect_recall로 실제 탐지력을 드러낸다."""
+        source = calculate_axis_metrics(records_v1)["source_validity"]
+        assert source.match_rate == 0.75
+        assert source.human_fail_support == 1
+        assert source.defect_recall == 0.0
+
+
+class TestFindMismatches:
+    def test_returns_only_mismatched_cases(self, records_v1):
+        mismatches = find_mismatches(records_v1)
+        assert {m.case_id for m in mismatches} == {"case_002", "case_003"}
+
+    def test_error_types(self, records_v1):
+        by_id = {m.case_id: m for m in find_mismatches(records_v1)}
+        assert by_id["case_002"].error_type == "false_negative"
+        assert by_id["case_002"].axis_mismatch == ("source_validity",)
+        assert by_id["case_003"].error_type == "false_positive"
+        assert by_id["case_003"].axis_mismatch == ("disclaimer",)
+
+    def test_includes_judge_reason_for_mismatched_axes_only(self, records_v1):
+        by_id = {m.case_id: m for m in find_mismatches(records_v1)}
+        assert by_id["case_002"].judge_axis_reasons == {"source_validity": "mock reason"}
+        assert by_id["case_003"].judge_axis_reasons == {"disclaimer": "mock reason"}
+
+
+class TestRunConsistency:
+    def test_consistent_run_passes(self, records_v1):
+        validate_run_consistency(records_v1)  # 예외 없이 통과
+
+    def test_different_prompt_version_raises(self):
+        judge = [
+            _judge("case_001", True),
+            _judge("case_002", True),
+            _judge("case_003", False, ("disclaimer",)),
+            _judge("case_004", False, ("numeric_consistency",), prompt_version="v2"),
+        ]
+        records = merge_records(HUMAN_LABELS_V1, judge)
+        with pytest.raises(CalibrationSchemaError, match="prompt_version"):
+            validate_run_consistency(records)
+
+    def test_different_code_sha_raises(self):
+        judge = [
+            _judge("case_001", True),
+            _judge("case_002", True),
+            _judge("case_003", False, ("disclaimer",)),
+            _judge("case_004", False, ("numeric_consistency",), code_sha="cafef00d"),
+        ]
+        records = merge_records(HUMAN_LABELS_V1, judge)
+        with pytest.raises(CalibrationSchemaError, match="한 실행"):
+            validate_run_consistency(records)
+
+
+def _official_20_records(*, prompt_version: str = "v1") -> list[CalibrationRecord]:
+    """6축 전부 최소 1건 결함을 포함하는 case_001~020 mock 세트. LangSmith 필드까지 채운다."""
+    defect_case_ids = [f"case_{i:03d}" for i in range(1, len(AXIS_NAMES) + 1)]
+
+    def _with_langsmith(case_id: str, **kwargs) -> dict:
+        return _judge(
+            case_id,
+            langsmith_run_id=f"run-{case_id}",
+            langsmith_trace_url=f"https://smith.langchain.com/runs/{case_id}",
+            prompt_version=prompt_version,
+            **kwargs,
+        )
+
+    human = [
+        _human(case_id, "fail", [_ko_for(axis)])
+        for axis, case_id in zip(AXIS_NAMES, defect_case_ids)
+    ]
+    judge = [
+        _with_langsmith(case_id, passed=False, fail_axes_en=(axis,))
+        for axis, case_id in zip(AXIS_NAMES, defect_case_ids)
+    ]
+    for i in range(1, 21):
+        case_id = f"case_{i:03d}"
+        if case_id in defect_case_ids:
+            continue
+        human.append(_human(case_id, "pass"))
+        judge.append(_with_langsmith(case_id, passed=True))
+    return merge_records(human, judge)
+
+
+class TestOfficialCaseSet:
+    def test_valid_20_case_set_passes(self):
+        validate_official_case_set(_official_20_records())  # LangSmith 필드까지 포함해 통과
+
+    def test_wrong_count_raises(self):
+        records = _official_20_records()[:-1]
+        with pytest.raises(CalibrationSchemaError, match="20건"):
+            validate_official_case_set(records)
+
+    def test_missing_langsmith_run_id_raises_by_default(self):
+        """require_langsmith 기본값(True)에서는 LangSmith run ID 누락을 잡아야 한다."""
+        records = _official_20_records()
+        records = [
+            r if r.case_id != "case_020" else _no_langsmith(r) for r in records
+        ]
+        with pytest.raises(CalibrationSchemaError, match="LangSmith run ID"):
+            validate_official_case_set(records)
+
+    def test_non_first_attempt_raises(self):
+        """20건 전체를 채우되 한 건만 judge_attempt=2로 만들어 그 검증만 걸리게 한다."""
+        defect_case_ids = [f"case_{i:03d}" for i in range(1, len(AXIS_NAMES) + 1)]
+        human = [
+            _human(case_id, "fail", [_ko_for(axis)])
+            for axis, case_id in zip(AXIS_NAMES, defect_case_ids)
+        ]
+        judge = [
+            _judge(case_id, False, (axis,))
+            for axis, case_id in zip(AXIS_NAMES, defect_case_ids)
+        ]
+        for i in range(1, 21):
+            case_id = f"case_{i:03d}"
+            if case_id in defect_case_ids:
+                continue
+            human.append(_human(case_id, "pass"))
+            attempt = 2 if case_id == "case_020" else 1
+            judge.append(_judge(case_id, True, judge_attempt=attempt))
+        records = merge_records(human, judge)
+        with pytest.raises(CalibrationSchemaError, match="1차 판정"):
+            validate_official_case_set(records, require_langsmith=False)
+
+    def test_uncovered_axis_raises(self):
+        covered_axes = [axis for axis in AXIS_NAMES if axis != "hallucination"]
+        defect_ids = [f"case_{i:03d}" for i in range(1, len(covered_axes) + 1)]
+        human = [
+            _human(case_id, "fail", [_ko_for(axis)]) for axis, case_id in zip(covered_axes, defect_ids)
+        ]
+        judge = [_judge(case_id, False, (axis,)) for axis, case_id in zip(covered_axes, defect_ids)]
+        for i in range(1, 21):
+            case_id = f"case_{i:03d}"
+            if case_id in defect_ids:
+                continue
+            human.append(_human(case_id, "pass"))
+            judge.append(_judge(case_id, True))
+        records = merge_records(human, judge)
+        with pytest.raises(CalibrationSchemaError, match="6축"):
+            validate_official_case_set(records, require_langsmith=False)
+
+
+class TestCompareVersions:
+    def test_v2_fixes_false_negative(self, records_v1):
+        judge_v2 = [
+            _judge("case_001", True, prompt_version="v2"),
+            _judge("case_002", False, ("source_validity",), prompt_version="v2"),  # v2에서 탐지
+            _judge("case_003", False, ("disclaimer",), prompt_version="v2"),  # 오탐은 그대로
+            _judge("case_004", False, ("numeric_consistency",), prompt_version="v2"),
+        ]
+        records_v2 = merge_records(HUMAN_LABELS_V1, judge_v2)
+
+        comparison = compare_versions(records_v1, records_v2)
+
+        assert comparison.before.match_rate == 0.5
+        assert comparison.after.match_rate == 0.75
+        assert comparison.match_rate_delta == 0.25
+        assert comparison.false_negative_delta == -1
+        assert comparison.false_positive_delta == 0
+        assert comparison.axis_after["source_validity"].false_negative == 0
+        assert comparison.axis_after["source_validity"].defect_recall == 1.0
+
+    def test_mismatched_case_ids_raise(self, records_v1):
+        with pytest.raises(ValueError, match="동일 case_id"):
+            compare_versions(records_v1, records_v1[:-1])
+
+    def test_different_human_label_raises(self, records_v1):
+        """사람 정답이 v1·v2 사이에 달라지면 judge 개선 여부와 무관하게 비교를 거부한다."""
+        human_v2_relabeled = [
+            _human("case_001", "pass"),
+            _human("case_002", "pass"),  # v1에서는 fail이었는데 v2에서 정답이 바뀜
+            _human("case_003", "pass"),
+            _human("case_004", "fail", ["수치 정합"]),
+        ]
+        judge_v2 = [
+            _judge("case_001", True, prompt_version="v2"),
+            _judge("case_002", True, prompt_version="v2"),
+            _judge("case_003", False, ("disclaimer",), prompt_version="v2"),
+            _judge("case_004", False, ("numeric_consistency",), prompt_version="v2"),
+        ]
+        records_v2_relabeled = merge_records(human_v2_relabeled, judge_v2)
+
+        with pytest.raises(ValueError, match="사람 정답이 다릅니다"):
+            compare_versions(records_v1, records_v2_relabeled)
+
+    def test_different_case_content_raises(self, records_v1):
+        """사례 본문이 바뀌면(시험 문제가 바뀐 것) judge 개선 효과로 오인하면 안 된다."""
+        judge_v2 = [
+            _judge("case_001", True, prompt_version="v2", case_content_seed="case_001-rewritten"),
+            _judge("case_002", True, prompt_version="v2"),
+            _judge("case_003", False, ("disclaimer",), prompt_version="v2"),
+            _judge("case_004", False, ("numeric_consistency",), prompt_version="v2"),
+        ]
+        records_v2 = merge_records(HUMAN_LABELS_V1, judge_v2)
+        with pytest.raises(ValueError, match="사례 본문"):
+            compare_versions(records_v1, records_v2)
+
+
+class TestCompareOfficialVersions:
+    def test_valid_v1_v2_passes(self):
+        v1 = _official_20_records(prompt_version="v1")
+        v2 = _official_20_records(prompt_version="v2")
+        comparison = compare_official_versions(v1, v2)
+        assert comparison.before.total == 20
+        assert comparison.after.total == 20
+
+    def test_different_code_sha_raises(self):
+        v1 = _official_20_records(prompt_version="v1")
+        v2 = [replace(r, code_sha="cafef00d") for r in _official_20_records(prompt_version="v2")]
+        with pytest.raises(ValueError, match="동일한 code_sha"):
+            compare_official_versions(v1, v2)
+
+    def test_different_model_version_raises(self):
+        v1 = _official_20_records(prompt_version="v1")
+        v2 = [
+            replace(r, model_version={"deployment": "other", "model": "other-model", "api_version": "x"})
+            for r in _official_20_records(prompt_version="v2")
+        ]
+        with pytest.raises(ValueError, match="동일한 model_version"):
+            compare_official_versions(v1, v2)
+
+    def test_same_prompt_version_raises(self):
+        v1 = _official_20_records(prompt_version="v1")
+        v2 = _official_20_records(prompt_version="v1")
+        with pytest.raises(ValueError, match="prompt_version이 같습니다"):
+            compare_official_versions(v1, v2)
+
+    def test_invalid_case_set_is_rejected_before_comparison(self):
+        v1 = _official_20_records(prompt_version="v1")[:-1]  # 19건
+        v2 = _official_20_records(prompt_version="v2")
+        with pytest.raises(CalibrationSchemaError, match="20건"):
+            compare_official_versions(v1, v2)
+
+
+def test_expected_case_ids_constant_has_20_entries():
+    assert len(EXPECTED_CASE_IDS) == 20
+    assert EXPECTED_CASE_IDS == {f"case_{i:03d}" for i in range(1, 21)}
+
+
+def test_build_judge_result_accepts_real_judge_eval_output(monkeypatch):
+    """실제 judge_eval() 반환값이 build_judge_result → normalize_judge_result를 그대로 통과하는지 확인한다.
+
+    스키마가 실제 judge_eval() 계약과 어긋나면(중첩 구조·필드명 변경 등)
+    여기서 먼저 깨져야 한다 — mock으로만 만든 JudgeResult는 이런 계약 드리프트를
+    잡지 못한다. EC-01은 기존 judge 회귀 평가셋의 결함 없는 기준 사례다.
+
+    model_version_record()를 가짜 함수로 바꿔치기하는 이유: 이 함수는 실제
+    Azure 배포 환경변수·LLM 응답 메타데이터에서 deployment를 읽는데, 이
+    테스트는 로컬 오프라인 실행이라 둘 다 없어 원래는 전부 None이 나온다(그럼
+    normalize_judge_result가 정상적으로 거부한다 — 스키마는 맞다는 뜻). 여기서는
+    실제 비밀값을 전혀 읽지 않고, app/llm/audit.py의 with_llm_audit()가 호출하는
+    이 함수 하나만 테스트 동안 가짜 값으로 대체해 구조 계약만 검증한다.
+    """
+    monkeypatch.setattr(
+        "app.llm.audit.model_version_record",
+        lambda llm=None, responses=(): {
+            "deployment": "test-deployment",
+            "model": "test-model",
+            "api_version": "2026-01-01",
+        },
+    )
+    from app.nodes.judge_eval import judge_eval
+    from tests.test_judge_eval_evalset import _PassingLLM, build_eval_case
+
+    case = build_eval_case("EC-01")
+    judge_output = judge_eval(case["state"], llm=_PassingLLM())
+
+    raw = build_judge_result(
+        case_id="case_smoke_ec01",
+        judge_output=judge_output,
+        trace_id="trace-smoke-ec01",
+        prompt_version="v1",
+        code_sha="deadbeef",
+        case_content_sha256=_sha256_hex("case_smoke_ec01"),
+    )
+    result = normalize_judge_result(raw)
+
+    assert result.passed is True
+    assert result.fail_axes == ()
+    assert result.failed_required_checks == ()
+    assert result.judge_attempt == 1
