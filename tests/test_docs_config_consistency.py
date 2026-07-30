@@ -43,7 +43,13 @@ _JUDGE_RETRY_CLAIM_RE = re.compile(
     r"(?:judge_max_retries|Judge 재시도|judge 재시도)"
     r")"
 )
-# 재시도와 무관한 문맥에서 "N회"가 걸리는 것을 걸러낸다.
+# 재시도와 무관한 문맥에서 "N회"가 걸리는 것을 걸러낸다. conflict 재추출 상한(1회)이
+# 일반 키워드 "재시도"에 걸리는 것을 막는 필수 필터다.
+#
+# 알려진 한계(#139 리뷰): 이 필터는 줄 단위로 동작하므로, judge 재시도 숫자와
+# 위 무관 키워드가 **한 줄에 공존하면 그 줄 전체가 스킵되어** 불일치를 놓친다.
+# 현재 문서에는 그런 줄이 없다. 새로 문서를 쓸 때는 judge 재시도 횟수를
+# conflict 재추출 서술과 같은 줄에 섞지 말고 줄을 나눈다.
 _UNRELATED_RE = re.compile(r"충돌|conflict|재추출|IPS 추출|computation_hash|예열|단일 기간")
 
 
