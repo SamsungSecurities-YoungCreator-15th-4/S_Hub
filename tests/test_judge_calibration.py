@@ -118,6 +118,37 @@ def _ko_for(axis_en: str) -> str:
     return to_ko(axis_en)
 
 
+def _fake_judge_output(*, as_of_date: str = "2026-06-30", strict_citation_gate: bool = False) -> dict:
+    """build_judge_result()의 자체 로직(as_of_date 교차검증 등)만 단위 테스트하기
+    위한 최소 judge_eval() 반환값 모양. 실제 judge_eval() 계약 자체는
+    test_build_judge_result_accepts_real_judge_eval_output()이 별도로 검증한다."""
+    return {
+        "judge_retries": 1,
+        "judge_feedback": "",
+        "run_config": {
+            "as_of_date": as_of_date,
+            "strict_citation_gate": strict_citation_gate,
+            "audit": {
+                "llm": {
+                    "judge_eval": {
+                        "latest": {
+                            "prompt_hash": {"aggregate_sha256": _sha256_hex("fake")},
+                            "model_version": _model_version(),
+                        }
+                    }
+                }
+            },
+        },
+        "judge": {
+            "passed": True,
+            "reason": "fake pass",
+            "rubric": _rubric(),
+            "checks": _checks(),
+            "manual_review_flags": [],
+        },
+    }
+
+
 def _no_langsmith(record: CalibrationRecord) -> CalibrationRecord:
     return replace(record, langsmith_run_id=None, langsmith_trace_url=None)
 
@@ -298,7 +329,7 @@ class TestNormalizeJudgeResult:
             normalize_judge_result(raw)
 
     def test_non_uuid_langsmith_run_id_raises(self):
-        """LangSmith run ID는 항상 uuid.uuid4() 문자열이다 — "abc" 같은 placeholder를 거부한다."""
+        """LangSmith run ID는 유효한 UUID여야 한다 — "abc" 같은 placeholder를 거부한다."""
         raw = _judge("c1", True)
         raw["langsmith_run_id"] = "abc-123"
         with pytest.raises(CalibrationSchemaError, match="UUID"):
@@ -837,6 +868,60 @@ class TestCompareOfficialVersions:
         v2 = _official_20_records(prompt_version="v2")
         with pytest.raises(CalibrationSchemaError, match="20건"):
             compare_official_versions(v1, v2)
+
+
+class TestBuildJudgeResultCrossChecks:
+    def test_as_of_date_matching_run_config_is_accepted(self):
+        result = build_judge_result(
+            case_id="c1",
+            judge_output=_fake_judge_output(as_of_date="2026-06-30"),
+            trace_id="trace-c1",
+            prompt_version="v1",
+            code_sha="deadbeef",
+            case_content_sha256=_sha256_hex("c1"),
+            as_of_date="2026-06-30",
+        )
+        assert result["as_of_date"] == "2026-06-30"
+
+    def test_as_of_date_mismatching_run_config_raises(self):
+        """호출자가 실수로 다른 날짜를 넘기면, judge_output의 실제 실행값과
+        대조해 조용히 틀린 값이 감사 기록에 남지 않게 한다."""
+        with pytest.raises(CalibrationSchemaError, match="as_of_date"):
+            build_judge_result(
+                case_id="c1",
+                judge_output=_fake_judge_output(as_of_date="2026-06-30"),
+                trace_id="trace-c1",
+                prompt_version="v1",
+                code_sha="deadbeef",
+                case_content_sha256=_sha256_hex("c1"),
+                as_of_date="2026-07-15",  # 실제 실행값(2026-06-30)과 다름
+            )
+
+
+class TestJudgeCheckNamesConsistency:
+    def test_different_check_names_raises(self, records_v1):
+        """RAG routing audit 존재 여부처럼 필수 검사 항목 자체가 v1·v2에서 달라지면 잡아야 한다."""
+        extra_check = {
+            "name": "citation_routing_contract",
+            "passed": True,
+            "required": True,
+            "detail": "mock routing detail",
+        }
+        judge_v2 = [
+            _judge("case_001", True, prompt_version="v2"),
+            _judge("case_002", True, prompt_version="v2"),
+            _judge("case_003", False, ("disclaimer",), prompt_version="v2"),
+            _judge("case_004", False, ("numeric_consistency",), prompt_version="v2"),
+        ]
+        records_v2 = merge_records(HUMAN_LABELS_V1, judge_v2)
+        records_v2 = [
+            replace(record, judge_checks=(*record.judge_checks, extra_check))
+            if record.case_id == "case_001"
+            else record
+            for record in records_v2
+        ]
+        with pytest.raises(ValueError, match="검사 항목 집합이 다릅니다"):
+            compare_versions(records_v1, records_v2)
 
 
 def test_expected_case_ids_constant_has_20_entries():

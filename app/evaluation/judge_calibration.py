@@ -213,7 +213,10 @@ def _assert_same_evaluation_target(
     와 물리적으로 분리된 값이라 case_content_sha256만으로는 못 잡을 수 있다.
     strict_citation_gate도 같은 성격이다 — source_validity/citation_content_contract
     의 엄격도를 바꾸는 판정 기준이라, 이게 v1·v2 사이에 달라지면 프롬프트를
-    안 고쳐도 PASS 비율이 변한다.
+    안 고쳐도 PASS 비율이 변한다. judge_checks의 검사 이름 집합도 비교한다 —
+    RAG routing audit 존재 여부에 따라 citation_routing_contract 같은 필수
+    검사 자체가 생기거나 사라질 수 있는데, 이건 새 필드 하나로 추적할 수 있는
+    값이 아니라 이미 기록된 judge_checks에서 직접 비교하는 게 정확하다.
     """
     before_by_id = {record.case_id: record for record in before_records}
     after_by_id = {record.case_id: record for record in after_records}
@@ -257,6 +260,19 @@ def _assert_same_evaluation_target(
     if strict_gate_mismatched:
         raise ValueError(
             f"v1·v2의 strict_citation_gate가 다릅니다: {strict_gate_mismatched}"
+        )
+    check_names_mismatched = sorted(
+        case_id
+        for case_id, before_record in before_by_id.items()
+        if (
+            {check["name"] for check in before_record.judge_checks}
+            != {check["name"] for check in after_by_id[case_id].judge_checks}
+        )
+    )
+    if check_names_mismatched:
+        raise ValueError(
+            "v1·v2에서 judge가 수행한 검사 항목 집합이 다릅니다(예: RAG routing audit "
+            f"존재 여부 변화). 같은 조건에서 실행했는지 확인하세요: {check_names_mismatched}"
         )
 
 

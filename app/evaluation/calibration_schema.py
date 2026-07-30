@@ -222,10 +222,10 @@ def _optional_nonempty_str(raw: dict, key: str, *, case_id: str) -> str | None:
 
 
 def _optional_uuid_str(raw: dict, key: str, *, case_id: str) -> str | None:
-    """LangSmith run ID는 항상 uuid.uuid4() 문자열이다(app/observability/langsmith.py).
-
-    "abc"·"임시값" 같은 placeholder가 형식 검증을 그냥 통과하지 않도록,
-    있을 때는 실제 UUID 형태인지까지 확인한다.
+    """LangSmith run ID는 실행 시 app/observability/langsmith.py가 uuid.uuid4()로
+    생성한다. 다만 여기서는 "abc"·"임시값" 같은 placeholder만 거부하면 충분하므로
+    버전(v4)까지는 강제하지 않고 유효한 UUID 형식인지만 확인한다 — 테스트
+    fixture처럼 결정론적 uuid5를 쓰는 경우까지 계약으로 막을 이유는 없다.
     """
     value = _optional_nonempty_str(raw, key, case_id=case_id)
     if value is None:
@@ -591,14 +591,23 @@ def build_judge_result(
     judge_output["judge_feedback"], judge_output["run_config"] 중첩 구조).
     trace_id는 judge_eval() 반환값에 없다 — state["trace_id"](그래프
     load_inputs/observability 단계에서 설정)를 호출자가 그대로 넘긴다.
-    as_of_date도 judge_eval() 반환값에 없다 — 호출자가 실행에 쓴
-    state["run_config"]["as_of_date"]를 그대로 넘긴다.
+    as_of_date도 judge_eval() 반환값에 명시 필드로 없다 — 호출자가 실행에 쓴
+    state["run_config"]["as_of_date"]를 그대로 넘긴다. 다만 judge_eval()이
+    보존하는 judge_output["run_config"]에는 이 값이 그대로 남아있으므로,
+    호출자가 넘긴 값과 실제 실행에 쓰인 값이 다르면(예: 실수로 다른 날짜를
+    넘김) 여기서 바로 잡아낸다 — 조용히 틀린 값을 감사 기록에 남기지 않는다.
     strict_citation_gate는 반대로 judge_output["run_config"]에 이미 보존돼
     있어(judge_eval()이 이 값을 그대로 읽고 되돌려준다) 호출자가 따로 넘길
     필요가 없다 — judge_eval.py가 검사에 쓴 판정과 정확히 같은 값을 뽑는다.
     tests/test_judge_calibration.py의 통합 테스트가 이 함수를 실제
     judge_eval() 출력에 대해 검증한다.
     """
+    actual_as_of_date = judge_output["run_config"].get("as_of_date")
+    if actual_as_of_date is not None and actual_as_of_date != as_of_date:
+        raise CalibrationSchemaError(
+            f"{case_id}: 넘겨받은 as_of_date({as_of_date!r})가 judge_output의 실제 실행값"
+            f"({actual_as_of_date!r})과 다릅니다."
+        )
     judge = judge_output["judge"]
     audit = judge_output["run_config"]["audit"]["llm"]["judge_eval"]["latest"]
     return {
