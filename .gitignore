@@ -25,6 +25,11 @@ data/rag-index-cache/
 /corpus/**/*.pdf
 !/corpus/**/.gitkeep
 
+# judge 실행·기록 러너 산출물 — 실행마다 생기는 로컬 리허설/결과 파일이라
+# 커밋하지 않는다. 공식 v1/v2 결과 파일 공유 방식은 팀 합의 후 별도로 정한다.
+/out/
+judge_v*_results.json
+
 # 정답 사례집 출제 의도 봉인 파일 — judge가 채점받는 정답지라 커밋하면
 # 라벨러 독립성이 깨진다. 코퍼스(goldenset/corpus/)와 사례 본문은 추적 대상이다.
 /goldenset/.sealed/
