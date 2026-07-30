@@ -8,6 +8,7 @@ merge_records에 들어간다.
 from __future__ import annotations
 
 import hashlib
+import uuid
 from dataclasses import replace
 
 import pytest
@@ -89,6 +90,7 @@ def _judge(
     langsmith_run_id: str | None = None,
     langsmith_trace_url: str | None = None,
     as_of_date: str = "2026-06-30",
+    strict_citation_gate: bool = False,
 ) -> dict:
     return {
         "case_id": case_id,
@@ -108,6 +110,7 @@ def _judge(
         "code_sha": code_sha,
         "case_content_sha256": _sha256_hex(case_content_seed or case_id),
         "as_of_date": as_of_date,
+        "strict_citation_gate": strict_citation_gate,
     }
 
 
@@ -282,16 +285,23 @@ class TestNormalizeJudgeResult:
 
     def test_optional_langsmith_fields_pass_through(self):
         raw = _judge("c1", True)
-        raw["langsmith_run_id"] = "abc-123"
-        raw["langsmith_trace_url"] = "https://smith.langchain.com/runs/abc-123"
+        raw["langsmith_run_id"] = "b6f1c9d0-6e2e-4a3b-9b1a-7f2a6a0c9e11"
+        raw["langsmith_trace_url"] = "https://smith.langchain.com/runs/b6f1c9d0-6e2e-4a3b-9b1a-7f2a6a0c9e11"
         result = normalize_judge_result(raw)
-        assert result.langsmith_run_id == "abc-123"
-        assert result.langsmith_trace_url == "https://smith.langchain.com/runs/abc-123"
+        assert result.langsmith_run_id == "b6f1c9d0-6e2e-4a3b-9b1a-7f2a6a0c9e11"
+        assert result.langsmith_trace_url == "https://smith.langchain.com/runs/b6f1c9d0-6e2e-4a3b-9b1a-7f2a6a0c9e11"
 
     def test_blank_langsmith_field_raises(self):
         raw = _judge("c1", True)
         raw["langsmith_run_id"] = "   "
         with pytest.raises(CalibrationSchemaError, match="langsmith_run_id"):
+            normalize_judge_result(raw)
+
+    def test_non_uuid_langsmith_run_id_raises(self):
+        """LangSmith run ID는 항상 uuid.uuid4() 문자열이다 — "abc" 같은 placeholder를 거부한다."""
+        raw = _judge("c1", True)
+        raw["langsmith_run_id"] = "abc-123"
+        with pytest.raises(CalibrationSchemaError, match="UUID"):
             normalize_judge_result(raw)
 
     def test_checks_missing_raises(self):
@@ -332,6 +342,22 @@ class TestNormalizeJudgeResult:
         raw["as_of_date"] = "2026-02-30"
         with pytest.raises(CalibrationSchemaError, match="실재하는 날짜"):
             normalize_judge_result(raw)
+
+    def test_strict_citation_gate_missing_raises(self):
+        raw = _judge("c1", True)
+        del raw["strict_citation_gate"]
+        with pytest.raises(CalibrationSchemaError, match="strict_citation_gate"):
+            normalize_judge_result(raw)
+
+    def test_strict_citation_gate_non_bool_raises(self):
+        raw = _judge("c1", True)
+        raw["strict_citation_gate"] = "true"
+        with pytest.raises(CalibrationSchemaError, match="strict_citation_gate"):
+            normalize_judge_result(raw)
+
+    def test_strict_citation_gate_true_is_accepted(self):
+        result = normalize_judge_result(_judge("c1", True, strict_citation_gate=True))
+        assert result.strict_citation_gate is True
 
     def test_failed_required_check_outside_rubric_is_captured(self):
         """citation_content_contract처럼 6축 밖의 필수 검사 실패가 소실되면 안 된다."""
@@ -569,16 +595,32 @@ class TestRunConsistency:
         with pytest.raises(CalibrationSchemaError, match="as_of_date"):
             validate_run_consistency(records)
 
+    def test_different_strict_citation_gate_raises(self):
+        judge = [
+            _judge("case_001", True),
+            _judge("case_002", True),
+            _judge("case_003", False, ("disclaimer",)),
+            _judge("case_004", False, ("numeric_consistency",), strict_citation_gate=True),
+        ]
+        records = merge_records(HUMAN_LABELS_V1, judge)
+        with pytest.raises(CalibrationSchemaError, match="strict_citation_gate"):
+            validate_run_consistency(records)
+
+
+def _uuid_for(seed: str) -> str:
+    return str(uuid.uuid5(uuid.NAMESPACE_DNS, seed))
+
 
 def _official_20_records(*, prompt_version: str = "v1") -> list[CalibrationRecord]:
     """6축 전부 최소 1건 결함을 포함하는 case_001~020 mock 세트. LangSmith 필드까지 채운다."""
     defect_case_ids = [f"case_{i:03d}" for i in range(1, len(AXIS_NAMES) + 1)]
 
     def _with_langsmith(case_id: str, **kwargs) -> dict:
+        run_id = _uuid_for(f"{case_id}-{prompt_version}")
         return _judge(
             case_id,
-            langsmith_run_id=f"run-{case_id}",
-            langsmith_trace_url=f"https://smith.langchain.com/runs/{case_id}",
+            langsmith_run_id=run_id,
+            langsmith_trace_url=f"https://smith.langchain.com/runs/{run_id}",
             prompt_version=prompt_version,
             **kwargs,
         )
@@ -616,6 +658,17 @@ class TestOfficialCaseSet:
             r if r.case_id != "case_020" else _no_langsmith(r) for r in records
         ]
         with pytest.raises(CalibrationSchemaError, match="LangSmith run ID"):
+            validate_official_case_set(records)
+
+    def test_duplicate_langsmith_run_id_raises(self):
+        """사례마다 별도 LangSmith run이어야 한다 — 같은 run ID를 재사용하면 거부한다."""
+        records = _official_20_records()
+        shared_run_id = records[0].langsmith_run_id
+        records = [
+            replace(r, langsmith_run_id=shared_run_id) if r.case_id == "case_002" else r
+            for r in records
+        ]
+        with pytest.raises(CalibrationSchemaError, match="중복된 run ID"):
             validate_official_case_set(records)
 
     def test_non_first_attempt_raises(self):
@@ -725,6 +778,17 @@ class TestCompareVersions:
         with pytest.raises(ValueError, match="as_of_date"):
             compare_versions(records_v1, records_v2)
 
+    def test_different_strict_citation_gate_raises(self, records_v1):
+        judge_v2 = [
+            _judge("case_001", True, prompt_version="v2", strict_citation_gate=True),
+            _judge("case_002", True, prompt_version="v2", strict_citation_gate=True),
+            _judge("case_003", False, ("disclaimer",), prompt_version="v2", strict_citation_gate=True),
+            _judge("case_004", False, ("numeric_consistency",), prompt_version="v2", strict_citation_gate=True),
+        ]
+        records_v2 = merge_records(HUMAN_LABELS_V1, judge_v2)
+        with pytest.raises(ValueError, match="strict_citation_gate"):
+            compare_versions(records_v1, records_v2)
+
 
 class TestCompareOfficialVersions:
     def test_valid_v1_v2_passes(self):
@@ -734,10 +798,23 @@ class TestCompareOfficialVersions:
         assert comparison.before.total == 20
         assert comparison.after.total == 20
 
-    def test_different_code_sha_raises(self):
+    def test_different_code_sha_is_allowed(self):
+        """LLM축 프롬프트가 rubric.py에 하드코딩돼 있어, 진짜 프롬프트 개선이면 code_sha가
+        달라지는 게 정상이다 — 이걸 막으면 R2가 요구하는 v1→v2 개선 자체가 불가능해진다."""
         v1 = _official_20_records(prompt_version="v1")
         v2 = [replace(r, code_sha="cafef00d") for r in _official_20_records(prompt_version="v2")]
-        with pytest.raises(ValueError, match="동일한 code_sha"):
+        comparison = compare_official_versions(v1, v2)
+        assert comparison.before.total == 20
+        assert comparison.after.total == 20
+
+    def test_identical_prompt_hash_despite_different_prompt_version_raises(self):
+        """prompt_version 라벨만 바뀌고 실제 prompt_hash가 20건 전부 동일하면,
+        진짜 프롬프트가 안 바뀐 것으로 보고 거부해야 한다."""
+        v1 = _official_20_records(prompt_version="v1")
+        v2_raw = _official_20_records(prompt_version="v2")
+        v1_by_id = {record.case_id: record for record in v1}
+        v2 = [replace(record, prompt_hash=v1_by_id[record.case_id].prompt_hash) for record in v2_raw]
+        with pytest.raises(ValueError, match="prompt_hash"):
             compare_official_versions(v1, v2)
 
     def test_different_model_version_raises(self):
@@ -809,4 +886,44 @@ def test_build_judge_result_accepts_real_judge_eval_output(monkeypatch):
     assert result.passed is True
     assert result.fail_axes == ()
     assert result.failed_required_checks == ()
+    assert result.judge_attempt == 1
+
+
+def test_build_judge_result_accepts_real_judge_eval_failure_output(monkeypatch):
+    """실패 경로도 build_judge_result → normalize_judge_result를 통과하는지 확인한다.
+
+    위 테스트(EC-01)는 결함 없는 PASS 사례 하나만 검증한다 — 실제 오판 분석에서
+    다룰 건 대부분 FAIL 사례이므로, judge.passed=False·judge_feedback 비어있지
+    않음·실패축 보존까지 실제 judge_eval() 출력으로 확인해 둔다. EC-04는 본문
+    수치를 metrics와 다르게 바꿔 numeric_consistency를 실패시키는 기존 회귀
+    평가셋 사례다.
+    """
+    monkeypatch.setattr(
+        "app.llm.audit.model_version_record",
+        lambda llm=None, responses=(): {
+            "deployment": "test-deployment",
+            "model": "test-model",
+            "api_version": "2026-01-01",
+        },
+    )
+    from app.nodes.judge_eval import judge_eval
+    from tests.test_judge_eval_evalset import _PassingLLM, build_eval_case
+
+    case = build_eval_case("EC-04")
+    judge_output = judge_eval(case["state"], llm=_PassingLLM())
+
+    raw = build_judge_result(
+        case_id="case_smoke_ec04",
+        judge_output=judge_output,
+        trace_id="trace-smoke-ec04",
+        prompt_version="v1",
+        code_sha="deadbeef",
+        case_content_sha256=_sha256_hex("case_smoke_ec04"),
+        as_of_date=case["state"]["run_config"]["as_of_date"],
+    )
+    result = normalize_judge_result(raw)
+
+    assert result.passed is False
+    assert "numeric_consistency" in result.fail_axes
+    assert result.judge_feedback.strip() != ""
     assert result.judge_attempt == 1

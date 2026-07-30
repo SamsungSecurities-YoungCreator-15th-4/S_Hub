@@ -211,6 +211,9 @@ def _assert_same_evaluation_target(
     같은 이유로 검사한다 — judge의 disclaimer/numeric_consistency 축이 쓰는
     expected_dates의 재료라 판정에 영향을 주지만, metrics/explanations/citations
     와 물리적으로 분리된 값이라 case_content_sha256만으로는 못 잡을 수 있다.
+    strict_citation_gate도 같은 성격이다 — source_validity/citation_content_contract
+    의 엄격도를 바꾸는 판정 기준이라, 이게 v1·v2 사이에 달라지면 프롬프트를
+    안 고쳐도 PASS 비율이 변한다.
     """
     before_by_id = {record.case_id: record for record in before_records}
     after_by_id = {record.case_id: record for record in after_records}
@@ -245,6 +248,15 @@ def _assert_same_evaluation_target(
     if as_of_date_mismatched:
         raise ValueError(
             f"v1·v2의 as_of_date(기준일)가 다릅니다: {as_of_date_mismatched}"
+        )
+    strict_gate_mismatched = sorted(
+        case_id
+        for case_id, before_record in before_by_id.items()
+        if before_record.strict_citation_gate != after_by_id[case_id].strict_citation_gate
+    )
+    if strict_gate_mismatched:
+        raise ValueError(
+            f"v1·v2의 strict_citation_gate가 다릅니다: {strict_gate_mismatched}"
         )
 
 
@@ -284,18 +296,22 @@ def compare_official_versions(
     """R2 공식 v1·v2 비교 — compare_versions()에 제출 요건 검증을 더한 wrapper.
 
     각 실행이 validate_official_case_set()을 통과해야 하고(정확히 20건·1차
-    판정·run 내부 일관성), v1·v2 사이에서는 code_sha·model_version이 같고
-    prompt_version만 달라야 한다 — 그래야 "프롬프트만 바꿔서 나온 효과"라고
-    말할 수 있다. 코드까지 같이 바뀐 v1·v2는 이 함수로 비교하면 안 된다.
+    판정·run 내부 일관성), v1·v2 사이에서는 model_version이 같고 prompt_version은
+    달라야 한다.
+
+    code_sha는 v1·v2 간 동일성을 요구하지 않는다 — 지금 judge의 LLM축
+    프롬프트(hallucination/false_precision)는 app/judge/rubric.py에 문자열로
+    하드코딩돼 있어, 프롬프트를 실제로 고치는 유일한 방법이 코드 수정이다.
+    즉 진짜 개선이면 code_sha가 반드시 달라진다 — 여기서 동일성을 요구하면
+    R2가 요구하는 "v1 측정 → 개선 → v2 재측정" 자체를 이 함수가 거부하게 된다.
+    대신 prompt_hash가 case_id별로 전부 같은지 확인한다 — prompt_hash는 사례
+    payload까지 포함해 렌더링한 프롬프트의 해시라, 템플릿이 조금이라도
+    바뀌면 사실상 항상 달라진다. 전부 동일하면 라벨(prompt_version)만
+    바뀌고 실제 프롬프트는 안 바뀐 것으로 보고 거부한다.
     """
     validate_official_case_set(before_records, require_langsmith=require_langsmith)
     validate_official_case_set(after_records, require_langsmith=require_langsmith)
     before_first, after_first = before_records[0], after_records[0]
-    if before_first.code_sha != after_first.code_sha:
-        raise ValueError(
-            "v1·v2는 동일한 code_sha로 실행해야 합니다(코드가 아니라 프롬프트만 "
-            f"바뀌어야 함): v1={before_first.code_sha}, v2={after_first.code_sha}"
-        )
     if before_first.model_version != after_first.model_version:
         raise ValueError(
             f"v1·v2는 동일한 model_version으로 실행해야 합니다: "
@@ -303,4 +319,14 @@ def compare_official_versions(
         )
     if before_first.prompt_version == after_first.prompt_version:
         raise ValueError(f"v1·v2의 prompt_version이 같습니다({before_first.prompt_version}) — 비교할 변화가 없습니다.")
+    before_by_id = {record.case_id: record for record in before_records}
+    after_by_id = {record.case_id: record for record in after_records}
+    unchanged_prompt_hash = all(
+        before_by_id[case_id].prompt_hash == after_by_id[case_id].prompt_hash for case_id in before_by_id
+    )
+    if unchanged_prompt_hash:
+        raise ValueError(
+            "prompt_version은 다르지만 20건 전체의 prompt_hash가 v1·v2에서 전부 같습니다 — "
+            "실제 judge 프롬프트가 바뀌지 않고 버전 라벨만 바뀐 것으로 보입니다."
+        )
     return compare_versions(before_records, after_records)
