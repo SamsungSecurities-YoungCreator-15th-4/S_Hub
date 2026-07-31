@@ -10,6 +10,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 import calibration_report  # noqa: E402
 
+from app.judge.axes import to_ko  # noqa: E402
 from app.judge.rubric import AXIS_NAMES  # noqa: E402
 
 
@@ -110,6 +111,45 @@ def _run(monkeypatch: pytest.MonkeyPatch, argv: list[str]) -> None:
     calibration_report.main()
 
 
+def _official_human_labels() -> list[dict]:
+    """공식 20건(case_001~020) — pass 10건 + 6축 전부 최소 1건씩 커버하는 fail 10건."""
+    labels = [_human(f"case_{i:03d}", "pass") for i in range(1, 11)]
+    fail_axes_en = list(AXIS_NAMES) + [AXIS_NAMES[2]] * 4  # 나머지 4건은 환각을 재사용
+    for offset, axis_en in enumerate(fail_axes_en):
+        case_id = f"case_{11 + offset:03d}"
+        labels.append(_human(case_id, "fail", [to_ko(axis_en)]))
+    return labels
+
+
+def _official_judge_results(*, prompt_version: str, code_sha: str) -> list[dict]:
+    """_official_human_labels()와 축까지 정확히 일치하는(TP) judge 결과 — 검증 통과가 목적."""
+    results = [
+        _judge(f"case_{i:03d}", True, prompt_version=prompt_version, code_sha=code_sha) for i in range(1, 11)
+    ]
+    fail_axes_en = list(AXIS_NAMES) + [AXIS_NAMES[2]] * 4
+    for offset, axis_en in enumerate(fail_axes_en):
+        case_id = f"case_{11 + offset:03d}"
+        results.append(_judge(case_id, False, (axis_en,), prompt_version=prompt_version, code_sha=code_sha))
+    return results
+
+
+@pytest.fixture()
+def official_files(tmp_path: Path) -> dict[str, Path]:
+    human_path = tmp_path / "human_labels.json"
+    human_path.write_text(json.dumps(_official_human_labels(), ensure_ascii=False), encoding="utf-8")
+    v1_path = tmp_path / "v1.json"
+    v1_path.write_text(
+        json.dumps(_official_judge_results(prompt_version="v1", code_sha="deadbeef"), ensure_ascii=False),
+        encoding="utf-8",
+    )
+    v2_path = tmp_path / "v2.json"
+    v2_path.write_text(
+        json.dumps(_official_judge_results(prompt_version="v2", code_sha="cafebabe"), ensure_ascii=False),
+        encoding="utf-8",
+    )
+    return {"human": human_path, "v1": v1_path, "v2": v2_path}
+
+
 class TestCalibrationReportV1Only:
     def test_prints_overall_metrics_and_mismatches(self, files, monkeypatch, capsys):
         _run(
@@ -134,6 +174,10 @@ class TestCalibrationReportV1Only:
             ],
         )
         report = json.loads(out_path.read_text(encoding="utf-8"))
+        assert report["schema_version"] == calibration_report.SCHEMA_VERSION
+        assert report["mode"] == "dev_mock"
+        assert report["official_validation_passed"] is False
+        assert "evalset_hash" in report["v1"]
         assert report["v1"]["overall"]["total"] == 4
         assert report["v1"]["overall"]["false_negative"] == 1
         assert report["v1"]["overall"]["false_positive"] == 1
@@ -180,3 +224,52 @@ class TestCalibrationReportVersionComparison:
         assert comparison["false_negative_delta"] == -1
         assert comparison["before_code_sha"] == "deadbeef"
         assert comparison["after_code_sha"] == "cafebabe"
+
+
+class TestCalibrationReportOfficialMode:
+    def test_no_langsmith_without_official_is_rejected(self, files, monkeypatch):
+        with pytest.raises(SystemExit):
+            _run(
+                monkeypatch,
+                [
+                    "--human-labels-json", str(files["human"]),
+                    "--judge-results", str(files["v1"]),
+                    "--no-langsmith",
+                ],
+            )
+
+    def test_official_no_langsmith_v1_v2_comparison_succeeds(self, official_files, monkeypatch, capsys, tmp_path: Path):
+        """회귀 테스트: --official --no-langsmith일 때 compare_official_versions()에
+        require_langsmith가 전달되지 않아 validate_official_case_set() 통과 뒤
+        비교 단계에서 다시 실패하던 버그(중현 리뷰 PR #147)의 재발을 막는다."""
+        out_path = tmp_path / "report.json"
+        _run(
+            monkeypatch,
+            [
+                "--human-labels-json", str(official_files["human"]),
+                "--judge-results", str(official_files["v1"]),
+                "--judge-results-v2", str(official_files["v2"]),
+                "--official", "--no-langsmith",
+                "--out", str(out_path),
+            ],
+        )
+        out = capsys.readouterr().out
+        assert "v1 → v2 비교" in out
+
+        report = json.loads(out_path.read_text(encoding="utf-8"))
+        assert report["mode"] == "offline_rehearsal"
+        assert report["official_validation_passed"] is True
+        assert report["langsmith_required"] is False
+
+    def test_official_without_no_langsmith_still_requires_langsmith_ids(self, official_files, monkeypatch):
+        # official_files의 langsmith_run_id는 전부 None이므로 --no-langsmith 없이
+        # --official만 쓰면 validate_official_case_set()에서 거부돼야 한다.
+        with pytest.raises(Exception, match="LangSmith"):
+            _run(
+                monkeypatch,
+                [
+                    "--human-labels-json", str(official_files["human"]),
+                    "--judge-results", str(official_files["v1"]),
+                    "--official",
+                ],
+            )

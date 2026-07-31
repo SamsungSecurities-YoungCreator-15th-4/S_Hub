@@ -10,11 +10,22 @@ app.evaluation.judge_calibration의 집계 함수를 실행해 콘솔 표 + (선
 
 사용 예:
     python scripts/calibration_report.py --judge-results out/v1.json \\
-        --human-labels-dir corpus/r1_gold_labels --official
+        --human-labels-dir goldenset/cases --official
 
     python scripts/calibration_report.py --judge-results out/v1.json \\
-        --judge-results-v2 out/v2.json --human-labels-dir corpus/r1_gold_labels \\
+        --judge-results-v2 out/v2.json --human-labels-dir goldenset/cases \\
         --official --out out/calibration_report.json
+
+출력 JSON의 `mode`는 이 실행이 어떤 신뢰 수준인지 표시한다 — R4가 파일
+내용만으로 공식 증거 여부를 판별해야 하므로, `--out` 산출물을 그대로 증거로
+쓰기 전에 반드시 `mode == "official"`과 `official_validation_passed`를
+확인해야 한다.
+
+    - "official": --official (LangSmith 포함) 통과 — R2 공식 제출 요건 충족
+    - "offline_rehearsal": --official --no-langsmith — 구조는 검증됐으나
+      LangSmith 증거가 없어 공식 제출로 쓸 수 없음
+    - "dev_mock": --official 없음 — 개수·ID·run 일관성 등 아무 검증도 하지
+      않은 개발용 실행. 절대 증거로 쓰지 않는다
 """
 from __future__ import annotations
 
@@ -41,6 +52,11 @@ from app.evaluation.judge_calibration import (  # noqa: E402
     compare_versions,
     find_mismatches,
 )
+from app.evidence.schema import evalset_hash  # noqa: E402
+
+#: 리포트 JSON 스키마 버전. app/evidence/schema.py가 이 산출물을 소비하는
+#: 어댑터를 만들 때 이 값으로 호환성을 확인할 수 있도록 처음부터 박아둔다.
+SCHEMA_VERSION = "1"
 
 
 def _load_json_list(path: Path, *, what: str) -> list[dict]:
@@ -117,6 +133,14 @@ def _to_jsonable(records: list[CalibrationRecord]) -> list[dict]:
     return [asdict(record) for record in records]
 
 
+def _resolve_mode(args: argparse.Namespace) -> str:
+    if not args.official:
+        return "dev_mock"
+    if args.no_langsmith:
+        return "offline_rehearsal"
+    return "official"
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="사람 라벨과 judge 결과를 비교해 캘리브레이션 리포트를 출력한다.")
     labels_group = parser.add_mutually_exclusive_group(required=True)
@@ -136,39 +160,52 @@ def main() -> None:
     )
     parser.add_argument("--out", type=Path, help="리포트를 JSON으로도 저장할 경로(증거번들·서류철용).")
     args = parser.parse_args()
+    if args.no_langsmith and not args.official:
+        parser.error("--no-langsmith는 --official과 함께 써야 합니다(비공식 실행은 애초에 LangSmith를 요구하지 않습니다).")
+
+    require_langsmith = not args.no_langsmith
+    mode = _resolve_mode(args)
 
     human_labels = _load_human_labels(args)
     judge_results = _load_json_list(args.judge_results, what="judge 결과")
     records = merge_records(human_labels, judge_results)
     if args.official:
-        validate_official_case_set(records, require_langsmith=not args.no_langsmith)
+        validate_official_case_set(records, require_langsmith=require_langsmith)
 
     _print_overall(records, title="v1")
     _print_mismatches(records, title="v1")
 
     report: dict = {
+        "schema_version": SCHEMA_VERSION,
+        "mode": mode,
+        "official_validation_passed": args.official,
+        "langsmith_required": args.official and require_langsmith,
         "v1": {
+            "evalset_hash": evalset_hash(records),
             "records": _to_jsonable(records),
             "overall": asdict(calculate_overall_metrics(records)),
             "confusion_matrix": build_confusion_matrix(records),
             "axis_metrics": {axis: asdict(m) for axis, m in calculate_axis_metrics(records).items()},
             "mismatches": [asdict(m) for m in find_mismatches(records)],
-        }
+        },
     }
 
     if args.judge_results_v2 is not None:
         judge_results_v2 = _load_json_list(args.judge_results_v2, what="judge 결과(v2)")
         records_v2 = merge_records(human_labels, judge_results_v2)
         if args.official:
-            validate_official_case_set(records_v2, require_langsmith=not args.no_langsmith)
+            validate_official_case_set(records_v2, require_langsmith=require_langsmith)
         _print_overall(records_v2, title="v2")
         _print_mismatches(records_v2, title="v2")
 
-        compare = compare_official_versions if args.official else compare_versions
-        comparison = compare(records, records_v2)
+        if args.official:
+            comparison = compare_official_versions(records, records_v2, require_langsmith=require_langsmith)
+        else:
+            comparison = compare_versions(records, records_v2)
         _print_version_comparison(comparison)
 
         report["v2"] = {
+            "evalset_hash": evalset_hash(records_v2),
             "records": _to_jsonable(records_v2),
             "overall": asdict(calculate_overall_metrics(records_v2)),
             "confusion_matrix": build_confusion_matrix(records_v2),
