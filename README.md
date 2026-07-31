@@ -176,6 +176,8 @@ Orchestration/
 │   ├── llm/           # AzureChatOpenAI 팩토리, IPS 추출 체인, 감사
 │   ├── rag/           # ingest·retriever·citations·배포 검증
 │   ├── judge/         # Judge 루브릭·평가
+│   ├── evaluation/    # 캘리브레이션 입력 계약(사람 라벨↔judge 결과)·프롬프트 버전 성능 비교
+│   ├── evidence/      # 실행 1회분 감사 증거 묶음 스키마(SSOT)
 │   ├── observability/ # LangSmith 트레이싱
 │   └── utils/         # 해시 등 공용 유틸
 ├── config/            # config.yaml, ips_policy.yaml, rag_sources.json
@@ -183,7 +185,7 @@ Orchestration/
 ├── data/              # 시장 데이터·Chroma (gitignore 대상 산출물 포함)
 ├── docs/              # 정책·평가·배포 문서
 ├── scripts/           # CLI 진입점·평가·배포 스크립트
-├── tests/             # pytest (22개 테스트 모듈)
+├── tests/             # pytest (28개 테스트 모듈)
 ├── ui/                # Streamlit UI (랜딩·PB 승인·RAG 근거 뷰)
 └── .github/           # PR 템플릿·CI·Dependabot
 ```
@@ -224,9 +226,21 @@ python scripts/evaluate_ips_extraction.py --repeats 3
 # Judge 평가셋 20건 — 결정론 15건 / Azure LLM 5건 분리
 pytest tests/test_judge_eval_evalset.py
 RUN_AZURE_JUDGE_EVALSET=1 pytest tests/test_judge_eval_evalset.py
+
+# Judge 캘리브레이션 기록 — 사례를 judge에 돌려 JudgeResult JSON으로 남긴다
+python scripts/judge_runner.py --ec-demo --offline --prompt-version v1 --out data/judge_runs/v1.json
+
+# 감사 증거 묶음 생성 (실행 상태 JSON → 번들 디렉터리)
+python scripts/make_evidence_bundle.py --state run_state.json --out evidence/run-001
 ```
 
 pytest에는 위험↑→VaR↑ 방향성 검증(`tests/test_metrics_direction.py`)이 포함된다.
+
+`judge_runner.py`는 실행 코드 커밋(`code_sha`)·프롬프트 해시·모델 버전·기준일·
+`strict_citation_gate`까지 함께 기록해, 같은 20건을 프롬프트 v1·v2로 재실행한 결과를
+`app/evaluation/judge_calibration.py`가 사람 라벨과 대조·비교할 수 있게 한다.
+`--ec-demo`는 judge 회귀 평가셋으로 배선을 리허설하는 모드이고, `--offline`은 Azure 대신
+fake LLM을 쓴다.
 
 ## 설정 (`config/config.yaml`)
 
@@ -264,7 +278,7 @@ pytest에는 위험↑→VaR↑ 방향성 검증(`tests/test_metrics_direction.p
 | R0-5 도구 적정 사용 정당화 | 위 "도구 적정 사용 정당화" 절 |
 | R1 정량 리스크 엔진 | Historical VaR 99% 1일/10일·CVaR·스트레스 3종, KRW 기준, 방향성 pytest |
 | R2 RAG 인용 | 코퍼스 21건, 원문·문서명·조항/주장·청크 정밀 대조, provenance 지문 |
-| R3 LLM-as-Judge | 6축 루브릭 자동평가, 결함 사유 로그, SSOT 재시도와 Hard Stop |
+| R3 LLM-as-Judge | 6축 루브릭 자동평가, 결함 사유 로그, SSOT 재시도와 Hard Stop, 사람 라벨 대조 캘리브레이션(`app/evaluation/`)으로 프롬프트 버전별 정확도 비교 |
 | R4 결합 리포트 | Judge 통과본만 확정·내보내기 허용, 실패본은 차단 증거 기록 |
 | R5 재현성 | seed 고정+parquet 캐시, `computation_hash`(SHA256), LangSmith 감사 로그 병기. 재현성 경계: `config_hash`·`computation_hash`는 결정론 계층 산출물이라 리포트 문구 변경에 불변이고, 문구 변경은 이미 비결정론이던 judge 축 입력 표면(`prompt_hashes.judge_eval`)만 움직인다 |
 | R6 3계층 분리 | `app/engine/` LLM import 금지(코드 강제) + mermaid 시각 분리 |
