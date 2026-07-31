@@ -8,15 +8,55 @@
 
 ## 0. 로더가 지켜야 할 경계 — 먼저 읽어주세요
 
-frontmatter의 아래 필드는 **정답지입니다. 로더가 읽지 마세요.**
+**judge 실행 단계에는 정답(gold label)이 필요 없습니다.** 정답은 실행이 끝난 뒤
+**일치율을 계산하는 분석 단계**에서만 씁니다. 저장소에 정답이 공개돼 있더라도
+실행 로더는 그것을 읽지 않아야 하며, 이는 테스트로 강제됩니다.
+
+**차단 목록이 아니라 allowlist로 구현하세요.** state에 넣는 키를 아래 셋으로
+제한하면, 나중에 frontmatter에 필드가 추가돼도 자동으로 안전합니다.
+
+```python
+ALLOWED_STATE_KEYS = {"metrics", "explanations", "citations"}
+```
+
+읽어도 되는 frontmatter는 `id` · `variant` · `llm_draft` 셋뿐입니다.
+아래는 **정답지이므로 어떤 경로로도 state에 들어가면 안 됩니다.**
 
 ```
 label · fail_axes · trap_type · rationale · labelers · initial_agreement
 ```
 
-judge에 넘길 것은 **본문에서 추출한 내용뿐**입니다. 이 경계가 `case_content_sha256`이 정답을 제외하고 해시하는 것과 같은 원칙입니다.
+이 경계는 `case_content_sha256`이 frontmatter를 제외하고 본문만 해시하는 것과
+같은 원칙입니다 (`tools/case_hashes.py`).
 
-읽어도 되는 frontmatter: `id`, `variant`, `llm_draft`.
+### 검증
+
+`tests/test_goldenset_integrity.py` §8이 로더를 자동으로 잡습니다.
+
+| 테스트 | 무엇을 막나 |
+|---|---|
+| `test_loader_does_not_expose_answer_fields` | 정답 필드가 state·직렬화 결과에 남는 것 |
+| `test_loader_uses_allowlist_only` | allowlist 밖의 키가 state에 섞이는 것 |
+
+지금은 로더가 없어 **skip** 상태이고, `scripts/judge_runner.py`에 `load_case`가
+생기는 순간 자동으로 검사 대상이 됩니다. 함수명을 다르게 쓰실 거면 알려주세요 —
+테스트의 탐색 경로에 추가하겠습니다.
+
+### v1 실행 결과에 반드시 기록할 것
+
+v1과 v2가 같은 조건이었음을 감사에서 증명해야 합니다.
+
+| 필드 | 출처 |
+|---|---|
+| `freeze_commit` | `git rev-parse v1-freeze^{commit}` |
+| `case_content_sha256` | `goldenset/case_hashes.json` (사례별) |
+| `evalset_hash` | 20건 해시의 집합 해시 |
+| `executed_at` | 실행 시각 (UTC) |
+| `langsmith_run` | LangSmith run id |
+
+**v1 결과가 기록으로 고정되기 전에는 judge 프롬프트·룰을 수정하지 않습니다.**
+순서가 뒤집히면 "고치고 나서 v1을 잰 것 아니냐"를 반박할 수 없습니다.
+수명주기 전체는 `.sealed/README.md` §2를 보세요.
 
 ---
 

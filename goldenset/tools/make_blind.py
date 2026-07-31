@@ -60,8 +60,29 @@ def strip_labels(text: str) -> str:
     return body.lstrip("\n")
 
 
-# 배포용 가이드에서 남길 절
-KEEP_SECTIONS = ("0.", "1.", "2.", "4.")
+# 배포용 가이드에서 남길 절 — 판정 기준 그 자체만 남긴다.
+#
+# ⚠️ §4(규칙 갱신 로그)를 여기에 넣지 말 것.
+#    §4는 라벨링이 진행되면서 "어느 사례에서 무엇이 갈렸는지"가 사례 ID와 함께
+#    누적된다. 1회차 배포 시점에는 비어 있어 안전해 보이지만, 라벨링 후 생성기를
+#    다시 돌리면 그때는 정답표가 된다. 절 목록으로 막지 않고 아래 누출 검사로
+#    이중 방어한다.
+KEEP_SECTIONS = ("0.", "1.", "2.")
+
+# 배포본에 있으면 안 되는 것 — 하나라도 걸리면 생성을 중단한다.
+LEAK_PATTERNS = (
+    r"pass\s*\d+건",           # pass/fail 건수 배분
+    r"fail\s*\d+건",
+    r"case[-_]plan",           # 구성표 파일명
+    r"manifest\.md",
+    r"case_\d+",               # 원본 사례 ID (블라인드 ID만 노출돼야 한다)
+    r"\.sealed",               # 봉인 경로
+    r"함정",                    # 출제 의도 어휘
+    r"trap[-_]?type",
+    r"규칙 갱신 로그",           # §4 제목 — 절 필터가 뚫렸다는 신호
+)
+# `fail_axes`는 라벨러가 직접 채우는 필드명이라 §1 안내에 정당하게 등장한다.
+# 누출 패턴에 넣지 말 것 — 오탐으로 생성이 막힌다.
 
 
 def build_labeler_guide(text: str) -> str:
@@ -69,18 +90,23 @@ def build_labeler_guide(text: str) -> str:
 
     제거 대상
       §3 라벨링 절차 — 배포 패키지 표가 '어떤 파일에 답이 있는지' 알려준다
+      §4 규칙 갱신 로그 — **사례 ID와 판정 이력이 누적된다** (위 주석 참조)
       §5 파일 규격  — 라벨러가 쓸 일 없다
       §6 체크리스트 · §7 설계 근거 — **pass/fail 건수 배분이 적혀 있다**
     헤더의 총 건수 표기도 지운다. 균형을 알면 답을 맞춰버릴 수 있다.
+
+    재실행 안전성: 원본 가이드가 라벨링 이후로 갱신됐더라도 이 함수는 같은
+    결과를 내야 한다. 절 목록(화이트리스트) + 누출 패턴 검사로 보장한다.
     """
     head, *rest = re.split(r"\n(?=## )", text)
     head = re.sub(r"> 대상:.*\n", "> 대상: 4조 · 정답 사례집 라벨링\n", head)
+    head = re.sub(r"> \*\*상태:.*\n", "> **상태: 라벨링용 배포본**\n", head)
     kept = [s for s in rest if s[3:].lstrip().startswith(KEEP_SECTIONS)]
     guide = head + "\n" + "\n".join(kept)
 
-    leaks = re.findall(r"pass\s*\d+건|fail\s*\d+건|case[-_]plan|manifest\.md", guide)
+    leaks = {m for p in LEAK_PATTERNS for m in re.findall(p, guide)}
     if leaks:
-        raise AssertionError(f"배포용 가이드에 누출이 남았습니다: {set(leaks)}")
+        raise AssertionError(f"배포용 가이드에 누출이 남았습니다: {sorted(leaks)}")
     return guide.rstrip() + "\n"
 
 
@@ -131,7 +157,7 @@ def main() -> int:
             "조원 두 명이 **공통으로** 보는 사례 수 (기본 8). "
             "출제자(라벨러#1)는 함정 설계를 알고 있어 라벨이 오염돼 있다. "
             "겹치는 구간이 있어야 '오염 없는 사람-사람 일치율'을 잴 수 있다 — "
-            "그 숫자가 judge 일치율의 천장이 된다. 0이면 겹침 없음."
+            "그 숫자로 사람 간 일치율(IAA)을 낸다. 0이면 겹침 없음."
         ),
     )
     ap.add_argument(
@@ -193,7 +219,7 @@ def main() -> int:
                 "clean_pair": shared,
                 "clean_pair_note": (
                     "조원 2인이 공통으로 라벨한 사례. 출제자 오염이 없어 "
-                    "'사람-사람 일치율'(judge 일치율의 천장) 추정에 쓴다."
+                    "사람 간 일치율(IAA) 산출에 쓴다. judge 일치율의 상한이 아니다."
                 ),
             },
             ensure_ascii=False,
