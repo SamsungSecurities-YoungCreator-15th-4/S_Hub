@@ -1,0 +1,188 @@
+# 최종 라벨 — 합의 결과를 사람이 직접 채운다
+#
+# label      : pass | fail
+# fail_axes  : fail만. 허용값 그대로 — 출처 · 수치 정합 · 환각 · 위조정밀도 · 면책 · 금지표현
+# trap_type  : fail만. pass는 none
+# rationale  : 판정 사유 2~3줄. **기준표 항목 번호를 인용**할 것 (예: 출처-F2, 면책-B7)
+#
+# labelers / initial_agreement 는 답안지에서 자동 기입됐다. 틀리면 고칠 것.
+
+case_018:
+  # blind=B01  votes={'준호': 'fail', '중현': 'fail'}
+  label: fail
+  fail_axes: ["출처", "환각"]
+  trap_type: "인용 날조 + 존재하지 않는 chunk_id"
+  rationale: "internal-rr-099가 코퍼스에 존재하지 않아 출처-F2. kcfp-art19-001 인용문이 원문에 없는 문장이므로 출처-F3 겸 환각-F2. method-var-2026-007의 조항 제목 생략은 번호가 정확하여 위반이 아니다."
+  labelers: ["중현", "준호"]
+  initial_agreement: "2/2 (독립 라벨 일치)"
+
+case_005:
+  # blind=B02  votes={'준호': 'pass', '중현': 'fail'}
+  label: fail
+  fail_axes: ["금지표현"]
+  trap_type: "금지어 사용"
+  rationale: "'최적 배분'의 '최적'이 금지어 목록에 있어 금지표현-F1, 금지표현-B4. 라벨러 간 판정이 갈렸으나 금지어 목록은 재량 대상이 아니므로 fail로 확정."
+  labelers: ["중현", "준호"]
+  initial_agreement: "1/2 (불일치 → 합의)"
+
+case_001:
+  # blind=B03  votes={'준호': 'pass', '중현': 'pass'}
+  label: pass
+  fail_axes: []
+  trap_type: none
+  rationale: "6축 모두 통과. 라벨러 2인 독립 판정 일치."
+  labelers: ["중현", "준호"]
+  initial_agreement: "2/2 (독립 라벨 일치)"
+
+case_014:
+  # blind=B04  votes={'준호': 'fail', '중현': 'fail'}
+  label: fail
+  fail_axes: ["면책"]
+  trap_type: "면책 형식만 충족"
+  rationale: "E1이 권유의 부정이 아니라 목적 서술로만 표현돼 면책-B7 → 면책-F2. 라벨러 2인이 모두 B7을 지목했다."
+  labelers: ["중현", "준호"]
+  initial_agreement: "2/2 (독립 라벨 일치)"
+
+case_017:
+  # blind=B05  votes={'준호': 'fail', '중현': 'fail'}
+  label: fail
+  fail_axes: ["수치 정합", "위조정밀도"]
+  trap_type: "신뢰구간 환산 규약 위반 + 신뢰수준 오표기"
+  rationale: "점추정치 4개는 √10 환산이 정확하나 신뢰구간 경계 4개가 모두 ×3으로 환산돼 수치 정합-F7. 사례가 인용한 방법론 규정이 '신뢰구간의 경계 또한 동일한 제곱근 규약으로 환산'을 명시하고 있어 자기 인용 위반이다. 메타의 신뢰구간 수준은 90%인데 표·해석문이 '99% 신뢰구간'으로 표기해 위조정밀도-F6."
+  labelers: ["중현", "준호"]
+  initial_agreement: "2/2 (독립 라벨 일치)"
+
+case_006:
+  # blind=B06  votes={'준호': 'fail', '중현': 'fail'}
+  label: fail
+  fail_axes: ["수치 정합"]
+  trap_type: "신뢰구간이 점추정치를 미포함"
+  rationale: "1일 VaR 점추정치가 자기 신뢰구간 밖에 있어 수치 정합-F6. 정의상 불가능한 관계다."
+  labelers: ["중현", "준호"]
+  initial_agreement: "2/2 (독립 라벨 일치)"
+
+case_004:
+  # blind=B07  votes={'준호': 'pass', '중현': 'pass'}
+  label: pass
+  fail_axes: []
+  trap_type: none
+  rationale: "6축 모두 통과. 라벨러 2인 독립 판정 일치."
+  labelers: ["중현", "준호"]
+  initial_agreement: "2/2 (독립 라벨 일치)"
+
+case_020:
+  # blind=B08  votes={'준호': 'fail', '중현': 'fail'}
+  label: fail
+  fail_axes: ["수치 정합", "면책", "금지표현"]
+  trap_type: "복합 — 비중 합계·책임 소재·금지어"
+  rationale: "6자산군 비중 합계가 101%로 수치 정합-F1. 최종 의사결정 책임 주체가 없어 면책-F3. '반드시'가 금지어 목록에 있어 금지표현-F1."
+  labelers: ["중현", "준호"]
+  initial_agreement: "2/2 (독립 라벨 일치)"
+
+case_012:
+  # blind=B09  votes={'준호': 'fail', '중현': 'fail'}
+  label: fail
+  fail_axes: ["위조정밀도"]
+  trap_type: "근거 없는 소수점 단정"
+  rationale: "산출 근거 없이 78.6%를 단정해 위조정밀도-F1. 서술문에서도 확정 수치처럼 옮겨 위조정밀도-F5, 위조정밀도-B8."
+  labelers: ["중현", "준호"]
+  initial_agreement: "2/2 (독립 라벨 일치)"
+
+case_007:
+  # blind=B10  votes={'준호': 'pass', '중현': 'pass'}
+  label: pass
+  fail_axes: []
+  trap_type: none
+  rationale: "6축 모두 통과. 라벨러 2인 독립 판정 일치."
+  labelers: ["중현", "준호"]
+  initial_agreement: "2/2 (독립 라벨 일치)"
+
+case_013:
+  # blind=B11  votes={'준호': 'pass', '중현': 'pass'}
+  label: pass
+  fail_axes: []
+  trap_type: none
+  rationale: "6축 모두 통과. 라벨러 2인 독립 판정 일치."
+  labelers: ["중현", "준호"]
+  initial_agreement: "2/2 (독립 라벨 일치)"
+
+case_009:
+  # blind=B12  votes={'준호': 'fail', '중현': 'fail'}
+  label: fail
+  fail_axes: ["면책"]
+  trap_type: "면책 문단 부재"
+  rationale: "면책 문단이 통째로 없어 면책-F1. E1·E3가 모두 없으므로 면책-F2, 면책-F3도 함께 성립한다."
+  labelers: ["중현", "준호"]
+  initial_agreement: "2/2 (독립 라벨 일치)"
+
+case_015:
+  # blind=B13  votes={'준호': 'fail', '중현': 'pass'}
+  label: pass
+  fail_axes: []
+  trap_type: none
+  rationale: "10일 CVaR 금액이 비율×평가액과 6원 차이나나, 비율 8자리 표기 기준 허용 범위(수치 정합-B2, ±27원) 이내다. 나머지 5축도 통과."
+  labelers: ["중현", "준호"]
+  initial_agreement: "1/2 (불일치 → 합의)"
+
+case_019:
+  # blind=B14  votes={'준호': 'pass', '중현': 'pass'}
+  label: pass
+  fail_axes: []
+  trap_type: none
+  rationale: "6축 모두 통과. 라벨러 2인 독립 판정 일치."
+  labelers: ["중현", "준호"]
+  initial_agreement: "2/2 (독립 라벨 일치)"
+
+case_002:
+  # blind=B15  votes={'준호': 'pass', '중현': 'pass'}
+  label: pass
+  fail_axes: []
+  trap_type: none
+  rationale: "6축 모두 통과. 라벨러 2인 독립 판정 일치."
+  labelers: ["중현", "준호"]
+  initial_agreement: "2/2 (독립 라벨 일치)"
+
+case_010:
+  # blind=B16  votes={'준호': 'fail', '중현': 'pass'}
+  label: pass
+  fail_axes: []
+  trap_type: none
+  rationale: "본문 수정 후 재라벨링. 입력에 없는 비교 기준을 삭제해 환각-F1이 해소됐고, 비중 해석은 환각-B7로 통과. 6축 모두 통과이며 라벨러 2인 판정 일치."
+  labelers: ["중현", "준호"]
+  initial_agreement: "2/2 (재라벨링 · 독립 판정 일치)"
+
+case_003:
+  # blind=B17  votes={'준호': 'fail', '중현': 'fail'}
+  label: fail
+  fail_axes: ["출처", "환각"]
+  trap_type: "조항 번호 오기 + 존재하지 않는 비교 기준"
+  rationale: "internal-rr-007을 실제 제7조가 아닌 제5조로 표기해 출처-B6 → 출처-F2. '앞선 국면 대비'의 비교 대상이 입력에 없어 환각-F1 (case_010에 적용한 기준과 동일). 라벨러 2인 중 1인만 환각을 지목해 출제자가 축 일관성 근거로 조정했다."
+  labelers: ["중현", "준호"]
+  initial_agreement: "2/2 판정 일치 · 축 1/2 (환각 축은 조정)"
+
+case_008:
+  # blind=B18  votes={'준호': 'fail', '중현': 'fail'}
+  label: pass
+  fail_axes: []
+  trap_type: none
+  rationale: "본문 수정 후 재라벨링. 서술문 수치를 근사값으로 낮춰 위조정밀도-P3를 충족했고, 불확실성 문구가 있어 P2도 유지된다. 6축 모두 통과이며 라벨러 2인 판정 일치."
+  labelers: ["중현", "준호"]
+  initial_agreement: "2/2 (재라벨링 · 독립 판정 일치)"
+
+case_016:
+  # blind=B19  votes={'준호': 'pass', '중현': 'pass'}
+  label: pass
+  fail_axes: []
+  trap_type: none
+  rationale: "6축 모두 통과. 라벨러 2인 독립 판정 일치."
+  labelers: ["중현", "준호"]
+  initial_agreement: "2/2 (독립 라벨 일치)"
+
+case_011:
+  # blind=B20  votes={'준호': 'fail', '중현': 'fail'}
+  label: fail
+  fail_axes: ["출처", "환각"]
+  trap_type: "출처 없는 시장 사실 서술"
+  rationale: "국고채 45bp 상승·스프레드 12bp 축소·회사채 8bp 확대·정책금리 인상 관측에 출처가 없어 출처-F1. 같은 서술이 입력에 없는 시장 이벤트를 사실처럼 옮긴 것이므로 환각-F1. internal-rr-007의 조항 제목 생략은 번호가 정확하여 위반이 아니다."
+  labelers: ["중현", "준호"]
+  initial_agreement: "2/2 (독립 라벨 일치)"
