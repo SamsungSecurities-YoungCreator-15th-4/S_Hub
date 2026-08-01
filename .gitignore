@@ -30,10 +30,6 @@ data/rag-index-cache/
 /out/
 judge_v*_results.json
 
-# 정답 사례집 출제 의도 봉인 파일 — judge가 채점받는 정답지라 커밋하면
-# 라벨러 독립성이 깨진다. 코퍼스(goldenset/corpus/)와 사례 본문은 추적 대상이다.
-/goldenset/.sealed/
-
 # 에디터/OS
 .idea/
 .vscode/
