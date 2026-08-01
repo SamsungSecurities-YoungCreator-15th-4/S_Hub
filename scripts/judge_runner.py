@@ -73,6 +73,10 @@ def record_case(case: dict, *, llm, prompt_version: str, code_sha: str) -> dict:
         prompt_version=prompt_version,
         code_sha=code_sha,
         case_content_sha256=case_content_sha256(state),
+        # v1·v2가 같은 기준일로 채점됐음을 계약이 검증할 수 있도록, 실행에 쓴
+        # run_config의 as_of_date를 그대로 넘긴다(judge disclaimer/numeric 축의
+        # expected_dates 재료). 필수 실행 조건이라 없으면 즉시 실패시킨다.
+        as_of_date=state["run_config"]["as_of_date"],
         # LangSmith 연결은 실제 그래프 실행(Phase 2)에서 채운다. EC 오프라인
         # 리허설엔 run이 없으므로 None(계약상 선택 필드).
         langsmith_run_id=None,

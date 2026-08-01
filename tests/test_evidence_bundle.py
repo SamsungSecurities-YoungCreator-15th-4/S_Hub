@@ -6,6 +6,7 @@ import json
 import re
 import subprocess
 import sys
+import uuid
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -410,10 +411,12 @@ def _calibration_records(
                     "api_version": "2026-01-01",
                 },
                 "trace_id": f"trace-{case_id}",
-                "langsmith_run_id": f"run-{case_id}",
+                "langsmith_run_id": str(uuid.uuid5(uuid.NAMESPACE_DNS, case_id)),
                 "langsmith_trace_url": None,
                 "code_sha": "deadbeef",
                 "case_content_sha256": hashlib.sha256(body_seed.encode()).hexdigest(),
+                "as_of_date": "2026-07-03",
+                "strict_citation_gate": False,
             }
         )
     return merge_records(human, judge)

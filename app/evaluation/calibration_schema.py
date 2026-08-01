@@ -16,19 +16,38 @@ judge_eval()의 실제 반환 계약(app/nodes/judge_eval.py)과 감사 기록
 - ``prompt_hash``는 사례 payload까지 포함해 렌더링한 프롬프트의 해시라
   같은 프롬프트 버전이어도 사례마다 값이 다른 게 정상이다. "같은 실행인가"는
   ``prompt_version``/``model_version``/``code_sha``로 확인하고(→
-  ``validate_run_consistency``), ``prompt_hash``로 확인하지 않는다.
+  ``validate_run_consistency``), ``prompt_hash``로 확인하지 않는다. 다만
+  v1·v2 비교(``compare_official_versions``)에서는 반대로 ``prompt_hash``가
+  "실제 프롬프트가 바뀌었는가"를 증명하는 유일한 신호다 — LLM축 프롬프트가
+  ``app/judge/rubric.py``에 하드코딩돼 있어 ``code_sha``는 v1·v2 사이에
+  달라지는 게 정상이라(진짜 개선이면 코드가 바뀐다), ``code_sha`` 동일성으로는
+  "프롬프트만 바뀌었다"를 증명할 수 없다.
 - ``model_version``은 문자열이 아니라 ``app.llm.audit.model_version_record()``
   가 반환하는 ``{deployment, model, api_version}`` dict다.
 - ``trace_id``는 LangSmith run ID가 아니라 내부 상관관계 ID
   (``app.observability.langsmith.prepare_trace_invocation``)다. 실제
   LangSmith 식별자는 별도 필드 ``langsmith_run_id``/``langsmith_trace_url``
   이며, LangSmith가 꺼져 있으면 비어 있을 수 있어 선택 필드로 둔다.
+- ``as_of_date``는 judge의 disclaimer/numeric_consistency 축이 쓰는
+  ``expected_dates``의 재료(``run_config.as_of_date``)다. 사례 본문
+  (``case_content_sha256``이 보는 metrics/explanations/citations)과 물리적으로
+  분리된 값이라, 기준일만 다른 채로 v1·v2를 돌려도 case_content_sha256으로는
+  못 잡을 수 있다. 그래서 명시 필드로 두고 실행 일관성·v1·v2 동일성을 직접
+  검사한다(→ ``validate_run_consistency``, ``compare_versions``).
+- ``strict_citation_gate``도 as_of_date와 같은 이유로 명시 필드다 —
+  ``app/nodes/judge_eval.py``에서 ``source_validity``/``citation_content_contract``
+  의 엄격도를 바꾸는 실행 조건이라 판정에 영향을 주지만, 사례 본문과
+  물리적으로 분리돼 있다. ``build_judge_result()``가 ``judge_output["run_config"]``
+  에서 자동으로 뽑으므로 호출자가 따로 넘길 필요는 없다.
 """
 from __future__ import annotations
 
 import re
+from collections import Counter
 from dataclasses import dataclass
+from datetime import date
 from typing import Iterable, Literal, NamedTuple, TypedDict
+from uuid import UUID
 
 from app.judge.axes import to_en
 from app.judge.rubric import AXIS_NAMES
@@ -37,6 +56,7 @@ Label = Literal["pass", "fail"]
 
 _SHA256_HEX_RE = re.compile(r"^[0-9a-fA-F]{64}$")
 _GIT_SHA_RE = re.compile(r"^[0-9a-fA-F]{7,40}$")
+_ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 EXPECTED_CASE_COUNT = 20
 EXPECTED_CASE_IDS = frozenset(f"case_{i:03d}" for i in range(1, EXPECTED_CASE_COUNT + 1))
@@ -82,6 +102,8 @@ class JudgeResult(TypedDict, total=False):
     langsmith_trace_url: str | None
     code_sha: str
     case_content_sha256: str
+    as_of_date: str
+    strict_citation_gate: bool
 
 
 @dataclass(frozen=True)
@@ -109,6 +131,8 @@ class CalibrationRecord:
     langsmith_trace_url: str | None
     code_sha: str
     case_content_sha256: str
+    as_of_date: str
+    strict_citation_gate: bool
 
 
 class CalibrationSchemaError(ValueError):
@@ -178,6 +202,8 @@ class NormalizedJudgeResult(NamedTuple):
     langsmith_trace_url: str | None
     code_sha: str
     case_content_sha256: str
+    as_of_date: str
+    strict_citation_gate: bool
 
 
 def _require_nonempty_str(raw: dict, key: str, *, case_id: str) -> str:
@@ -203,6 +229,52 @@ def _optional_nonempty_str(raw: dict, key: str, *, case_id: str) -> str | None:
     value = raw[key]
     if not isinstance(value, str) or not value.strip():
         raise CalibrationSchemaError(f"{case_id}: {key}는 None이거나 비어있지 않은 문자열이어야 합니다.")
+    return value
+
+
+def _optional_uuid_str(raw: dict, key: str, *, case_id: str) -> str | None:
+    """LangSmith run ID는 실행 시 app/observability/langsmith.py가 uuid.uuid4()로
+    생성한다. 다만 여기서는 "abc"·"임시값" 같은 placeholder만 거부하면 충분하므로
+    버전(v4)까지는 강제하지 않고 유효한 UUID 형식인지만 확인한다 — 테스트
+    fixture처럼 결정론적 uuid5를 쓰는 경우까지 계약으로 막을 이유는 없다.
+
+    표준형(소문자, 하이픈 포함)으로 정규화해서 반환한다 — 대소문자·하이픈
+    유무만 다른 동일 UUID가 validate_official_case_set()의 중복 run ID
+    검사를 문자열 비교로 우회하는 걸 막는다.
+    """
+    value = _optional_nonempty_str(raw, key, case_id=case_id)
+    if value is None:
+        return None
+    try:
+        parsed = UUID(value)
+    except ValueError as exc:
+        raise CalibrationSchemaError(f"{case_id}: {key}는 UUID 형식이어야 합니다 (받은 값: {value!r}).") from exc
+    return str(parsed)
+
+
+def _require_iso_date(raw: dict, key: str, *, case_id: str) -> str:
+    """YYYY-MM-DD 형식만 허용한다.
+
+    date.fromisoformat()은 파이썬 3.11부터 ISO 8601 전체(압축형 '20260715',
+    주차형 '2026-W27-1' 등)를 받아들인다. 이 필드는 전부 문자열 동등 비교로
+    쓰이므로("2026-07-03" vs "20260703") 형식이 넓으면 같은 날짜가 다른
+    문자열로 들어와 불일치로 잘못 잡힌다. 정규식으로 표기를 먼저 고정하고,
+    fromisoformat은 2026-02-30처럼 존재하지 않는 날짜만 걸러내는 데 쓴다.
+    """
+    value = raw.get(key)
+    if not isinstance(value, str) or not _ISO_DATE_RE.fullmatch(value):
+        raise CalibrationSchemaError(f"{case_id}: {key}는 YYYY-MM-DD 형식의 날짜여야 합니다 (받은 값: {value!r}).")
+    try:
+        date.fromisoformat(value)
+    except ValueError as exc:
+        raise CalibrationSchemaError(f"{case_id}: {key}는 실재하는 날짜가 아닙니다 (받은 값: {value!r}).") from exc
+    return value
+
+
+def _require_bool(raw: dict, key: str, *, case_id: str) -> bool:
+    value = raw.get(key)
+    if not isinstance(value, bool):
+        raise CalibrationSchemaError(f"{case_id}: {key}는 bool이어야 합니다 (받은 값: {value!r}).")
     return value
 
 
@@ -358,12 +430,14 @@ def normalize_judge_result(raw: dict) -> NormalizedJudgeResult:
         ),
         model_version=_require_model_version(raw, case_id=case_id),
         trace_id=_require_nonempty_str(raw, "trace_id", case_id=case_id),
-        langsmith_run_id=_optional_nonempty_str(raw, "langsmith_run_id", case_id=case_id),
+        langsmith_run_id=_optional_uuid_str(raw, "langsmith_run_id", case_id=case_id),
         langsmith_trace_url=_optional_nonempty_str(raw, "langsmith_trace_url", case_id=case_id),
         code_sha=_require_pattern(raw, "code_sha", _GIT_SHA_RE, case_id=case_id, hint="7~40자리 git SHA(16진)"),
         case_content_sha256=_require_pattern(
             raw, "case_content_sha256", _SHA256_HEX_RE, case_id=case_id, hint="64자리 SHA-256 16진 문자열"
         ),
+        as_of_date=_require_iso_date(raw, "as_of_date", case_id=case_id),
+        strict_citation_gate=_require_bool(raw, "strict_citation_gate", case_id=case_id),
     )
 
 
@@ -428,17 +502,30 @@ def merge_records(
                 langsmith_trace_url=j.langsmith_trace_url,
                 code_sha=j.code_sha,
                 case_content_sha256=j.case_content_sha256,
+                as_of_date=j.as_of_date,
+                strict_citation_gate=j.strict_citation_gate,
             )
         )
     return records
 
 
 def validate_run_consistency(records: list[CalibrationRecord]) -> None:
-    """한 번의 공식 실행(run) 안에서 prompt_version·model_version·code_sha가 전부 같은지 확인한다.
+    """한 번의 공식 실행(run) 안에서 prompt_version·model_version·code_sha·as_of_date·strict_citation_gate가 전부 같은지 확인한다.
 
     prompt_hash·case_content_sha256·trace_id는 사례마다 달라지는 게 정상이므로
     여기서 검사하지 않는다 — 이 함수는 "같은 실행인가"를 증명하고, 그 값들은
     compare_versions()가 "같은 사례인가"를 증명하는 데 쓴다.
+
+    as_of_date를 여기 둔 건 R1 사례집 20건이 서로 다른 기준일의 리포트를
+    섞지 않는다는 전제다 — config/config.yaml의 as_of_date가 포트폴리오별이
+    아니라 전역 단일값이므로, 한 번의 공식 실행은 하나의 기준일로 20건 전체를
+    채점한다고 본다. 사례별로 기준일이 달라야 하는 시나리오가 생기면 이 함수가
+    아니라 compare_versions()의 v1·v2 간 검사로 옮겨야 한다.
+
+    strict_citation_gate도 같은 이유다 — app/judge/rubric.py의
+    source_validity()·citation_content_contract 검사 엄격도를 바꾸는 run_config
+    값이라, 20건 중 일부만 엄격 게이트로 돌리면 같은 실행 안에서 판정 기준이
+    갈린다.
     """
     if not records:
         raise ValueError("records가 비어 있습니다.")
@@ -450,12 +537,14 @@ def validate_run_consistency(records: list[CalibrationRecord]) -> None:
             record.prompt_version != first.prompt_version
             or record.model_version != first.model_version
             or record.code_sha != first.code_sha
+            or record.as_of_date != first.as_of_date
+            or record.strict_citation_gate != first.strict_citation_gate
         )
     )
     if mismatched:
         raise CalibrationSchemaError(
-            "한 실행(run) 안에서는 prompt_version·model_version·code_sha가 전부 같아야 합니다. "
-            f"{first.case_id}과(와) 다른 사례: {mismatched}"
+            "한 실행(run) 안에서는 prompt_version·model_version·code_sha·as_of_date·"
+            f"strict_citation_gate가 전부 같아야 합니다. {first.case_id}과(와) 다른 사례: {mismatched}"
         )
 
 
@@ -490,6 +579,12 @@ def validate_official_case_set(records: list[CalibrationRecord], *, require_lang
         missing_langsmith = sorted(record.case_id for record in records if not record.langsmith_run_id)
         if missing_langsmith:
             raise CalibrationSchemaError(f"LangSmith run ID가 없는 사례: {missing_langsmith}")
+        run_id_counts = Counter(record.langsmith_run_id for record in records)
+        duplicated = sorted(run_id for run_id, count in run_id_counts.items() if count > 1)
+        if duplicated:
+            raise CalibrationSchemaError(
+                f"사례마다 서로 다른 LangSmith run이어야 합니다. 중복된 run ID: {duplicated}"
+            )
 
 
 def build_judge_result(
@@ -500,6 +595,7 @@ def build_judge_result(
     prompt_version: str,
     code_sha: str,
     case_content_sha256: str,
+    as_of_date: str,
     langsmith_run_id: str | None = None,
     langsmith_trace_url: str | None = None,
 ) -> dict:
@@ -510,9 +606,27 @@ def build_judge_result(
     judge_output["judge_feedback"], judge_output["run_config"] 중첩 구조).
     trace_id는 judge_eval() 반환값에 없다 — state["trace_id"](그래프
     load_inputs/observability 단계에서 설정)를 호출자가 그대로 넘긴다.
+    as_of_date도 judge_eval() 반환값에 명시 필드로 없다 — 호출자가 실행에 쓴
+    state["run_config"]["as_of_date"]를 그대로 넘긴다. judge_eval()이 보존하는
+    judge_output["run_config"]에는 이 값이 그대로 남아있으므로, 여기서 실제
+    실행값이 아예 없거나(run_config에 as_of_date가 없음) 호출자가 넘긴 값과
+    다르면 즉시 거부한다 — 실제 값이 없는데 호출자 값만 조용히 감사 기록에
+    남는 것도, 호출자가 실수로 다른 날짜를 넘기는 것도 둘 다 막는다. 반환값에는
+    호출자 값이 아니라 judge_output에서 읽은 실제 값을 담는다.
+    strict_citation_gate는 반대로 judge_output["run_config"]에 이미 보존돼
+    있어(judge_eval()이 이 값을 그대로 읽고 되돌려준다) 호출자가 따로 넘길
+    필요가 없다 — judge_eval.py가 검사에 쓴 판정과 정확히 같은 값을 뽑는다.
     tests/test_judge_calibration.py의 통합 테스트가 이 함수를 실제
     judge_eval() 출력에 대해 검증한다.
     """
+    actual_as_of_date = judge_output["run_config"].get("as_of_date")
+    if actual_as_of_date is None:
+        raise CalibrationSchemaError(f"{case_id}: judge_output.run_config에 as_of_date가 없습니다.")
+    if actual_as_of_date != as_of_date:
+        raise CalibrationSchemaError(
+            f"{case_id}: 넘겨받은 as_of_date({as_of_date!r})가 judge_output의 실제 실행값"
+            f"({actual_as_of_date!r})과 다릅니다."
+        )
     judge = judge_output["judge"]
     audit = judge_output["run_config"]["audit"]["llm"]["judge_eval"]["latest"]
     return {
@@ -532,4 +646,9 @@ def build_judge_result(
         "langsmith_trace_url": langsmith_trace_url,
         "code_sha": code_sha,
         "case_content_sha256": case_content_sha256,
+        "as_of_date": actual_as_of_date,
+        # judge_eval.py는 run_config.get("strict_citation_gate") is True로
+        # 판정하므로 여기서도 같은 식을 그대로 쓴다 — 키 부재(None)를 False로
+        # 취급하는 규칙까지 일치시켜야 기록값이 실제 판정과 어긋나지 않는다.
+        "strict_citation_gate": judge_output["run_config"].get("strict_citation_gate") is True,
     }
