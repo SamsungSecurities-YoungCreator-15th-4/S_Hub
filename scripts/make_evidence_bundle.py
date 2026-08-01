@@ -230,16 +230,40 @@ def build_citation_verification(state: dict) -> dict:
             if isinstance(citations, list)
             else unavailable("state.citations")
         ),
-        # 탈락 인용은 rag_cite가 log.warning으로만 남기고 state에 저장하지 않는다.
-        "rejected_citations": unavailable(
-            "state의 탈락 인용 기록",
-            note=(
-                "app/nodes/rag_cite.py가 verify_citations의 rejected를 로그로만 "
-                "남기고 state에 저장하지 않는다. 번들에 실으려면 R2에 상태 기록을 "
-                "요청해야 한다."
-            ),
-        ),
+        "rejected_citations": _rejected_citations(state),
     }
+
+
+def _rejected_citations(state: dict) -> object:
+    """탈락 인용 기록. 키가 없는 과거 state에서는 기존대로 available:false다."""
+    rejections = state.get("citation_rejections")
+    if not isinstance(rejections, list):
+        return unavailable(
+            "state.citation_rejections",
+            note=(
+                "이 실행은 탈락 인용을 기록하지 않는 버전에서 생성됐다. "
+                "app/nodes/rag_cite.py가 citation_rejections를 채우면 실린다."
+            ),
+        )
+    return [
+        {
+            # 재작성 루프에서 시도별로 누적되므로, 어느 시도의 탈락인지 함께 싣는다.
+            "attempt": _get(rejection, "attempt"),
+            "topic": _get(rejection, "topic"),
+            "chunk_id": _get(rejection, "chunk_id"),
+            "cited_source": _get(rejection, "cited_source"),
+            "cited_locator": _get(rejection, "cited_locator"),
+            "quote": _get(rejection, "quote"),
+            "reason": _get(rejection, "reason"),
+            "original_comparison": _field(
+                rejection,
+                "original_comparison",
+                "state.citation_rejections[].original_comparison",
+            ),
+        }
+        for rejection in rejections
+        if isinstance(rejection, dict)
+    ]
 
 
 def build_hard_stop_record(state: dict) -> dict:

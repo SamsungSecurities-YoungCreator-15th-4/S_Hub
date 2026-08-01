@@ -205,12 +205,13 @@ class ReplayDiff(TypedDict):
 
 REPLAY_DIFF_REQUIRED_KEYS = ("status", "hashes", "note")
 
-#: 이번 단계는 1회 실행분의 해시만 싣는 자리표시다. 2회 실행 대조는
-#: run_graph.py 배선 PR에서 채운다.
+#: 1회 실행분의 해시만 싣는 자리표시다. run_graph.py 배선(#148)은 번들을 자동
+#: 생성할 뿐 2회 실행 대조를 하지 않으므로, 이 표시는 R5 재현 검증에서 채워질
+#: 때까지 유지한다 — 번들이 "재현 증명까지 완료"로 읽히면 안 된다.
 REPLAY_DIFF_PLACEHOLDER_STATUS = "single_run_only"
 REPLAY_DIFF_PLACEHOLDER_NOTE = (
-    "이번 단계는 1회 실행분 해시만 기록한다. 동일 입력 2회 실행 대조는 "
-    "run_graph.py 자동 호출 배선 PR에서 채운다."
+    "이 번들은 1회 실행분 해시만 기록한다. 동일 입력 2회 실행 대조는 아직 "
+    "수행되지 않았으므로 재현성이 증명된 것이 아니다. R5 재현 검증에서 채운다."
 )
 
 

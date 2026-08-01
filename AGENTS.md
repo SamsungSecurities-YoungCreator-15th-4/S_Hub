@@ -114,6 +114,7 @@ START
 | `metrics` | `dict` | TBD |
 | `explanations` | `list` | TBD |
 | `citations` | `list` | TBD |
+| `citation_rejections` | `list` | `rag_cite` 생산 → R4 증거 번들 소비 (시도별 **누적**, [인용 검증 계약](docs/hard_stop_contract.md#5-인용-검증-계약) 참조) |
 | `judge` | `dict` | `route_after_judge`가 `judge.passed`를 읽어 분기③ 판단 |
 | `judge_retries` | `int` | `route_after_judge`가 읽어 분기③ 판단 (상한 SSOT=`config/config.yaml: judge_max_retries`) |
 | `judge_feedback` | `str` | TBD |

@@ -52,7 +52,12 @@ def _source_name(value: object) -> str:
     return PurePosixPath(value.replace("\\", "/")).name.strip()
 
 
-def _chunk_source(chunk: dict) -> str:
+def chunk_source(chunk: dict) -> str:
+    """청크의 표시 문서명. `source`가 없으면 chunk_id 접두에서 되살린다.
+
+    공개 API다 — 탈락 인용 감사 기록(`app/nodes/rag_cite.py`)이 검증기와 **같은**
+    정규화를 써야 해서 노드에서 직접 호출한다. 재구현하면 기록과 판정이 어긋난다.
+    """
     source = _source_name(chunk.get("source"))
     if source:
         return source
@@ -62,7 +67,8 @@ def _chunk_source(chunk: dict) -> str:
     return _source_name(chunk_id.rsplit("::", 1)[0])
 
 
-def _locator_metadata(value: object) -> dict[str, str]:
+def locator_metadata(value: object) -> dict[str, str]:
+    """조항/절/항 표기만 정규화해 뽑는다. 공개 API — `chunk_source`와 같은 이유."""
     if not isinstance(value, dict):
         return {}
     return {
@@ -77,12 +83,12 @@ def _citation_provenance(citation: Citation, chunk: dict) -> dict:
     chunk_text = chunk.get("text")
     normalized_chunk_text = chunk_text if isinstance(chunk_text, str) else ""
     return {
-        "source": _chunk_source(chunk),
+        "source": chunk_source(chunk),
         "chunk_id": citation.chunk_id,
         "claim": citation.claim,
         "quote_sha256": _sha256_text(citation.quote),
         "chunk_text_sha256": _sha256_text(normalized_chunk_text),
-        "locator": _locator_metadata(chunk),
+        "locator": locator_metadata(chunk),
     }
 
 
@@ -151,8 +157,8 @@ def citation_contract_issues(
         ):
             issues.append("원문 청크 provenance 지문 불일치")
 
-        expected_locator = _locator_metadata(provenance.get("locator"))
-        cited_locator = _locator_metadata(citation) or _locator_metadata(extra)
+        expected_locator = locator_metadata(provenance.get("locator"))
+        cited_locator = locator_metadata(citation) or locator_metadata(extra)
         if expected_locator and not cited_locator:
             issues.append("문서 조항/절/항 표기 누락")
         elif cited_locator and cited_locator != expected_locator:
@@ -202,10 +208,10 @@ def verify_citations(
             reason = f"존재하지 않는 chunk_id: {cit.chunk_id}"
         else:
             chunk = chunk_by_id[cit.chunk_id]
-            expected_source = _chunk_source(chunk)
+            expected_source = chunk_source(chunk)
             cited_source = _source_name(cit.source)
-            cited_locator = _locator_metadata(cit.extra)
-            expected_locator = _locator_metadata(chunk)
+            cited_locator = locator_metadata(cit.extra)
+            expected_locator = locator_metadata(chunk)
 
         if reason is None and expected_source and cited_source != expected_source:
             reason = (

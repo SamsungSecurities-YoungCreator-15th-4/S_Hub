@@ -8,6 +8,7 @@
 import argparse
 import json
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -16,6 +17,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 THREAD_ID = "demo-thread-001"
+DEFAULT_EVIDENCE_ROOT = Path("evidence")
+RUN_ID_PREFIX = "run"
 DEPLOYMENT_VALIDATION_RAW_INPUT = (
     "고객은 사업체 운영자금과 은퇴자금을 함께 관리하고 있으며 투자기간은 10년이다. "
     "목표수익률은 연 5%이고 중간 수준의 유동성을 원한다. 금융소득 종합과세와 "
@@ -41,6 +44,50 @@ def _stream_and_collect(graph, payload, invocation, order: list[str]) -> None:
                 print(f"  ▶ 노드 실행: {node_name}")
 
 
+def allocate_run_id(root: Path, today: str) -> str:
+    """`run-YYYYMMDD-NNN` — 사람이 지정하지 않아도 충돌 없이 자동 부여한다.
+
+    같은 날 재실행하면 기존 번들을 덮어쓰지 않고 다음 일련번호를 잡는다.
+    """
+    prefix = f"{RUN_ID_PREFIX}-{today}-"
+    used = set()
+    if root.is_dir():
+        for child in root.iterdir():
+            if child.is_dir() and child.name.startswith(prefix):
+                suffix = child.name[len(prefix):]
+                if suffix.isdigit():
+                    used.add(int(suffix))
+    sequence = 1
+    while sequence in used:
+        sequence += 1
+    return f"{prefix}{sequence:03d}"
+
+
+def generate_evidence_bundle(final: dict, root: Path) -> Path:
+    """그래프 종료 직후 증거 번들을 in-process로 생성한다.
+
+    subprocess로 다시 부르지 않는 이유: 명령과 번들 사이에 사람이 파일을 옮기거나
+    경로를 지정하는 단계가 생기면 "명령 한 번이면 자동 생성"이 성립하지 않는다.
+    """
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from make_evidence_bundle import make_bundle
+
+    # 한 번만 읽는다. 두 번 호출하면 자정 경계에서 generated_at과 run_id의
+    # 날짜가 갈린다(generated_at=08-01인데 run_id는 …20260731).
+    now = datetime.now(timezone.utc)
+    generated_at = now.isoformat(timespec="seconds")
+    run_id = allocate_run_id(root, now.strftime("%Y%m%d"))
+    out_dir = make_bundle(final, root / run_id, run_id=run_id, generated_at=generated_at)
+
+    from app.evidence.schema import BUNDLE_FILENAMES
+
+    missing = [name for name in BUNDLE_FILENAMES if not (out_dir / name).is_file()]
+    if missing:
+        # 번들 없이 성공 종료하면 서류철이 비어 있는 채로 제출된다.
+        raise SystemExit(f"증거 번들 생성 실패 — 누락 파일: {', '.join(missing)}")
+    return out_dir
+
+
 def main() -> None:
     load_dotenv(ROOT / ".env")
     parser = argparse.ArgumentParser(description="리스크 리포트 그래프 실행")
@@ -56,6 +103,25 @@ def main() -> None:
         "--validate-deployment",
         action="store_true",
         help="4개 RAG category·Judge·LangSmith를 포함한 실제 배포 계약 검증",
+    )
+    parser.add_argument(
+        "--dump-state",
+        type=Path,
+        default=None,
+        metavar="PATH",
+        help="최종 state를 결정론적 JSON으로 저장 (증거 번들 입력)",
+    )
+    parser.add_argument(
+        "--evidence-bundle",
+        nargs="?",
+        type=Path,
+        const=DEFAULT_EVIDENCE_ROOT,
+        default=None,
+        metavar="DIR",
+        help=(
+            "실행 종료 후 감사 증거 번들을 자동 생성 "
+            f"(기본 출력 루트: {DEFAULT_EVIDENCE_ROOT})"
+        ),
     )
     args = parser.parse_args()
 
@@ -168,6 +234,24 @@ def main() -> None:
             "  ⚠ judge 미통과 — 리포트는 확정되지 않았습니다(수동검토 대기). "
             "사람 검토 전에는 고객 제공·최종 판단 근거로 사용하지 않습니다."
         )
+
+    if args.dump_state:
+        from app.evidence.state_dump import dump_state
+
+        _print_header("6) 최종 state 덤프")
+        dumped = dump_state(final, args.dump_state)
+        print(f"  저장: {dumped}")
+
+    if args.evidence_bundle:
+        # 정상 확정·수동검토 차단 양쪽 모두에서 생성한다. 차단 사례도 제출물이다.
+        _print_header("7) 증거 번들 생성")
+        bundle_dir = generate_evidence_bundle(final, args.evidence_bundle)
+        print(f"  생성: {bundle_dir}")
+        for name in sorted(child.name for child in bundle_dir.iterdir()):
+            print(f"    - {name}")
+        from app.evidence.schema import BUNDLE_HASH_FILENAME
+
+        print(f"  bundle_hash: {(bundle_dir / BUNDLE_HASH_FILENAME).read_text().strip()}")
 
     if args.validate_deployment:
         from app.deployment_validation import (

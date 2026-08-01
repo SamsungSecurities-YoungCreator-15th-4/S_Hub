@@ -82,6 +82,7 @@ class RiskState(TypedDict, total=False):
     metrics: dict
     explanations: list
     citations: list
+    citation_rejections: list
     judge: dict
     judge_retries: int
     judge_feedback: str
