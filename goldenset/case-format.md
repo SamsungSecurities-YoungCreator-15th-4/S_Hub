@@ -1,6 +1,6 @@
 # 사례 md 형식 명세 — 로더 작성용
 
-> R1 사례 20건(`goldenset/cases/case_001~020.md`)을 judge 입력으로 바꾸는 로더를 만들 때 참고하는 문서입니다.
+> R1 사례에서 정답 메타데이터를 제거한 20건(`goldenset/judge_inputs/case_001~020.md`)을 judge 입력으로 바꾸는 로더를 만들 때 참고하는 문서입니다.
 > 작성: R1(승민) · 사용: R2 실행·기록(다경)
 > **이 문서에는 정답·함정 정보가 없습니다.** 구조만 기술합니다.
 
@@ -9,8 +9,17 @@
 ## 0. 로더가 지켜야 할 경계 — 먼저 읽어주세요
 
 **judge 실행 단계에는 정답(gold label)이 필요 없습니다.** 정답은 실행이 끝난 뒤
-**일치율을 계산하는 분석 단계**에서만 씁니다. 저장소에 정답이 공개돼 있더라도
-실행 로더는 그것을 읽지 않아야 하며, 이는 테스트로 강제됩니다.
+**일치율을 계산하는 분석 단계**에서만 씁니다. R2 실행 로더는 정답이 든
+`goldenset/cases/`를 열거나 파싱하지 않고, R3가 아래 명령으로 생성한
+`goldenset/judge_inputs/`만 읽습니다.
+
+```bash
+python goldenset/tools/export_judge_inputs.py --check
+```
+
+생성본은 원래 `case_001~020` ID를 유지하므로 Judge 결과와 Gold Label을 실행 후
+문항별로 대조할 수 있습니다. `manifest.json`의 본문 해시는 R1 동결 해시와 같아야
+합니다.
 
 **차단 목록이 아니라 allowlist로 구현하세요.** state에 넣는 키를 아래 셋으로
 제한하면, 나중에 frontmatter에 필드가 추가돼도 자동으로 안전합니다.
@@ -19,7 +28,7 @@
 ALLOWED_STATE_KEYS = {"metrics", "explanations", "citations"}
 ```
 
-읽어도 되는 frontmatter는 `id` · `variant` · `llm_draft` 셋뿐입니다.
+무라벨 입력본에 남는 frontmatter는 `id` · `variant` · `llm_draft` 셋뿐입니다.
 아래는 **정답지이므로 어떤 경로로도 state에 들어가면 안 됩니다.**
 
 ```
@@ -201,7 +210,8 @@ llm_draft: true
 
 | 파일 | 용도 |
 |---|---|
-| `goldenset/cases/case_001.md` | 표준형 견본. 여기서 시작하세요 |
+| `goldenset/judge_inputs/case_001.md` | 정답이 제거된 표준형 견본. R2 로더는 여기서 시작하세요 |
+| `goldenset/judge_inputs/manifest.json` | 20건 ID·본문 SHA-256·평가셋 해시 |
 | `goldenset/corpus/chunks.json` | `chunk_text` 원본 12건 |
 | `goldenset/labeling-guide.md` §1 | 6축 한글↔영문 매핑 |
 | `app/rag/citations.py` | `verify_citations()` — 인용문이 원문의 부분문자열인지 검증 |
