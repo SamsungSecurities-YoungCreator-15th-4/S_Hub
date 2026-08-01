@@ -17,7 +17,9 @@
 
 ## 2. 재현 보장 대상
 
-동일 입력·동일 thread로 2회 실행 시 아래 항목은 **완전히 일치한다.**
+동일 입력·동일 결정론 설정으로 재실행할 때 아래 항목은 코드 구조상
+**완전히 일치해야 한다.** 이 목록에는 실제 LLM 판정이나 그 파생 상태를
+포함하지 않는다.
 
 | 대상 | 근거 |
 | --- | --- |
@@ -27,15 +29,24 @@
 | `metrics` 전체 | 순수 numpy 계산 계층 |
 | `explanations` 전체 | 고정 골격 + metrics 값 조립 (LLM 생성 아님) |
 | `prompt_hash.rag_cite` | 검색 결과가 아닌 topic 골격에서 조립 |
-| **judge 6축 판정(pass/fail)** | 결정론 4축은 순수 파이썬, LLM 2축도 판정 자체는 안정 |
-| `judge.passed` | 위 6축의 집계 |
-| `report.status` · `report.finalized` | 판정 결과의 결정론 함수 |
-| `governance.export_allowed` | 〃 |
-| `manual_review_gate.decision_hash` | 해시 입력이 차단 판단 내용뿐이며 `trace_id`·`stopped_at`을 제외한다 (`manual_review_gate.py:149-170`) |
 
-**이 목록이 "같은 결과"의 정의다.** 재현 데모와 증거 번들의 대조는 이 항목들로 수행한다.
+**이 목록이 무조건적인 "같은 결과"의 정의다.** 재현 데모와 증거 번들의
+재현 지문은 이 항목들로 대조한다.
 
-> **`decision_hash`는 §3에서 §2로 옮겨온 항목이다.** 최초 선언 시점에는 해시 입력에 `trace_id`가 들어 있어 재현이 원천적으로 불가능했고, #150이 실행 메타데이터를 해시 입력에서 걷어내면서 성질이 바뀌었다. **측정 결과를 보고 범위를 넓힌 것이 아니라 코드가 바뀌어 범위가 바뀐 것**이며, §9 규칙대로 이 선언을 먼저 고친 뒤 §4.2로 확인했다.
+### 2.1 조건부 재현·반복 실측 대상
+
+아래 항목은 §4.1의 반복 실행에서 일치했지만, LLM 판정이 포함되어 **항상 같다고
+보장하지 않는다.** 분리된 감사 지표로 관찰하고 불일치를 숨기지 않는다.
+
+| 대상 | 정확한 성질 |
+| --- | --- |
+| Judge 6축 판정·`judge.passed` | 4축은 결정론이지만 환각·위조정밀도 2축은 LLM 판정이므로 반복 실측 대상 |
+| `report.status`·`report.finalized`·`export_allowed` | `judge.passed`의 결정론 파생이지만 upstream LLM 판정이 바뀌면 함께 바뀔 수 있음 |
+| `manual_review_gate.decision_hash` | 동일한 정책·계산·Judge 판정 내용에는 같지만, `failed_axes`가 바뀌면 의도적으로 달라짐 |
+
+> #150은 `decision_hash`에서 `trace_id`·`stopped_at`을 제외해 **동일한 차단
+> 판단 내용**에 대한 조건부 재현성을 회복했다. 이는 전체 LLM 파이프라인의
+> 무조건적 재현 보장을 뜻하지 않는다.
 
 ---
 
@@ -44,7 +55,7 @@
 | 대상 | 제외 사유 |
 | --- | --- |
 | `citations` 집합·순서 | LLM 응답 비결정성 (§5 참조). retriever는 결정론이나 인용 선택 단계가 갈린다 |
-| `judge.rubric.*.reason` 문구 | LLM 산문. **판정(pass/fail)은 재현 대상이며 사유 문장만 제외한다** |
+| `judge.rubric.*.reason` 문구 | LLM 산문. 판정(pass/fail)도 §2.1의 반복 실측 대상이며 무조건 보장은 아님 |
 | `prompt_hash.judge_eval` | judge 프롬프트 payload에 `citations`가 포함되어 위 항목의 파생으로 변동 |
 | `trace_id` · `run_id` · 타임스탬프 | 실행마다 다른 것이 정상. LangSmith 추적이 켜져 있으면 `trace_id`가 매 실행 새 UUID에서 파생된다 |
 | LangSmith trace URL | 위 파생 |
@@ -53,7 +64,9 @@
 
 **"재현 지문"으로 제시하는 해시는 `computation_hash` · `config_hash` · `approval_hash` 세 개로 한정한다.** `prompt_hash.judge_eval`을 재현 증거로 내세우면 자기모순이 된다.
 
-`decision_hash`는 §2로 옮겨왔지만 이 세 개에는 넣지 않는다. 차단 실행에서만 존재하는 값이라 정상 확정 실행에서는 대조할 것이 없고, 번들 `replay_diff.hashes`도 세 해시만 싣는다. **차단 사례의 감사 지문**으로는 쓰되, 모든 실행에 공통인 재현 지문 자리에는 올리지 않는다.
+`decision_hash`는 §2.1의 조건부 지문이며 이 세 개에는 넣지 않는다. 차단
+실행에서만 존재하고 Judge 판정 내용에 따라 달라질 수 있다. **같은 차단
+판단의 감사 지문**으로는 쓰되, 모든 실행에 공통인 재현 지문으로는 제시하지 않는다.
 
 ---
 
@@ -91,7 +104,7 @@
 
 ### 4.2 `decision_hash` — #150 이후 재측정 (2026-08-02, 커밋 `d865307`)
 
-`decision_hash`를 §3에서 §2로 옮긴 근거다. 차단 경로(모드 C)를 **LangSmith 추적 off/on 각 2회, 총 4회** 실행했다. 추적 on을 따로 돌린 이유는 **off에서는 `trace_id`가 애초에 갈리지 않기 때문**이다 — 추적이 꺼지면 `load_inputs`가 `run-{config_hash[:12]}`로 되짚어(`load_inputs.py:96`) 매 실행 같은 값이 나오고, 켜져 있어야 `run-{uuid4().hex[:12]}`로 실행마다 달라진다(`observability/langsmith.py:133`). off만 측정하면 "`trace_id`가 달라도 지문이 같다"를 증명한 것이 아니라 `trace_id`가 같은 경우를 본 것에 불과하다.
+`decision_hash`를 §3에서 §2.1로 옮긴 근거다. 차단 경로(모드 C)를 **LangSmith 추적 off/on 각 2회, 총 4회** 실행했다. 추적 on을 따로 돌린 이유는 **off에서는 `trace_id`가 애초에 갈리지 않기 때문**이다 — 추적이 꺼지면 `load_inputs`가 `run-{config_hash[:12]}`로 되짚어(`load_inputs.py:100` (trace_id)) 매 실행 같은 값이 나오고, 켜져 있어야 `run-{uuid4().hex[:12]}`로 실행마다 달라진다(`observability/langsmith.py:133`). off만 측정하면 "`trace_id`가 달라도 지문이 같다"를 증명한 것이 아니라 `trace_id`가 같은 경우를 본 것에 불과하다.
 
 | 대상 | 추적 off 2회 | 추적 on 2회 |
 | --- | --- | --- |
@@ -131,7 +144,7 @@ seed = 42     3회 동일 = False   고유 응답 2종
 
 | 대상 | offline이 대체하는가 | 근거 |
 | --- | --- | --- |
-| 시장 데이터 | **예** — `data_source="dummy"` → 고정 수식 + parquet 캐시 | `load_inputs.py:82` |
+| 시장 데이터 | **예** — `data_source="dummy"` → 고정 수식 + parquet 캐시 | `load_inputs.py:86` (demo_options) |
 | IPS 추출 LLM | **예** — 고정 `_offline_profile()` 반환 | `extract_ips.py:34` |
 | RAG 검색 | 아니오 — 실제 Chroma 검색 | `rag_cite.py`에 offline 분기 없음 |
 | rag_cite LLM | 아니오 — 실제 Azure 호출 | 〃 |
@@ -143,7 +156,10 @@ seed = 42     3회 동일 = False   고유 응답 2종
 
 ## 7. 모의 감사 대응
 
-**재현 데모는 §2 항목의 일치를 보인다.** `replay_verify` 대조 출력에 §2 항목만 싣고, §3 항목은 "재현 대상 아님"으로 함께 표기해 심사자가 화면에서 차이를 발견하기 전에 우리가 먼저 밝힌다.
+**재현 데모는 §2의 결정론 항목과 §2.1의 반복 실측 항목을 분리해
+보인다.** `replay_verify` 대조 출력에서 어떤 항목이 보장이고 어떤 항목이 관찰값인지
+표기해, LLM 판정의 일치를 결정론 보장으로 과장하지 않는다. §3 항목은 "재현 대상
+아님"으로 함께 표기한다.
 
 주의할 점 두 가지.
 
@@ -165,3 +181,5 @@ seed = 42     3회 동일 = False   고유 응답 2종
 - 재현 범위를 넓히거나 좁힐 때는 **재실행 검증 전에** 이 문서를 먼저 고친다.
 - 측정값이 바뀌면 §4를 갱신하고 측정 일자를 남긴다.
 - §2 항목에서 불일치가 발견되면 범위를 조정하지 말고 **원인을 찾아 고친다.** 그것이 결정론 계층의 결함이기 때문이다.
+- §2.1 항목이 달라지면 보장 범위를 조용히 넓히거나 좁히지 말고 불일치 사례와
+  LLM 모델·프롬프트 버전을 같이 기록한다.

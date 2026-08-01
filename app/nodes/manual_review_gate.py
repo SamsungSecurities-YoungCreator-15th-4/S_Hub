@@ -4,11 +4,8 @@ from __future__ import annotations
 
 import json
 from datetime import date, datetime
-from functools import lru_cache
-from pathlib import Path
 
-import yaml
-
+from app.hard_stop_policy import resolve_hard_stop_policy_version
 from app.nodes.assemble_report import (
     BASE_TITLE,
     PENDING_STATUS_LABEL,
@@ -22,29 +19,10 @@ from app.utils.hashing import sha256_of_dict
 
 GATE_STATUS_BLOCKED = "blocked"
 GATE_TRIGGER = "judge_retries_exhausted"
-HARD_STOP_POLICY_PATH = (
-    Path(__file__).resolve().parents[2] / "config" / "hard_stop_policy.yaml"
-)
 HARD_STOP_NOTICE = (
     "Judge 필수 검사를 통과하지 못한 채 재시도 상한에 도달하여 "
     "manual_review_gate에서 확정·다운로드가 차단되었습니다."
 )
-
-
-@lru_cache(maxsize=1)
-def resolve_hard_stop_policy_version() -> str:
-    """버전된 Hard Stop 정책 설정에서 유효한 버전을 읽는다.
-
-    결정 지문을 바꾸는 정책 버전의 SSOT는 코드 상수가 아니라
-    ``config/hard_stop_policy.yaml``이다. 누락·오염된 설정을 임의의 기본값으로
-    대체하면 감사 지문의 의미가 갈라지므로 명시적으로 실패한다.
-    """
-    with open(HARD_STOP_POLICY_PATH, encoding="utf-8") as file:
-        policy = yaml.safe_load(file)
-    version = policy.get("version") if isinstance(policy, dict) else None
-    if not isinstance(version, str) or not version.strip():
-        raise ValueError("Hard Stop 정책 설정에 비어 있지 않은 version이 필요합니다.")
-    return version.strip()
 
 
 def _failed_axes(judge: dict, judge_feedback: object) -> list[str]:

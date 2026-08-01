@@ -122,3 +122,33 @@ def test_no_hardcoded_fallback_in_code():
 
     with pytest.raises(ValueError, match="judge_max_retries"):
         resolve_max_judge_retries({"run_config": {}})
+
+
+def test_agents_requires_success_and_hard_stop_graph_runs():
+    text = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+
+    assert "python scripts/run_graph.py --auto-approve\n" in text
+    assert (
+        "python scripts/run_graph.py --auto-approve --force-judge-fail 3" in text
+    )
+
+
+def test_agents_corpus_count_matches_manifest():
+    agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+    manifest = (ROOT / "corpus" / "manifest.md").read_text(encoding="utf-8")
+    agents_match = re.search(r"RAG 근거 문서 \((\d+)건", agents)
+    manifest_match = re.search(r"총 문서 수: \*\*(\d+)건\*\*", manifest)
+
+    assert agents_match is not None, "AGENTS.md 레포 구조에 코퍼스 문서 수가 없습니다."
+    assert manifest_match is not None, "corpus/manifest.md에 총 문서 수가 없습니다."
+    assert int(agents_match.group(1)) == int(manifest_match.group(1))
+
+
+def test_reproducibility_scope_does_not_guarantee_llm_judge_axes():
+    text = (ROOT / "docs" / "reproducibility_scope.md").read_text(encoding="utf-8")
+    unconditional, conditional = text.split("### 2.1", maxsplit=1)
+
+    assert "judge 6축" not in unconditional.lower()
+    assert "Judge 6축" in conditional
+    normalized = " ".join(conditional.split())
+    assert "항상 같다고 보장하지 않는다" in normalized
