@@ -59,6 +59,31 @@
 | `prompt_hash.judge_eval` | judge 프롬프트 payload에 `citations`가 포함되어 위 항목의 파생으로 변동 |
 | `trace_id` · `run_id` · 타임스탬프 | 실행마다 다른 것이 정상. LangSmith 추적이 켜져 있으면 `trace_id`가 매 실행 새 UUID에서 파생된다 |
 | LangSmith trace URL | 위 파생 |
+| `ips` 추출 산출물 (`ips.Unique` 및 파생 5개 경로) | IPS 추출이 LLM 산출물이라 `citations`와 같은 사유다 — Azure 응답 비결정성(§5). `--offline`은 고정 프로필을 돌려주므로(§6) 모드 A·C에서는 갈리지 않는다 |
+
+`ips.Unique`는 `IPSProfile`의 필드이고(`state.py:32` (Unique)), 함께 움직이는 파생 5개는
+아래와 같다. 모두 §4.1 모드 B에서 실제로 갈린 leaf 경로다.
+
+| 파생 경로 | 생산 지점 |
+| --- | --- |
+| `ips_extraction_meta.output_hash` | `extract_ips.py:52` (output_hash) |
+| `ips_extraction_meta.extraction_hash` | `extract_ips.py:58` (extraction_hash) |
+| `report.client_summary.ips.Unique` | `assemble_report.py:326` (ips) |
+| `report.reproducibility.ips_extraction.output_hash` | `assemble_report.py:359` (ips_extraction) |
+| `report.reproducibility.ips_extraction.extraction_hash` | 〃 |
+
+### 이 항목은 선언의 공백을 메운 것이다
+
+**`ips`는 §2에 있다가 내려온 항목이 아니다.** 최초 선언에서 §2에도 §3에도 없었고,
+§4.1의 N=10 재측정에서 모드 B의 문구가 갈리는 것이 드러나면서 그 공백이 보였다.
+따라서 이 추가는 **보장 범위를 좁힌 것이 아니라 빠져 있던 선언을 채운 것**이다.
+
+§9는 "§2 항목에서 불일치가 발견되면 범위를 조정하지 말고 원인을 찾아 고친다"고
+정한다. 그 규칙은 **보장한 적 있는 항목**에 적용된다. `ips`는 보장한 적이 없으므로
+그 규칙의 대상이 아니며, 오히려 §9 첫 줄("범위를 넓히거나 좁힐 때는 재실행 검증
+전에 이 문서를 먼저 고친다")이 요구하는 선언을 뒤늦게 이행하는 쪽에 해당한다.
+같은 일이 반복되지 않도록, 새 state 키를 만들 때 §2·§3 중 어디에 속하는지를
+함께 정하는 것을 §9에 규칙으로 두는 편이 낫다.
 
 ### 제외 대상에 대한 원칙
 
@@ -99,11 +124,11 @@
 | `citations` chunk_id 집합·순서 | §3 | 상이 | 상이 | 상이 |
 | `judge.rubric.*.reason` | §3 | 상이 | 상이 | 상이 |
 | `prompt_hash.judge_eval` | §3 | 상이 | 상이 | 상이 |
-| `ips.Unique` 등 IPS 추출 산출물 | **미선언** | 동일 | **상이** | 동일 |
+| `ips.Unique` 등 IPS 추출 산출물 | §3 | 동일 | **상이** | 동일 |
 
 차이 건수는 leaf 경로 단위이며, 1회차와 갈린 적이 있는 경로의 **합집합**이다. A 760 · B 609 · C 570이고, 쌍별로는 A 291~594 · B 21~585 · C 178~362다. 분류하면 검색 결과 파생(A 735 · B 578 · C 544), LLM 산문(12·12·12), 시각·ID(13·13·14), IPS 추출 LLM(0·6·0)이다. 미분류 경로는 0건이다. **§2의 무조건 보장 대상과 §2.1의 조건부 대상 모두에서 어느 모드·어느 실행에서도 차이가 발생하지 않았다(불일치 0건).**
 
-`ips.Unique`는 §2에도 §3에도 없다. 모드 B에서 실행마다 문구가 갈리고 `ips_extraction_meta.extraction_hash`·`output_hash` 등 6개 경로가 함께 움직이는데, 보장 대상도 제외 대상도 아닌 상태다. 선언을 추가할지는 팀에서 정한다.
+`ips.Unique`와 파생 5개 경로는 이 측정에서 미선언 상태로 드러났고, **§3에 제외 대상으로 편입했다.** 편입 사유와 경로 목록은 §3을 따른다.
 
 실행 시간: A 평균 36.8초(34.8~39.8) · B 평균 32.4초(31.6~33.7) · C 평균 116.0초(74.2~131.4).
 
@@ -140,6 +165,8 @@ seed = 42     3회 동일 = False   고유 응답 2종
 **`seed`를 지정해도 해결되지 않는다.** 짧은 프롬프트에서는 3회 동일했으므로, 프롬프트가 길고 후보가 많을수록 갈리는 것으로 보인다. `temperature=0`은 벤더 측 비결정성을 제거하지 못한다.
 
 > **부수 확인 — `seed` 전달이 비일관적이다.** `get_llm(temperature, *, seed)` 호출부 3곳 중 `extract_ips_chain.py:78`만 seed를 넘기고 `rag_cite.py:879`·`judge_eval.py:379`는 넘기지 않는다. 위 측정상 이를 고쳐도 재현되지 않지만, 일관성 차원에서 정리할 가치는 있다. 단 `judge_eval`의 seed 전달 변경은 judge 출력 분포를 바꾸므로 R2 v1/v2 캘리브레이션 측정이 끝나기 전에는 수정하지 않는다.
+>
+> **두 번째 실사례 — seed를 넘겨도 갈렸다.** `extract_ips_chain.py:78` (EXTRACTION_SEED)는 세 호출부 중 **유일하게 `seed=EXTRACTION_SEED`를 넘기는데도** §4.1 모드 B에서 `ips.Unique`가 실행마다 갈렸다. 위 ③의 rag_cite 프롬프트 실험과 별개로, 실제 파이프라인에서 seed 지정이 재현을 보장하지 못한다는 것을 다시 보여준다.
 
 ---
 
