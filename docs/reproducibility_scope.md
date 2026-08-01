@@ -1,7 +1,7 @@
 # 재현성 범위 선언 (Reproducibility Scope)
 
 > 대상: S.ymphony Proof · R5
-> 최초 선언 2026-08-01 · 근거: 아래 §4 실측
+> 최초 선언 2026-08-01 · 최종 갱신 2026-08-02(#150 반영) · 근거: 아래 §4 실측
 > **이 문서는 재실행 검증 전에 선언된다.** 결과를 보고 범위를 조정하지 않는다.
 
 ---
@@ -30,8 +30,11 @@
 | `judge.passed` | 위 6축의 집계 |
 | `report.status` · `report.finalized` | 판정 결과의 결정론 함수 |
 | `governance.export_allowed` | 〃 |
+| `manual_review_gate.decision_hash` | 해시 입력이 차단 판단 내용뿐이며 `trace_id`·`stopped_at`을 제외한다 (`manual_review_gate.py:149-170`) |
 
 **이 목록이 "같은 결과"의 정의다.** 재현 데모와 증거 번들의 대조는 이 항목들로 수행한다.
+
+> **`decision_hash`는 §3에서 §2로 옮겨온 항목이다.** 최초 선언 시점에는 해시 입력에 `trace_id`가 들어 있어 재현이 원천적으로 불가능했고, #150이 실행 메타데이터를 해시 입력에서 걷어내면서 성질이 바뀌었다. **측정 결과를 보고 범위를 넓힌 것이 아니라 코드가 바뀌어 범위가 바뀐 것**이며, §9 규칙대로 이 선언을 먼저 고친 뒤 §4.2로 확인했다.
 
 ---
 
@@ -42,17 +45,20 @@
 | `citations` 집합·순서 | LLM 응답 비결정성 (§5 참조). retriever는 결정론이나 인용 선택 단계가 갈린다 |
 | `judge.rubric.*.reason` 문구 | LLM 산문. **판정(pass/fail)은 재현 대상이며 사유 문장만 제외한다** |
 | `prompt_hash.judge_eval` | judge 프롬프트 payload에 `citations`가 포함되어 위 항목의 파생으로 변동 |
-| `manual_review_gate.decision_hash` | 계산에 `trace_id`가 포함됨 (`manual_review_gate.py:62-74`). 구성 요소는 전부 일치 |
-| `trace_id` · `run_id` · 타임스탬프 | 실행마다 다른 것이 정상 |
+| `trace_id` · `run_id` · 타임스탬프 | 실행마다 다른 것이 정상. LangSmith 추적이 켜져 있으면 `trace_id`가 매 실행 새 UUID에서 파생된다 |
 | LangSmith trace URL | 위 파생 |
 
 ### 제외 대상에 대한 원칙
 
-**"재현 지문"으로 제시하는 해시는 `computation_hash` · `config_hash` · `approval_hash` 세 개로 한정한다.** `prompt_hash.judge_eval`이나 `decision_hash`를 재현 증거로 내세우면 자기모순이 된다.
+**"재현 지문"으로 제시하는 해시는 `computation_hash` · `config_hash` · `approval_hash` 세 개로 한정한다.** `prompt_hash.judge_eval`을 재현 증거로 내세우면 자기모순이 된다.
+
+`decision_hash`는 §2로 옮겨왔지만 이 세 개에는 넣지 않는다. 차단 실행에서만 존재하는 값이라 정상 확정 실행에서는 대조할 것이 없고, 번들 `replay_diff.hashes`도 세 해시만 싣는다. **차단 사례의 감사 지문**으로는 쓰되, 모든 실행에 공통인 재현 지문 자리에는 올리지 않는다.
 
 ---
 
-## 4. 실측 근거 (2026-08-01)
+## 4. 실측 근거
+
+### 4.1 3개 모드 필드 대조 (2026-08-01)
 
 동일 입력·동일 thread로 3개 모드를 각 2회 실행하고 `--dump-state` 덤프를 필드 단위로 대조했다.
 
@@ -77,6 +83,21 @@
 전체 차이 건수는 A 171 · B 72 · C 148이며, 분류하면 검색 결과 파생(A 145 · B 46 · C 111), LLM 산문(8·8·12), 시각·ID(10·10·11)이다. **§2의 보장 대상에서는 어느 모드에서도 차이가 발생하지 않았다.**
 
 실행 시간: A 23.8초 · B 20.8초 · C 107.6초.
+
+### 4.2 `decision_hash` — #150 이후 재측정 (2026-08-02)
+
+`decision_hash`를 §3에서 §2로 옮긴 근거다. 차단 경로(모드 C)를 **LangSmith 추적 off/on 각 2회, 총 4회** 실행했다. 추적 on을 따로 돌린 이유는 **off에서는 `trace_id`가 애초에 갈리지 않기 때문**이다 — 추적이 꺼지면 `load_inputs`가 `run-{config_hash[:12]}`로 되짚어(`load_inputs.py:96`) 매 실행 같은 값이 나오고, 켜져 있어야 `run-{uuid4().hex[:12]}`로 실행마다 달라진다(`observability/langsmith.py:133`). off만 측정하면 "`trace_id`가 달라도 지문이 같다"를 증명한 것이 아니라 `trace_id`가 같은 경우를 본 것에 불과하다.
+
+| 대상 | 추적 off 2회 | 추적 on 2회 |
+| --- | --- | --- |
+| `trace_id` | 동일 (`run-89c73320a15a`) | **상이** (`run-a888f05a2d8d` / `run-a3e2b387e11d`) |
+| `decision_hash` | 동일 | **동일** |
+| `manual_review_gate` 나머지 11개 키 | 차이 0건 | 차이 0건 |
+| `citations` chunk_id 집합·순서 | 상이 | 상이 |
+
+`decision_hash`는 **4회 실행 전부** `dd776bffcbf1a539acdf5566ddbea74e5be9bef8d7c3adfb5876bf021c675227`로 일치했다. `trace_id`가 갈린 실행 쌍에서도 같았고, 추적 on/off 사이에서도 같았다. 같은 실행에서 `citations`는 여전히 갈렸으므로(§3) 이 일치는 실행 전체가 결정론이어서가 아니라 **해시 입력이 결정론 산출물로만 구성되어서**다.
+
+측정 조건: `--auto-approve --offline --force-judge-fail 3`, `as_of_date=2026-07-03`, `policy_version=2026-08-01.v1`, `computation_hash=41c27a5c…3b120b08`, `failed_axes=["forced_failure"]`.
 
 ---
 

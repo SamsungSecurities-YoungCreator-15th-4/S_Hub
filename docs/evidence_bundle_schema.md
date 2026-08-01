@@ -145,7 +145,13 @@ python scripts/run_graph.py --auto-approve --evidence-bundle
 
 `blocked`는 state에 존재하는 키가 **아니다.** 성공 실행에서도 파일을 반드시 만들기 위해 번들이 파생시킨 값이며, 그래서 근거 경로를 `blocked_derived_from`에 함께 적는다. 판정식은 `report.governance.manual_review_gate.status == 'blocked'`다.
 
-`manual_review_gate` 전문의 키는 `status`·`trigger`·`trace_id`·`judge_passed`·`judge_retries`·`judge_max_retries`·`failed_axes`·`computation_hash`·`decision_hash`다. **`decision_hash` 계산에 `trace_id`가 포함되므로 재현 대상이 아니다** — [`docs/reproducibility_scope.md`](reproducibility_scope.md) §3을 따른다.
+`manual_review_gate` 전문의 키는 12개이며 `MANUAL_REVIEW_GATE_KEYS`의 순서를 그대로 따른다 — `status`·`trigger`·`policy_version`·`trace_id`·`stopped_at`·`stopped_at_basis`·`judge_passed`·`judge_retries`·`judge_max_retries`·`failed_axes`·`computation_hash`·`decision_hash`.
+
+**`decision_hash`는 재현 보장 대상이다** — [`docs/reproducibility_scope.md`](reproducibility_scope.md) §2를 따른다. 해시 입력은 차단 판단 내용(`status`·`trigger`·`policy_version`·`judge_passed`·`judge_retries`·`judge_max_retries`·`failed_axes`·`computation_hash`)뿐이고, 실행마다 달라지는 `trace_id`와 `stopped_at`은 제외된다. 감사 지문이 식별해야 하는 것은 실행이 아니라 **같은 정책·계산·Judge 판단**이기 때문이다.
+
+`policy_version`은 `config/hard_stop_policy.yaml`의 `version`에서 오며 해시 입력에 포함된다. 정책이 바뀌면 같은 판단이라도 지문이 갈리는 것이 의도된 동작이다.
+
+`stopped_at`은 승인 잠금일 또는 기준일에서 산출한 **논리적 기준시각**이지 차단이 실제로 일어난 벽시계 시각이 아니다. 감사자가 이를 혼동하지 않도록 `stopped_at_basis`가 원본 경로(`approval.locked_as_of` 또는 `run_config.as_of_date`)를 함께 밝힌다. 원본이 없거나 ISO 8601이 아니면 `stopped_at`은 §5의 "없음" 표기(`{"available": false, "reason": ...}`)로 나가고 `stopped_at_basis`는 `null`이 된다 — Hard Stop은 이 경우에도 예외 없이 차단으로 끝난다.
 
 `source_paths`를 파일에 함께 싣는 이유는 감사자가 번들의 모든 값을 원본 state 키로 되짚을 수 있게 하기 위해서다.
 
@@ -310,6 +316,6 @@ state에 원문이 없다. 이것은 결함이 아니라 `app/llm/audit.py`의 *
 
 ## 9. 관련 문서
 
-- [`docs/reproducibility_scope.md`](reproducibility_scope.md) — 무엇이 재현 대상이고 무엇이 아닌지의 선언. `replay_diff`의 세 해시와 `decision_hash` 제외 사유가 여기에 있다.
+- [`docs/reproducibility_scope.md`](reproducibility_scope.md) — 무엇이 재현 대상이고 무엇이 아닌지의 선언. `replay_diff`의 세 해시와 `decision_hash`의 재현 보장 근거가 여기에 있다.
 - [`docs/hard_stop_contract.md`](hard_stop_contract.md) — Judge Hard Stop 계약과 인용 검증 계약. `hard_stop_record.json`과 `citation_verification.json`의 원본 계약이다.
 - [`app/evidence/schema.py`](../app/evidence/schema.py) — 이 문서의 SSOT. 파일명·필수 키·"없음" 표기가 전부 여기서 온다.
