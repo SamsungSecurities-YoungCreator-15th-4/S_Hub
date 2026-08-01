@@ -14,6 +14,11 @@ Judge 필수 검사를 통과하지 못한 리포트가 확정본 또는 다운�
 - 환경변수나 그래프 상수로 별도 상한을 만들지 않는다.
 - 누락·불리언·0 이하·비정수 값은 코드 기본값으로 대체하지 않고 즉시 실패한다.
 
+Hard Stop 판단 정책의 버전은 `config/hard_stop_policy.yaml`의 `version`이
+유일한 원천이며, `resolve_hard_stop_policy_version()`을 통해서만 읽는다. 이 값은
+`decision_hash` 입력이므로 코드 상수나 문서에 별도 실행값을 복제하지 않는다.
+누락·빈 문자열·비문자열 버전은 기본값으로 대체하지 않고 즉시 실패한다.
+
 ## 3. 그래프 분기
 
 ```text
@@ -119,9 +124,30 @@ provenance 지문 대조에서 실패한다.
 | `governance.manual_review_required` | `true` |
 | `governance.confirmation_blocked_reason` | Judge 실패 사유 |
 | `governance.manual_review_gate.status` | `blocked` |
+| `governance.manual_review_gate.trigger` | `judge_retries_exhausted` |
+| `governance.manual_review_gate.policy_version` | 적용한 Hard Stop 정책 버전 |
+| `governance.manual_review_gate.trace_id` | 해당 실행을 LangSmith·번들과 연결하는 식별자 |
+| `governance.manual_review_gate.stopped_at` | 승인 잠금일 또는 기준일에서 산출한 논리적 차단 기준시각(ISO 8601) |
+| `governance.manual_review_gate.stopped_at_basis` | 논리적 기준시각의 원본 경로(`approval.locked_as_of` 또는 `run_config.as_of_date`) |
+| `governance.manual_review_gate.judge_passed` | 차단 당시 Judge 통과 여부(`false`) |
+| `governance.manual_review_gate.judge_retries` | 차단 당시 누적 Judge 시도 횟수 |
+| `governance.manual_review_gate.judge_max_retries` | 적용한 재시도 상한 SSOT 값 |
 | `governance.manual_review_gate.failed_axes` | 실패한 필수 검사명 목록 |
 | `governance.manual_review_gate.decision_hash` | 동일 결정의 재현성 확인용 SHA-256 |
 | `governance.manual_review_gate.computation_hash` | 차단된 계산 결과 연결값 |
+
+`decision_hash`는 차단 판단 내용(`status`, `trigger`, `policy_version`, Judge 판정·
+시도 횟수·실패 축, `computation_hash`)만 해시한다. 실행마다 달라질 수 있는
+`trace_id`와 시각 메타데이터 `stopped_at`은 표시·추적에는 보존하지만 해시 입력에서는
+제외한다. 따라서 같은 계산과 같은 정책 판단이면 실행이 달라도 동일한 결정 지문이
+생성된다.
+
+`stopped_at`은 노드가 벽시계를 직접 읽지 않도록 `approval.locked_as_of` 또는
+`run_config.as_of_date`에서 결정론적으로 산출한 논리적 기준시각이다. 실제 실행·번들
+생성 시각은 LangSmith trace와 R4 `manifest.generated_at`이 담당한다. 감사자가 이를
+실제 차단 발생 시각으로 오해하지 않도록 `stopped_at_basis`에 원본 경로를 함께 싣는다.
+두 원본이 모두 없거나 ISO 8601 형식이 아니어도 Hard Stop은 예외로 중단되지 않으며,
+`stopped_at={"available": false, "reason": ...}`로 부재 사유를 명시한다.
 
 UI와 향후 다운로드 기능은 `report_is_exportable(report)`가 `true`일 때만 고객 제공
 동작을 허용한다. 단순히 `report.finalized=true` 한 필드만 보고 허용하지 않는다.
@@ -137,6 +163,11 @@ UI와 향후 다운로드 기능은 `report_is_exportable(report)`가 `true`일 
 | 속성 ① 모든 유효 상한의 경계 | `test_property_retry_limit_routes_every_exhausted_failure_to_gate` |
 | 속성 ② 어떤 선행 상태에서도 Hard Stop | `test_property_manual_review_gate_is_always_fail_closed` |
 | 속성 ③ 인용 identity 변조 전부 차단 | `test_property_citation_identity_tampering_never_passes` |
+| 결정 지문에서 실행 식별자 제외 | `test_decision_hash_excludes_trace_id` |
+| Hard Stop 정책 버전 설정 SSOT | `test_hard_stop_policy_version_uses_config_ssot` |
+| 잘못된 정책 버전 설정 거부 | `test_hard_stop_policy_version_rejects_invalid_config` |
+| 정책 버전·논리적 차단시각 기록 | `test_manual_review_gate_records_policy_and_logical_stop_time` |
+| 시각 근거 누락·오류에도 fail-closed | `test_missing_or_invalid_stop_metadata_never_breaks_hard_stop` |
 
 ## 8. R1 사례집 20건 의존성
 
