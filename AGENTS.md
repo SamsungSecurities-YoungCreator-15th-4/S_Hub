@@ -37,6 +37,7 @@ Orchestration/
 ├── app/
 │   ├── state.py       # RiskState/IPSProfile — 팀 데이터 계약(SSOT), 임의 수정 금지
 │   ├── graph.py       # StateGraph 조립 (9노드 + 조건부 분기 2개)
+│   ├── hard_stop_policy.py # Hard Stop 정책 버전 로더·검증(SSOT 접근점)
 │   ├── nodes/         # 그래프 노드 (순수 함수, 바꾼 키만 반환)
 │   ├── engine/        # 결정론 계층 — langchain/llm import 금지
 │   ├── llm/           # AzureChatOpenAI 팩토리

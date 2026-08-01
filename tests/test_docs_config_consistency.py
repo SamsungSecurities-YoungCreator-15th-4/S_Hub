@@ -133,11 +133,15 @@ def test_agents_requires_success_and_hard_stop_graph_runs():
     )
 
 
-def test_agents_corpus_count_is_consistently_21():
-    text = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+def test_agents_corpus_count_matches_manifest():
+    agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+    manifest = (ROOT / "corpus" / "manifest.md").read_text(encoding="utf-8")
+    agents_match = re.search(r"RAG 근거 문서 \((\d+)건", agents)
+    manifest_match = re.search(r"총 문서 수: \*\*(\d+)건\*\*", manifest)
 
-    assert "RAG 근거 문서 (21건" in text
-    assert "RAG 근거 문서 (19건" not in text
+    assert agents_match is not None, "AGENTS.md 레포 구조에 코퍼스 문서 수가 없습니다."
+    assert manifest_match is not None, "corpus/manifest.md에 총 문서 수가 없습니다."
+    assert int(agents_match.group(1)) == int(manifest_match.group(1))
 
 
 def test_reproducibility_scope_does_not_guarantee_llm_judge_axes():
@@ -146,4 +150,5 @@ def test_reproducibility_scope_does_not_guarantee_llm_judge_axes():
 
     assert "judge 6축" not in unconditional.lower()
     assert "Judge 6축" in conditional
-    assert "항상 같다고\n보장하지 않는다" in conditional
+    normalized = " ".join(conditional.split())
+    assert "항상 같다고 보장하지 않는다" in normalized

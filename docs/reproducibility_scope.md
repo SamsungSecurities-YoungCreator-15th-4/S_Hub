@@ -34,7 +34,7 @@
 
 ### 2.1 조건부 재현·반복 실측 대상
 
-아래 항목은 최근 반복 실행에서 일치했지만, LLM 판정이 포함되어 **항상 같다고
+아래 항목은 §4.1의 반복 실행에서 일치했지만, LLM 판정이 포함되어 **항상 같다고
 보장하지 않는다.** 분리된 감사 지표로 관찰하고 불일치를 숨기지 않는다.
 
 | 대상 | 정확한 성질 |
@@ -99,7 +99,7 @@
 
 ### 4.2 `decision_hash` — #150 이후 재측정 (2026-08-02)
 
-`decision_hash`를 §3에서 §2로 옮긴 근거다. 차단 경로(모드 C)를 **LangSmith 추적 off/on 각 2회, 총 4회** 실행했다. 추적 on을 따로 돌린 이유는 **off에서는 `trace_id`가 애초에 갈리지 않기 때문**이다 — 추적이 꺼지면 `load_inputs`가 `run-{config_hash[:12]}`로 되짚어(`load_inputs.py:96`) 매 실행 같은 값이 나오고, 켜져 있어야 `run-{uuid4().hex[:12]}`로 실행마다 달라진다(`observability/langsmith.py:133`). off만 측정하면 "`trace_id`가 달라도 지문이 같다"를 증명한 것이 아니라 `trace_id`가 같은 경우를 본 것에 불과하다.
+`decision_hash`를 §3에서 §2.1로 옮긴 근거다. 차단 경로(모드 C)를 **LangSmith 추적 off/on 각 2회, 총 4회** 실행했다. 추적 on을 따로 돌린 이유는 **off에서는 `trace_id`가 애초에 갈리지 않기 때문**이다 — 추적이 꺼지면 `load_inputs`가 `run-{config_hash[:12]}`로 되짚어(`load_inputs.py:100` (trace_id)) 매 실행 같은 값이 나오고, 켜져 있어야 `run-{uuid4().hex[:12]}`로 실행마다 달라진다(`observability/langsmith.py:133`). off만 측정하면 "`trace_id`가 달라도 지문이 같다"를 증명한 것이 아니라 `trace_id`가 같은 경우를 본 것에 불과하다.
 
 | 대상 | 추적 off 2회 | 추적 on 2회 |
 | --- | --- | --- |
@@ -139,7 +139,7 @@ seed = 42     3회 동일 = False   고유 응답 2종
 
 | 대상 | offline이 대체하는가 | 근거 |
 | --- | --- | --- |
-| 시장 데이터 | **예** — `data_source="dummy"` → 고정 수식 + parquet 캐시 | `load_inputs.py:82` |
+| 시장 데이터 | **예** — `data_source="dummy"` → 고정 수식 + parquet 캐시 | `load_inputs.py:86` (demo_options) |
 | IPS 추출 LLM | **예** — 고정 `_offline_profile()` 반환 | `extract_ips.py:34` |
 | RAG 검색 | 아니오 — 실제 Chroma 검색 | `rag_cite.py`에 offline 분기 없음 |
 | rag_cite LLM | 아니오 — 실제 Azure 호출 | 〃 |

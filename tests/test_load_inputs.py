@@ -55,3 +55,37 @@ def test_load_inputs_validates_hard_stop_policy_before_graph(monkeypatch):
 
     with pytest.raises(ValueError, match="Hard Stop 정책 설정 오류"):
         load_inputs({})
+
+
+def test_graph_stops_at_first_node_for_invalid_hard_stop_policy(
+    monkeypatch,
+    tmp_path,
+):
+    """실제 정책 파일 오류면 downstream·terminal gate 전에 그래프가 실패해야 한다."""
+    import app.graph as graph_module
+    import app.hard_stop_policy as policy_module
+
+    invalid_policy = tmp_path / "hard_stop_policy.yaml"
+    invalid_policy.write_text('version: ""\n', encoding="utf-8")
+    monkeypatch.setattr(policy_module, "HARD_STOP_POLICY_PATH", invalid_policy)
+    policy_module.resolve_hard_stop_policy_version.cache_clear()
+
+    downstream_calls: list[str] = []
+
+    def should_not_run(state):
+        downstream_calls.append("downstream")
+        return {}
+
+    monkeypatch.setattr(graph_module, "extract_ips", should_not_run)
+    monkeypatch.setattr(graph_module, "manual_review_gate", should_not_run)
+    graph = graph_module.build_graph()
+
+    try:
+        with pytest.raises(ValueError, match="version"):
+            graph.invoke(
+                {},
+                {"configurable": {"thread_id": "invalid-hard-stop-policy"}},
+            )
+        assert downstream_calls == []
+    finally:
+        policy_module.resolve_hard_stop_policy_version.cache_clear()
