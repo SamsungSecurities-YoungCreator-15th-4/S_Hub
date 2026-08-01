@@ -5,7 +5,10 @@
 
 번들 계약(파일명·필수 키·"없음" 표기)은 app/evidence/schema.py가 SSOT다.
 이 스크립트는 상태를 해석만 하고 그래프·노드를 실행하지 않는다.
-run_graph.py에서 상태를 덤프해 자동 호출하는 배선은 다음 PR에서 다룬다.
+
+run_graph.py가 `--evidence-bundle`로 실행 종료 직후 make_bundle()을 in-process로
+호출한다. 이 파일을 직접 부르는 경로(--state/--out)는 이미 덤프해 둔 state로
+번들을 다시 만들 때 쓴다.
 """
 import argparse
 import json
@@ -141,7 +144,8 @@ def build_trace(state: dict) -> dict:
             "state의 노드 실행 순서",
             note=(
                 "run_graph.py가 스트리밍 중 지역 변수로만 수집하고 state에 기록하지 "
-                "않는다. 상태 덤프 배선 PR에서 함께 싣는다."
+                "않는다. state를 입력으로 받는 번들에서는 채울 수 없으며, 싣으려면 "
+                "노드 실행 순서를 state에 남기는 변경이 먼저 필요하다."
             ),
         ),
     }
