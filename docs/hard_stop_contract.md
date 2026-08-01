@@ -15,7 +15,9 @@ Judge 필수 검사를 통과하지 못한 리포트가 확정본 또는 다운�
 - 누락·불리언·0 이하·비정수 값은 코드 기본값으로 대체하지 않고 즉시 실패한다.
 
 Hard Stop 판단 정책의 버전은 `config/hard_stop_policy.yaml`의 `version`이
-유일한 원천이며, `resolve_hard_stop_policy_version()`을 통해서만 읽는다. 이 값은
+유일한 원천이며, `app.hard_stop_policy.resolve_hard_stop_policy_version()`을
+통해서만 읽는다. `load_inputs`가 그래프 첫 노드에서 정책 설정을
+먼저 검증하므로 terminal gate에서 뒤늦게 설정 오류로 중단되지 않는다. 이 값은
 `decision_hash` 입력이므로 코드 상수나 문서에 별도 실행값을 복제하지 않는다.
 누락·빈 문자열·비문자열 버전은 기본값으로 대체하지 않고 즉시 실패한다.
 

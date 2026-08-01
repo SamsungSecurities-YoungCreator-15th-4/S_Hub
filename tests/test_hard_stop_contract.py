@@ -12,14 +12,14 @@ from langgraph.graph import END, START, StateGraph
 
 from app.graph import route_after_judge
 from app.evidence.schema import MANUAL_REVIEW_GATE_KEYS
+from app.hard_stop_policy import (
+    HARD_STOP_POLICY_PATH,
+    resolve_hard_stop_policy_version,
+)
 from app.nodes.assemble_report import report_is_exportable
 from app.nodes.judge_eval import resolve_max_judge_retries
 from app.nodes.load_inputs import load_inputs
-from app.nodes.manual_review_gate import (
-    HARD_STOP_POLICY_PATH,
-    manual_review_gate,
-    resolve_hard_stop_policy_version,
-)
+from app.nodes.manual_review_gate import manual_review_gate
 from app.rag.citations import (
     Citation,
     citation_contract_issues,
@@ -251,15 +251,15 @@ def test_hard_stop_policy_version_rejects_invalid_config(
     monkeypatch,
     tmp_path,
 ):
-    import app.nodes.manual_review_gate as gate_module
+    import app.hard_stop_policy as policy_module
 
     policy_path = tmp_path / "hard_stop_policy.yaml"
     policy_path.write_text(yaml.safe_dump(invalid_policy), encoding="utf-8")
-    monkeypatch.setattr(gate_module, "HARD_STOP_POLICY_PATH", policy_path)
-    gate_module.resolve_hard_stop_policy_version.cache_clear()
+    monkeypatch.setattr(policy_module, "HARD_STOP_POLICY_PATH", policy_path)
+    policy_module.resolve_hard_stop_policy_version.cache_clear()
 
     with pytest.raises(ValueError, match="version"):
-        gate_module.resolve_hard_stop_policy_version()
+        policy_module.resolve_hard_stop_policy_version()
 
 
 def test_rule_3_starter_kit_source_marking_mismatch_is_rejected():

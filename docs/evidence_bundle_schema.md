@@ -147,7 +147,11 @@ python scripts/run_graph.py --auto-approve --evidence-bundle
 
 `manual_review_gate` 전문의 키는 12개이며 `MANUAL_REVIEW_GATE_KEYS`의 순서를 그대로 따른다 — `status`·`trigger`·`policy_version`·`trace_id`·`stopped_at`·`stopped_at_basis`·`judge_passed`·`judge_retries`·`judge_max_retries`·`failed_axes`·`computation_hash`·`decision_hash`.
 
-**`decision_hash`는 재현 보장 대상이다** — [`docs/reproducibility_scope.md`](reproducibility_scope.md) §2를 따른다. 해시 입력은 차단 판단 내용(`status`·`trigger`·`policy_version`·`judge_passed`·`judge_retries`·`judge_max_retries`·`failed_axes`·`computation_hash`)뿐이고, 실행마다 달라지는 `trace_id`와 `stopped_at`은 제외된다. 감사 지문이 식별해야 하는 것은 실행이 아니라 **같은 정책·계산·Judge 판단**이기 때문이다.
+**`decision_hash`는 같은 차단 판단 내용에 대한 조건부 재현 지문이다** —
+[`docs/reproducibility_scope.md`](reproducibility_scope.md) §2.1을 따른다. 해시 입력은
+차단 판단 내용(`status`·`trigger`·`policy_version`·`judge_passed`·`judge_retries`·`judge_max_retries`·`failed_axes`·`computation_hash`)뿐이고, 실행마다 달라지는
+`trace_id`와 `stopped_at`은 제외된다. 다만 LLM Judge의 `failed_axes`가 바뀌면
+다른 판단이므로 해시가 달라지는 것이 정상이다.
 
 `policy_version`은 `config/hard_stop_policy.yaml`의 `version`에서 오며 해시 입력에 포함된다. 정책이 바뀌면 같은 판단이라도 지문이 갈리는 것이 의도된 동작이다.
 

@@ -37,12 +37,13 @@ Orchestration/
 ├── app/
 │   ├── state.py       # RiskState/IPSProfile — 팀 데이터 계약(SSOT), 임의 수정 금지
 │   ├── graph.py       # StateGraph 조립 (9노드 + 조건부 분기 2개)
+│   ├── hard_stop_policy.py # Hard Stop 정책 버전 로더·검증(SSOT 접근점)
 │   ├── nodes/         # 그래프 노드 (순수 함수, 바꾼 키만 반환)
 │   ├── engine/        # 결정론 계층 — langchain/llm import 금지
 │   ├── llm/           # AzureChatOpenAI 팩토리
 │   └── utils/         # 해시 등 공용 유틸
 ├── config/            # config.yaml (seed, as_of_date, VaR 설정)
-├── corpus/            # RAG 근거 문서 (19건, 원문 PDF는 gitignore·로컬 전용 / manifest.md 참조)
+├── corpus/            # RAG 근거 문서 (21건, 원문 PDF는 gitignore·로컬 전용 / manifest.md 참조)
 ├── data/              # 시장 데이터 (gitignore 대상 산출물 포함)
 ├── scripts/           # CLI 진입점 (run_graph.py)
 ├── tests/             # pytest
@@ -158,7 +159,16 @@ RAG 근거 문서는 `corpus/`에 카테고리별로 둔다. 상세 목록은 [`
 - **커밋 메시지**: 한국어로, `타입: 설명` 형식. 타입은 `feat`, `fix`, `docs`, `chore`, `refactor`, `test` 중 하나.
   - 예) `feat: 스트레스 시나리오 금리 충격 추가`
   - `Co-Authored-By`, 모델명, 세션 링크 등 AI 도구 attribution·trailer를 커밋과 PR에 넣지 않는다.
-- **빌드/실행 확인**: 푸시 전 반드시 로컬에서 `python scripts/run_graph.py --auto-approve` 완주와 `pytest` 통과를 확인한다.
+- **빌드/실행 확인**: 푸시 전 반드시 로컬에서 아래 정상·차단 경로와
+  `pytest`, `ruff check .`을 모두 통과한다.
+
+  ```bash
+  # 정상 확정 경로: assemble_report 종료
+  python scripts/run_graph.py --auto-approve
+
+  # Judge 재시도 소진 경로: manual_review_gate 종료·다운로드 차단
+  python scripts/run_graph.py --auto-approve --force-judge-fail 3
+  ```
 - **덮어쓰기 알림**: 기존 파일을 지우거나 덮어쓰기 전 사용자에게 먼저 알리고 동의를 받는다.
 - **비밀 정보 금지**: `.env` 파일과 모든 비밀키는 절대 커밋하지 않는다. `.env.example`만 추적 대상이다.
 
