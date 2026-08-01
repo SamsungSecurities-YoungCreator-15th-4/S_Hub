@@ -46,6 +46,7 @@ from ui.rag_evidence import (
     replace_citation_indexes,
     unique_review_warnings,
 )
+from ui.report_export import pdf_export_state
 from ui.start_page import render_start_page
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -96,6 +97,28 @@ st.markdown(
     .app-topbar .logo-fallback { color: #1B3B8F; font-size: 24px; font-weight: 800; }
     .app-topbar .divider { width: 1px; height: 30px; background: #E4EAF2; }
     .app-topbar .title { font-size: 15.5px; font-weight: 800; letter-spacing: -0.01em; color: #0F172A; }
+
+    /* 결과 화면 상단 PDF 저장 액션 — 확정본만 파란색, 차단본은 명시적 회색. */
+    div[data-testid="stHorizontalBlock"]:has(.pdf-save-marker) {
+        align-items: stretch; margin-bottom: 16px;
+    }
+    div[data-testid="stHorizontalBlock"]:has(.pdf-save-marker) .app-topbar {
+        height: 100%; min-height: 58px; margin-bottom: 0;
+    }
+    div[data-testid="stColumn"]:has(.pdf-save-marker) > div[data-testid="stVerticalBlock"] {
+        height: 100%; justify-content: center;
+    }
+    div[data-testid="stColumn"]:has(.pdf-save-marker) [data-testid="stButton"] button {
+        min-height: 58px; border-radius: 14px; font-weight: 800;
+        background: #2563EB; color: #FFFFFF; border: 1px solid #2563EB;
+    }
+    div[data-testid="stColumn"]:has(.pdf-save-marker) [data-testid="stButton"] button:hover:not(:disabled) {
+        background: #1D4ED8; border-color: #1D4ED8; color: #FFFFFF;
+    }
+    div[data-testid="stColumn"]:has(.pdf-save-marker) [data-testid="stButton"] button:disabled {
+        background: #E2E8F0 !important; border-color: #CBD5E1 !important;
+        color: #94A3B8 !important; opacity: 1 !important; cursor: not-allowed;
+    }
 
     .report-header {
         background: #FFFFFF; border: 1px solid #E4EAF2; border-radius: 16px;
@@ -664,6 +687,15 @@ st.markdown(
         body, .stApp, [data-testid="stAppViewContainer"],
         [data-testid="stHeader"], [data-testid="stMain"] {
             background: #FFFFFF !important;
+        }
+        /* PDF 저장 버튼은 인쇄물에서 제외하고 상단 제목 영역은 전체 폭으로 확장한다. */
+        div[data-testid="stHorizontalBlock"]:has(.pdf-save-marker)
+            > div[data-testid="stColumn"]:has(.pdf-save-marker) {
+            display: none !important;
+        }
+        div[data-testid="stHorizontalBlock"]:has(.pdf-save-marker)
+            > div[data-testid="stColumn"]:not(:has(.pdf-save-marker)) {
+            width: 100% !important; flex: 1 1 100% !important;
         }
         /* 최신성 경고 상세는 인쇄 시 자동으로 펼쳐 보여준다 */
         div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .warn-exp-marker)
@@ -1274,22 +1306,52 @@ else:
     st.markdown('<div id="report-page-top" aria-hidden="true"></div>', unsafe_allow_html=True)
     scroll_report_to_top_once()
     total_value = report["summary"]["portfolio"]["total_value_krw"]
-    st.markdown(
-        f"""
-        <div class="app-topbar">
-        {LOGO_MARKUP}
-        <div class="divider"></div>
-        <div class="title">재현가능·설명가능 리스크 리포트</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
     risk = report.get("summary", {}).get("risk", {})
     warnings = report.get("warnings") or []
     _governance = report["governance"]
     _judge_passed = _governance["judge_passed"]
-    _finalized = report.get("finalized") is True
+    # Hard Stop 계약을 모두 만족한 확정본만 고객 제공 가능 상태로 취급한다.
+    _pdf_export = pdf_export_state(report)
+    _finalized = _pdf_export.enabled
+
+    _header_col, _pdf_col = st.columns([7, 1.2], vertical_alignment="center")
+    with _header_col:
+        st.markdown(
+            f"""
+            <div class="app-topbar">
+            {LOGO_MARKUP}
+            <div class="divider"></div>
+            <div class="title">재현가능·설명가능 리스크 리포트</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with _pdf_col:
+        st.markdown('<span class="pdf-save-marker"></span>', unsafe_allow_html=True)
+        _pdf_save_clicked = st.button(
+            "PDF 저장",
+            key="save_report_pdf",
+            type="primary",
+            icon=":material/download:",
+            disabled=not _pdf_export.enabled,
+            help=_pdf_export.help_text,
+            width="stretch",
+        )
+    if _pdf_save_clicked and _pdf_export.enabled:
+        # 확정본만 브라우저 인쇄 대화상자를 열며 @media print가 화면을 PDF용으로 정리한다.
+        components.html(
+            """
+            <script>
+            (() => {
+              const parentWindow = window.parent;
+              parentWindow.focus();
+              parentWindow.print();
+            })();
+            </script>
+            """,
+            height=0,
+            width=0,
+        )
     if _judge_passed and warnings:
         _judge_value, _judge_tone = "조건부 통과 (수동검토 필요)", "kpi-warn"
     elif _judge_passed:
@@ -1667,7 +1729,7 @@ else:
             unsafe_allow_html=True,
         )
         st.caption(
-            f"judge 재작성 시도 {retries_label} · 통과하지 못한 리포트는 확정되지 않습니다."
+            f"Judge 평가 시도 {retries_label} · 통과하지 못한 리포트는 확정되지 않습니다."
         )
         st.markdown("<br>", unsafe_allow_html=True)
         checks = judge.get("checks") or []

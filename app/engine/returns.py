@@ -121,7 +121,7 @@ def load_returns(
 # methodology_var_cvar_2026 §7(환율 처리) 참조 — 실데이터 경로는 fx_applied=True.
 REAL_ASSET_TICKERS = {
     "domestic_equity": "^KS11",     # KOSPI 지수 (KRW)
-    "domestic_bond": "114260.KS",   # KODEX 국고채10년 (KRW)
+    "domestic_bond": "114260.KS",   # KODEX 국고채3년 (KRW)
     "global_equity": "ACWI",        # iShares MSCI ACWI (USD)
     "global_bond": "IGOV",          # iShares International Treasury Bond, 무헤지 (USD)
     "alternatives": "GLD",          # SPDR Gold Shares (USD)

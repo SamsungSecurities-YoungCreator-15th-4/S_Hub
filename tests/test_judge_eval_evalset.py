@@ -12,13 +12,14 @@ from dotenv import load_dotenv
 from app.graph import route_after_judge
 from app.llm.client import get_llm
 from app.nodes.judge_eval import (
-    DEFAULT_MAX_JUDGE_RETRIES,
     MANUAL_REVIEW_WARNING,
     judge_eval,
 )
+from app.nodes.load_inputs import load_inputs
 
 AS_OF_DATE = "2026-06-30"
 RUN_AZURE_ENV = "RUN_AZURE_JUDGE_EVALSET"
+JUDGE_MAX_RETRIES = load_inputs({})["run_config"]["judge_max_retries"]
 
 BASE_TEXT = (
     f"기준일 {AS_OF_DATE} 기준 1일 99% VaR는 79,181,272원입니다. "
@@ -90,6 +91,7 @@ def _base_state() -> dict:
         "run_config": {
             "as_of_date": AS_OF_DATE,
             "strict_citation_gate": False,
+            "judge_max_retries": JUDGE_MAX_RETRIES,
         },
         "approval": {"status": "locked"},
         "metrics": deepcopy(BASE_METRICS),
@@ -206,7 +208,7 @@ def _case(case_id: str) -> dict:
         state["run_config"]["strict_citation_gate"] = True
         state["citations"] = []
         # 마지막 재시도에서 실패해 수동검토 플래그가 붙는 경계 케이스다.
-        state["judge_retries"] = DEFAULT_MAX_JUDGE_RETRIES - 1
+        state["judge_retries"] = JUDGE_MAX_RETRIES - 1
         expected_passed = False
         expected_axes.add("source_validity")
         expected_flags.add(MANUAL_REVIEW_WARNING)
@@ -283,8 +285,8 @@ def test_deterministic_judge_evalset(case_id: str):
     elif case_id == "EC-19":
         assert result["judge_feedback"] == ""
     elif case_id == "EC-20":
-        assert result["judge_retries"] == DEFAULT_MAX_JUDGE_RETRIES
-        assert route_after_judge(result) == "assemble_report"
+        assert result["judge_retries"] == JUDGE_MAX_RETRIES
+        assert route_after_judge(result) == "manual_review_gate"
 
 
 @pytest.fixture(scope="module")

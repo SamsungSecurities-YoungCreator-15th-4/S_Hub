@@ -22,6 +22,8 @@ from app.observability.langsmith import (
     prepare_trace_invocation,
 )
 
+JUDGE_MAX_RETRIES = load_inputs({})["run_config"]["judge_max_retries"]
+
 
 class _PassingLLM:
     model_name = "gpt-4o-test"
@@ -33,7 +35,10 @@ class _PassingLLM:
 
 def _judge_state() -> dict:
     return {
-        "run_config": {"as_of_date": "2026-07-03"},
+        "run_config": {
+            "as_of_date": "2026-07-03",
+            "judge_max_retries": JUDGE_MAX_RETRIES,
+        },
         "trace_id": "run-test",
         "demo_options": {"force_judge_fail": 1},
         "approval": {"status": "locked"},

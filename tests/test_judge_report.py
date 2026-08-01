@@ -4,17 +4,23 @@ import os
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.graph import route_after_judge
-from app.nodes.assemble_report import assemble_report
-from app.nodes.judge_eval import DEFAULT_MAX_JUDGE_RETRIES, judge_eval
+from app.nodes.assemble_report import assemble_report, report_is_exportable
+from app.nodes.judge_eval import judge_eval
+from app.nodes.load_inputs import load_inputs
+from app.nodes.manual_review_gate import manual_review_gate
 
+JUDGE_MAX_RETRIES = load_inputs({})["run_config"]["judge_max_retries"]
 
 BASE_STATE = {
     "run_config": {
         "as_of_date": "2026-06-30",
         "config_hash": "config-hash",
+        "judge_max_retries": JUDGE_MAX_RETRIES,
     },
     "trace_id": "run-config-hash",
     "raw_input": "고객 입력",
@@ -350,7 +356,7 @@ def test_assemble_report_warns_when_judge_failed_or_citations_missing(monkeypatc
         **BASE_STATE,
         "citations": [],
         "judge": {"passed": False, "manual_review_flags": ["수동 확인"]},
-        "judge_retries": DEFAULT_MAX_JUDGE_RETRIES,
+        "judge_retries": JUDGE_MAX_RETRIES,
     }
 
     report = assemble_report(state)["report"]
@@ -362,7 +368,7 @@ def test_assemble_report_warns_when_judge_failed_or_citations_missing(monkeypatc
     assert "수동 확인" in report["warnings"]
 
 
-def test_judge_retry_limit_routes_to_report_with_manual_review_warning():
+def test_judge_retry_limit_routes_to_manual_review_hard_stop():
     failed_state = {
         **BASE_STATE,
         "judge": {"passed": False, "manual_review_flags": []},
@@ -370,19 +376,21 @@ def test_judge_retry_limit_routes_to_report_with_manual_review_warning():
 
     assert (
         route_after_judge(
-            {**failed_state, "judge_retries": DEFAULT_MAX_JUDGE_RETRIES - 1}
+            {**failed_state, "judge_retries": JUDGE_MAX_RETRIES - 1}
         )
         == "rag_cite"
     )
     exhausted_state = {
         **failed_state,
-        "judge_retries": DEFAULT_MAX_JUDGE_RETRIES,
+        "judge_retries": JUDGE_MAX_RETRIES,
     }
-    assert route_after_judge(exhausted_state) == "assemble_report"
+    assert route_after_judge(exhausted_state) == "manual_review_gate"
 
-    report = assemble_report(exhausted_state)["report"]
-    assert report["governance"]["judge_retries"] == DEFAULT_MAX_JUDGE_RETRIES
+    report = manual_review_gate(exhausted_state)["report"]
+    assert report["governance"]["judge_retries"] == JUDGE_MAX_RETRIES
     assert report["governance"]["manual_review_required"] is True
+    assert report["governance"]["export_allowed"] is False
+    assert report["governance"]["manual_review_gate"]["status"] == "blocked"
     assert "judge 품질 점검이 통과되지 않았습니다." in report["warnings"]
 
 
@@ -391,7 +399,7 @@ def test_report_is_not_finalized_without_judge_pass():
     exhausted_state = {
         **BASE_STATE,
         "judge": {"passed": False, "reason": "필수 품질 점검 실패: source_validity=근거 부족"},
-        "judge_retries": DEFAULT_MAX_JUDGE_RETRIES,
+        "judge_retries": JUDGE_MAX_RETRIES,
     }
 
     report = assemble_report(exhausted_state)["report"]
@@ -402,6 +410,7 @@ def test_report_is_not_finalized_without_judge_pass():
     assert report["title"].startswith("[미확정 · 수동검토 대기]")
     assert report["governance"]["report_status"] == "pending_manual_review"
     assert report["governance"]["finalized"] is False
+    assert report_is_exportable(report) is False
     assert "source_validity" in report["governance"]["confirmation_blocked_reason"]
     assert report["warnings"][0].startswith("judge 품질 점검을 통과하지 못해")
 
@@ -414,10 +423,14 @@ def test_report_is_finalized_only_when_judge_passed():
     assert report["status"] == "confirmed"
     assert report["title"] == "재현가능·설명가능 리스크 리포트"
     assert report["governance"]["confirmation_blocked_reason"] == ""
+    assert report_is_exportable(report) is True
 
 
 def test_judge_max_retries_comes_from_config():
-    """상한은 config.yaml의 judge_max_retries를 따르고, 값이 없으면 기본값을 쓴다."""
+    """상한은 config.yaml의 judge_max_retries를 따르고, 값이 오염되면 즉시 실패한다.
+
+    폴백 기본값은 없다 — #135로 코드 기본값이 제거됐다.
+    """
     failed_state = {
         **BASE_STATE,
         "judge": {"passed": False, "manual_review_flags": []},
@@ -432,10 +445,10 @@ def test_judge_max_retries_comes_from_config():
         "run_config": {**BASE_STATE["run_config"], "judge_max_retries": 0},
     }
 
-    assert DEFAULT_MAX_JUDGE_RETRIES == 3
-    assert route_after_judge(failed_state) == "rag_cite"  # 기본 3회 → 재작성 여유 있음
-    assert route_after_judge(configured) == "assemble_report"  # 상한 2회 → 소진
-    assert route_after_judge(invalid) == "rag_cite"  # 유효하지 않은 값은 기본값
+    assert route_after_judge(failed_state) == "rag_cite"
+    assert route_after_judge(configured) == "manual_review_gate"  # 상한 2회 → 소진
+    with pytest.raises(ValueError, match="judge_max_retries"):
+        route_after_judge(invalid)
     assert assemble_report(configured)["report"]["governance"]["judge_max_retries"] == 2
 
 

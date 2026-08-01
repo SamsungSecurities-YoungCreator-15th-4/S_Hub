@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from app.nodes.assemble_report import report_is_exportable
+
 
 EXPECTED_CITATION_CATEGORIES = frozenset(
     {"methodology", "macro", "house_view", "tax"}
@@ -114,7 +116,11 @@ def validate_deployment_state(final: dict, order: list[str]) -> list[DeploymentC
         _check(
             "graph E2E nodes",
             not missing_nodes,
-            "전체 8노드 실행" if not missing_nodes else f"누락: {', '.join(missing_nodes)}",
+            (
+                "정상 경로 8노드 실행"
+                if not missing_nodes
+                else f"누락: {', '.join(missing_nodes)}"
+            ),
         ),
         _check(
             "verified citations",
@@ -149,11 +155,10 @@ def validate_deployment_state(final: dict, order: list[str]) -> list[DeploymentC
         ),
         _check(
             "report finalized",
-            report.get("finalized") is True
-            and governance.get("report_status") == "confirmed",
+            report_is_exportable(report),
             (
-                "judge 통과로 확정"
-                if report.get("finalized") is True
+                "judge 통과로 확정·다운로드 허용"
+                if report_is_exportable(report)
                 else f"미확정: {governance.get('confirmation_blocked_reason') or 'judge 미통과'}"
             ),
         ),
