@@ -4,6 +4,7 @@ from pathlib import Path
 
 import yaml
 
+from app.hard_stop_policy import resolve_hard_stop_policy_version
 from app.state import RiskState
 from app.utils.hashing import sha256_of_dict
 
@@ -74,6 +75,9 @@ def portfolio_from_percentages(
 
 
 def load_inputs(state: RiskState) -> dict:
+    # terminal gate에서 뒤늦게 설정 오류로 중단되지 않도록 그래프 첫 노드에서
+    # Hard Stop 정책 파일을 검증한다. 값의 SSOT와 실제 사용은 공용 로더가 맡는다.
+    resolve_hard_stop_policy_version()
     with open(CONFIG_PATH, encoding="utf-8") as f:
         config = yaml.safe_load(f)
 

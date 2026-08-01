@@ -122,3 +122,28 @@ def test_no_hardcoded_fallback_in_code():
 
     with pytest.raises(ValueError, match="judge_max_retries"):
         resolve_max_judge_retries({"run_config": {}})
+
+
+def test_agents_requires_success_and_hard_stop_graph_runs():
+    text = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+
+    assert "python scripts/run_graph.py --auto-approve\n" in text
+    assert (
+        "python scripts/run_graph.py --auto-approve --force-judge-fail 3" in text
+    )
+
+
+def test_agents_corpus_count_is_consistently_21():
+    text = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+
+    assert "RAG 근거 문서 (21건" in text
+    assert "RAG 근거 문서 (19건" not in text
+
+
+def test_reproducibility_scope_does_not_guarantee_llm_judge_axes():
+    text = (ROOT / "docs" / "reproducibility_scope.md").read_text(encoding="utf-8")
+    unconditional, conditional = text.split("### 2.1", maxsplit=1)
+
+    assert "judge 6축" not in unconditional.lower()
+    assert "Judge 6축" in conditional
+    assert "항상 같다고\n보장하지 않는다" in conditional

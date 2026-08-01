@@ -8,6 +8,8 @@ var_engine이 실제로는 data_source="real"을 쓰는데 state에는 "dummy"�
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.nodes.load_inputs import load_inputs
@@ -36,3 +38,20 @@ def test_market_data_ref_reflects_dummy_source(monkeypatch, tmp_path):
     result = load_inputs({})
     assert result["market_data_ref"]["source"] == "dummy"
     assert "더미" in result["market_data_ref"]["note"]
+
+
+def test_load_inputs_validates_hard_stop_policy_before_graph(monkeypatch):
+    """정책 파일 오류는 terminal gate가 아니라 그래프 첫 노드에서 드러나야 한다."""
+    import app.nodes.load_inputs as load_inputs_mod
+
+    def invalid_policy() -> str:
+        raise ValueError("Hard Stop 정책 설정 오류")
+
+    monkeypatch.setattr(
+        load_inputs_mod,
+        "resolve_hard_stop_policy_version",
+        invalid_policy,
+    )
+
+    with pytest.raises(ValueError, match="Hard Stop 정책 설정 오류"):
+        load_inputs({})
