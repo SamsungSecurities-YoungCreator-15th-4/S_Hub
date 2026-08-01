@@ -57,6 +57,13 @@ def main() -> None:
         action="store_true",
         help="4개 RAG category·Judge·LangSmith를 포함한 실제 배포 계약 검증",
     )
+    parser.add_argument(
+        "--dump-state",
+        type=Path,
+        default=None,
+        metavar="PATH",
+        help="최종 state를 결정론적 JSON으로 저장 (증거 번들 입력)",
+    )
     args = parser.parse_args()
 
     from app.graph import build_graph
@@ -168,6 +175,13 @@ def main() -> None:
             "  ⚠ judge 미통과 — 리포트는 확정되지 않았습니다(수동검토 대기). "
             "사람 검토 전에는 고객 제공·최종 판단 근거로 사용하지 않습니다."
         )
+
+    if args.dump_state:
+        from app.evidence.state_dump import dump_state
+
+        _print_header("6) 최종 state 덤프")
+        dumped = dump_state(final, args.dump_state)
+        print(f"  저장: {dumped}")
 
     if args.validate_deployment:
         from app.deployment_validation import (
