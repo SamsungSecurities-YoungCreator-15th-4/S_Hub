@@ -37,7 +37,6 @@ def _failed_state(
         "run_config": {
             "judge_max_retries": maximum,
             "strict_citation_gate": True,
-            "as_of_date": "2026-07-03",
         },
         "trace_id": "run-hard-stop",
         "metrics": {"meta": {"computation_hash": "calculation-hash"}},
@@ -179,28 +178,49 @@ def test_property_manual_review_gate_is_always_fail_closed(
     assert report_is_exportable(first) is False
 
 
-def test_decision_hash_excludes_trace_id_and_stopped_at_metadata():
-    """실행 식별자·시각이 달라도 동일한 차단 판단은 같은 지문이어야 한다."""
+def test_decision_hash_excludes_trace_id():
+    """실제 재현 방해 원인이던 trace_id만 달라도 결정 지문은 같아야 한다."""
     first_state = _failed_state()
     second_state = deepcopy(first_state)
     first_state["trace_id"] = "trace-first"
     second_state["trace_id"] = "trace-second"
-    second_state["run_config"]["as_of_date"] = "2026-07-04"
 
     first = manual_review_gate(first_state)["report"]["governance"]["manual_review_gate"]
     second = manual_review_gate(second_state)["report"]["governance"]["manual_review_gate"]
 
     assert first["trace_id"] != second["trace_id"]
-    assert first["stopped_at"] != second["stopped_at"]
     assert first["decision_hash"] == second["decision_hash"]
 
 
 def test_manual_review_gate_records_policy_and_logical_stop_time():
-    gate = manual_review_gate(_failed_state())["report"]["governance"]["manual_review_gate"]
+    state = _failed_state()
+    state["run_config"]["as_of_date"] = "2026-07-03"
+    gate = manual_review_gate(state)["report"]["governance"]["manual_review_gate"]
 
     assert set(gate) == set(MANUAL_REVIEW_GATE_KEYS)
     assert gate["policy_version"] == HARD_STOP_POLICY_VERSION
     assert gate["stopped_at"] == "2026-07-03T00:00:00+00:00"
+    assert gate["stopped_at_basis"] == "run_config.as_of_date"
+
+
+@pytest.mark.parametrize(
+    "bad_as_of_date",
+    [None, "", "2026/07/03", "2026-07-03T12:00:00"],
+)
+def test_missing_or_invalid_stop_metadata_never_breaks_hard_stop(bad_as_of_date):
+    """부가 시각 근거가 잘못돼도 terminal gate는 반드시 fail-closed로 끝난다."""
+    state = _failed_state()
+    if bad_as_of_date is not None:
+        state["run_config"]["as_of_date"] = bad_as_of_date
+
+    report = manual_review_gate(state)["report"]
+    gate = report["governance"]["manual_review_gate"]
+
+    assert report["status"] == "pending_manual_review"
+    assert report["finalized"] is False
+    assert report["governance"]["export_allowed"] is False
+    assert gate["stopped_at"]["available"] is False
+    assert gate["stopped_at"]["reason"]
 
 
 def test_rule_1_retry_limit_requires_config_ssot():

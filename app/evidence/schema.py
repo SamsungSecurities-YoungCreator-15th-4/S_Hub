@@ -146,6 +146,7 @@ MANUAL_REVIEW_GATE_KEYS = (
     "policy_version",
     "trace_id",
     "stopped_at",
+    "stopped_at_basis",
     "judge_passed",
     "judge_retries",
     "judge_max_retries",

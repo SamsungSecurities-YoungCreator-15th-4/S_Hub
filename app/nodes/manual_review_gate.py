@@ -49,46 +49,67 @@ def _failed_axes(judge: dict, judge_feedback: object) -> list[str]:
     return sorted(axes)
 
 
-def _logical_stopped_at(state: RiskState) -> str:
-    """재현 가능한 논리적 차단 기준시각을 ISO 8601로 반환한다.
+def _unavailable_stopped_at(reason: str) -> dict:
+    """시각 메타데이터가 없어도 Hard Stop을 중단하지 않고 사유를 남긴다."""
+    return {"available": False, "reason": reason}
+
+
+def _logical_stopped_at(state: RiskState) -> tuple[object, str | None]:
+    """재현 가능한 논리적 차단 기준시각과 원본 경로를 반환한다.
 
     노드 안에서 벽시계를 읽으면 같은 state의 출력이 달라진다. 따라서 승인 잠금일
     또는 설정 기준일을 사용하고, 실제 번들 생성 시각은 R4 manifest.generated_at,
     실제 실행 시각은 LangSmith trace가 담당한다.
+
+    이 값은 차단 판단에 필수적인 데이터가 아니다. 누락·형식 오류가 있더라도
+    예외를 던지지 않고 unavailable 표식을 반환해 fail-closed 종착점을 보장한다.
     """
     approval = state.get("approval")
     approval = approval if isinstance(approval, dict) else {}
     run_config = state.get("run_config")
     run_config = run_config if isinstance(run_config, dict) else {}
-    raw = approval.get("locked_as_of") or run_config.get("as_of_date")
+    if approval.get("locked_as_of"):
+        raw = approval["locked_as_of"]
+        basis = "approval.locked_as_of"
+    else:
+        raw = run_config.get("as_of_date")
+        basis = "run_config.as_of_date" if raw else None
     if not isinstance(raw, str) or not raw.strip():
-        raise ValueError(
-            "manual_review_gate stopped_at 산출에 approval.locked_as_of 또는 "
-            "run_config.as_of_date가 필요합니다."
+        return (
+            _unavailable_stopped_at(
+                "approval.locked_as_of와 run_config.as_of_date가 모두 없음"
+            ),
+            basis,
         )
     value = raw.strip()
-    if len(value) == 10:
+    if "T" not in value:
         try:
             parsed_date = date.fromisoformat(value)
-        except ValueError as exc:
-            raise ValueError(
-                "manual_review_gate stopped_at 기준값은 ISO 8601이어야 합니다: "
-                f"{value!r}"
-            ) from exc
-        return f"{parsed_date.isoformat()}T00:00:00+00:00"
+        except ValueError:
+            return (
+                _unavailable_stopped_at(
+                    f"{basis or 'stopped_at 기준값'}이 ISO 8601 날짜가 아님: {value!r}"
+                ),
+                basis,
+            )
+        return f"{parsed_date.isoformat()}T00:00:00+00:00", basis
     try:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except ValueError as exc:
-        raise ValueError(
-            "manual_review_gate stopped_at 기준값은 ISO 8601이어야 합니다: "
-            f"{value!r}"
-        ) from exc
-    if parsed.tzinfo is None:
-        raise ValueError(
-            "manual_review_gate stopped_at 시각에는 timezone이 필요합니다: "
-            f"{value!r}"
+    except ValueError:
+        return (
+            _unavailable_stopped_at(
+                f"{basis or 'stopped_at 기준값'}이 ISO 8601 시각이 아님: {value!r}"
+            ),
+            basis,
         )
-    return parsed.isoformat()
+    if parsed.tzinfo is None:
+        return (
+            _unavailable_stopped_at(
+                f"{basis or 'stopped_at 기준값'} 시각에 timezone이 없음: {value!r}"
+            ),
+            basis,
+        )
+    return parsed.isoformat(), basis
 
 
 def manual_review_gate(state: RiskState) -> dict:
@@ -117,10 +138,12 @@ def manual_review_gate(state: RiskState) -> dict:
             ((state.get("metrics") or {}).get("meta") or {}).get("computation_hash")
         ),
     }
+    stopped_at, stopped_at_basis = _logical_stopped_at(state)
     decision = {
         **decision_content,
         "trace_id": state.get("trace_id"),
-        "stopped_at": _logical_stopped_at(state),
+        "stopped_at": stopped_at,
+        "stopped_at_basis": stopped_at_basis,
         "decision_hash": sha256_of_dict(decision_content),
     }
 
