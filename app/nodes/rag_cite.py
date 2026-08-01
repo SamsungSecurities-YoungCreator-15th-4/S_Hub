@@ -24,7 +24,13 @@ import re
 
 from app.llm.audit import with_llm_audit
 from app.observability.langsmith import annotate_current_run
-from app.rag.citations import Citation, verify_citations
+from app.rag.citations import (
+    Citation,
+    _chunk_source,
+    _locator_metadata,
+    normalize_ws,
+    verify_citations,
+)
 from app.rag.contracts import EVIDENCE_ROLES, ROUTING_CONTRACT
 from app.rag.ingest import CHUNK_SIZE
 from app.state import RiskState
@@ -680,11 +686,57 @@ def _llm_text(response) -> str:
     return content if isinstance(content, str) else str(content)
 
 
+def _rejection_record(
+    rejected: dict,
+    topic: str,
+    candidates: list[Citation],
+    chunk_by_id: dict[str, dict],
+) -> dict:
+    """탈락 인용 1건의 감사 기록을 만든다 — 표기한 것과 원문이 어떻게 어긋났는지.
+
+    `verify_citations`의 반환값에는 조항 표기와 원문 대조 결과가 없다. 감사에서
+    묻는 것은 "무엇을 인용했다고 표기했고 원문은 실제로 무엇이었나"라서, 후보
+    인용과 청크 원문을 여기서 대조해 함께 남긴다.
+    """
+    chunk_id = rejected.get("chunk_id")
+    quote = rejected.get("quote") or ""
+    candidate = next(
+        (
+            cit
+            for cit in candidates
+            if cit.chunk_id == chunk_id and cit.quote == quote and not cit.verified
+        ),
+        None,
+    )
+    cited_locator = _locator_metadata(candidate.extra if candidate else None)
+    chunk = chunk_by_id.get(chunk_id) or {}
+    chunk_text = chunk.get("text")
+    normalized_chunk = normalize_ws(chunk_text) if isinstance(chunk_text, str) else ""
+    return {
+        "topic": topic,
+        "chunk_id": chunk_id,
+        # 인용이 "이 문서의 이 조항"이라고 표기한 내용
+        "cited_source": rejected.get("source"),
+        "cited_locator": cited_locator,
+        "quote": quote,
+        "reason": rejected.get("reason"),
+        # 원문이 실제로 무엇이었는지 — 표기와 대조한 결과
+        "original_comparison": {
+            "chunk_found": bool(chunk),
+            "chunk_source": _chunk_source(chunk) if chunk else None,
+            "chunk_locator": _locator_metadata(chunk),
+            "quote_found_in_chunk": bool(normalized_chunk)
+            and normalize_ws(quote) in normalized_chunk,
+        },
+    }
+
+
 def _result_with_audit(
     *,
     run_config: dict,
     explanations: list[dict],
     citations: list[dict],
+    citation_rejections: list[dict],
     revision: int,
     prompts: dict[str, str],
     routes: list[dict],
@@ -729,6 +781,9 @@ def _result_with_audit(
         "run_config": audited_config,
         "explanations": explanations,
         "citations": citations,
+        # 순수 추가 — explanations 텍스트와 citations는 한 글자도 바뀌지 않는다.
+        # 탈락 인용을 citations로 되살리면 judge 판정이 달라진다.
+        "citation_rejections": citation_rejections,
     }
 
 
@@ -770,6 +825,7 @@ def rag_cite(state: RiskState, *, llm=None, retriever=None) -> dict:
                 run_config=run_config,
                 explanations=explanations,
                 citations=[],
+                citation_rejections=[],
                 revision=revision,
                 prompts=prompts,
                 routes=routes,
@@ -787,6 +843,7 @@ def rag_cite(state: RiskState, *, llm=None, retriever=None) -> dict:
                 run_config=run_config,
                 explanations=explanations,
                 citations=[],
+                citation_rejections=[],
                 revision=revision,
                 prompts=prompts,
                 routes=routes,
@@ -796,6 +853,7 @@ def rag_cite(state: RiskState, *, llm=None, retriever=None) -> dict:
     from app.rag.retriever import retrieve_chunks
 
     all_verified: list[Citation] = []
+    all_rejections: list[dict] = []
     for explanation in explanations:
         topic = str(explanation.get("topic", "")).strip()
         route = route_by_topic[topic]
@@ -881,6 +939,9 @@ def rag_cite(state: RiskState, *, llm=None, retriever=None) -> dict:
                 rejected_citation["reason"],
                 rejected_citation["quote"],
             )
+            all_rejections.append(
+                _rejection_record(rejected_citation, topic, candidates, chunk_by_id)
+            )
 
     unique_verified: list[Citation] = []
     seen = set()
@@ -894,6 +955,7 @@ def rag_cite(state: RiskState, *, llm=None, retriever=None) -> dict:
         run_config=run_config,
         explanations=explanations,
         citations=[citation.to_dict() for citation in unique_verified],
+        citation_rejections=all_rejections,
         revision=revision,
         prompts=prompts,
         routes=routes,
