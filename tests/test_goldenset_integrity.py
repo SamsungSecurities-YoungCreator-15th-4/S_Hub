@@ -30,6 +30,7 @@ yaml = pytest.importorskip("yaml")
 ROOT = Path(__file__).resolve().parents[1]
 GS = ROOT / "goldenset"
 CASES = GS / "cases"
+JUDGE_INPUTS = GS / "judge_inputs"
 
 AXES = ("출처", "수치 정합", "환각", "위조정밀도", "면책", "금지표현")
 EXPECTED_PASS = 10
@@ -312,7 +313,7 @@ def test_loader_does_not_expose_answer_fields():
     **일치율 계산 단계**에서만 쓰인다.
     """
     load_case = _loader()
-    state = load_case(CASES / "case_001.md")
+    state = load_case(JUDGE_INPUTS / "case_001.md")
     assert isinstance(state, dict)
     leaked = [f for f in ANSWER_FIELDS if f in state]
     assert not leaked, f"로더가 정답 필드를 state에 넣었다: {leaked}"
@@ -324,6 +325,6 @@ def test_loader_does_not_expose_answer_fields():
 def test_loader_uses_allowlist_only():
     """allowlist 밖의 키를 state에 넣지 않는다 — 차단 목록이 아니라 허용 목록이어야 한다."""
     load_case = _loader()
-    state = load_case(CASES / "case_001.md")
+    state = load_case(JUDGE_INPUTS / "case_001.md")
     extra = set(state) - ALLOWED_STATE_KEYS
     assert not extra, f"allowlist({sorted(ALLOWED_STATE_KEYS)}) 밖의 키: {sorted(extra)}"

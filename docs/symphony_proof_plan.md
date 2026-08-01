@@ -106,7 +106,7 @@ goldenset/
 
 사례집은 리포트 md 전문인데 `judge_eval(state)`는 `RiskState`를 먹는다. 이 사이를 잇는 변환기가 이번 과제 코드의 심장이다.
 
-> **소유권 확정** — 이 변환기는 R2 실행 담당(다경)의 `scripts/judge_runner.py` 안에 **로더**로 들어간다. R1(승민)은 코드를 쓰지 않고 **형식 명세**(`goldenset/case-format.md`)만 제공한다. 계획서 초안의 `app/goldenset/adapter.py`는 이 러너와 중복이므로 만들지 않는다.
+> **소유권 확정** — R3가 `goldenset/tools/export_judge_inputs.py`로 R1 원본에서 정답 메타데이터를 제거하고, R2 실행 담당(다경)은 `goldenset/judge_inputs/`만 읽는 **로더**를 `scripts/judge_runner.py`에 연결한다. R2는 정답이 든 `goldenset/cases/`를 열거나 파싱하지 않는다. 계획서 초안의 `app/goldenset/adapter.py`는 이 러너와 중복이므로 만들지 않는다.
 
 ```python
 # 다경의 러너 안에 들어갈 로더 (아래는 변환 규칙)
