@@ -255,8 +255,8 @@ def main() -> int:
     )
     if not shared:
         print("   ⚠️ 겹치는 구간이 없다 — 오염 없는 사람-사람 일치율을 잴 수 없다")
-    print(f"✅ 배포 패키지 → dist/ (labeling-guide.md · chunks.json · cases_blind/ · 답안지)")
-    print(f"🔒 매핑 봉인 → .sealed/blind_map.json")
+    print("✅ 배포 패키지 → dist/ (labeling-guide.md · chunks.json · cases_blind/ · 답안지)")
+    print("🔒 매핑 봉인 → .sealed/blind_map.json")
     print("\n⚠️ dist/ 만 조원에게 전달하세요. corpus/manifest.md 와 .sealed/ 는 절대 금지.")
     return 0
 

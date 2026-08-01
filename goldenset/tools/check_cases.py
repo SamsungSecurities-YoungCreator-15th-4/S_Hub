@@ -35,7 +35,8 @@ LBL = {"VaR": r"(?<!C)VaR", "CVaR": r"CVaR"}
 SCALE_TOL = 2e-8  # 비율 8자리 반올림 오차 허용
 KRW_RE = re.compile(r"(\d{1,3}(?:,\d{3})+)\s*KRW|\*\*(\d{1,3}(?:,\d{3})+)\s*KRW\*\*")
 
-norm = lambda s: " ".join(s.split())
+def norm(value: str) -> str:
+    return " ".join(value.split())
 
 
 def load_chunks() -> dict:
@@ -93,7 +94,9 @@ def check_ci(text: str) -> list[str]:
         r"\| \1 90% 신뢰구간 \(KRW\) \| ([\d,]+) ~ ([\d,]+) \| ([\d,]+) ~ ([\d,]+) \|",
         text,
     )
-    n = lambda s: int(s.replace(",", ""))
+    def n(value: str) -> int:
+        return int(value.replace(",", ""))
+
     for label, p1, p10, l1, h1, l10, h10 in rows:
         if not n(l1) < n(p1) < n(h1):
             out.append(f"수치정합-F6: {label} 1일 구간이 점추정치를 품지 않음")

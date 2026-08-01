@@ -7,6 +7,7 @@ from copy import deepcopy
 from pathlib import Path
 
 import pytest
+import yaml
 from langgraph.graph import END, START, StateGraph
 
 from app.graph import route_after_judge
@@ -14,7 +15,11 @@ from app.evidence.schema import MANUAL_REVIEW_GATE_KEYS
 from app.nodes.assemble_report import report_is_exportable
 from app.nodes.judge_eval import resolve_max_judge_retries
 from app.nodes.load_inputs import load_inputs
-from app.nodes.manual_review_gate import HARD_STOP_POLICY_VERSION, manual_review_gate
+from app.nodes.manual_review_gate import (
+    HARD_STOP_POLICY_PATH,
+    manual_review_gate,
+    resolve_hard_stop_policy_version,
+)
 from app.rag.citations import (
     Citation,
     citation_contract_issues,
@@ -198,7 +203,7 @@ def test_manual_review_gate_records_policy_and_logical_stop_time():
     gate = manual_review_gate(state)["report"]["governance"]["manual_review_gate"]
 
     assert set(gate) == set(MANUAL_REVIEW_GATE_KEYS)
-    assert gate["policy_version"] == HARD_STOP_POLICY_VERSION
+    assert gate["policy_version"] == resolve_hard_stop_policy_version()
     assert gate["stopped_at"] == "2026-07-03T00:00:00+00:00"
     assert gate["stopped_at_basis"] == "run_config.as_of_date"
 
@@ -232,6 +237,29 @@ def test_rule_1_retry_limit_requires_config_ssot():
         state = {"run_config": {"judge_max_retries": invalid}}
         with pytest.raises(ValueError, match="judge_max_retries"):
             resolve_max_judge_retries(state)
+
+
+def test_hard_stop_policy_version_uses_config_ssot():
+    policy = yaml.safe_load(HARD_STOP_POLICY_PATH.read_text(encoding="utf-8"))
+
+    assert resolve_hard_stop_policy_version() == policy["version"]
+
+
+@pytest.mark.parametrize("invalid_policy", [None, {}, {"version": ""}, {"version": 1}])
+def test_hard_stop_policy_version_rejects_invalid_config(
+    invalid_policy,
+    monkeypatch,
+    tmp_path,
+):
+    import app.nodes.manual_review_gate as gate_module
+
+    policy_path = tmp_path / "hard_stop_policy.yaml"
+    policy_path.write_text(yaml.safe_dump(invalid_policy), encoding="utf-8")
+    monkeypatch.setattr(gate_module, "HARD_STOP_POLICY_PATH", policy_path)
+    gate_module.resolve_hard_stop_policy_version.cache_clear()
+
+    with pytest.raises(ValueError, match="version"):
+        gate_module.resolve_hard_stop_policy_version()
 
 
 def test_rule_3_starter_kit_source_marking_mismatch_is_rejected():

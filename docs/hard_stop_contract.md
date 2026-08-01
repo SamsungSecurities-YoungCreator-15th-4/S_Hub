@@ -14,6 +14,11 @@ Judge 필수 검사를 통과하지 못한 리포트가 확정본 또는 다운�
 - 환경변수나 그래프 상수로 별도 상한을 만들지 않는다.
 - 누락·불리언·0 이하·비정수 값은 코드 기본값으로 대체하지 않고 즉시 실패한다.
 
+Hard Stop 판단 정책의 버전은 `config/hard_stop_policy.yaml`의 `version`이
+유일한 원천이며, `resolve_hard_stop_policy_version()`을 통해서만 읽는다. 이 값은
+`decision_hash` 입력이므로 코드 상수나 문서에 별도 실행값을 복제하지 않는다.
+누락·빈 문자열·비문자열 버전은 기본값으로 대체하지 않고 즉시 실패한다.
+
 ## 3. 그래프 분기
 
 ```text
@@ -159,6 +164,8 @@ UI와 향후 다운로드 기능은 `report_is_exportable(report)`가 `true`일 
 | 속성 ② 어떤 선행 상태에서도 Hard Stop | `test_property_manual_review_gate_is_always_fail_closed` |
 | 속성 ③ 인용 identity 변조 전부 차단 | `test_property_citation_identity_tampering_never_passes` |
 | 결정 지문에서 실행 식별자 제외 | `test_decision_hash_excludes_trace_id` |
+| Hard Stop 정책 버전 설정 SSOT | `test_hard_stop_policy_version_uses_config_ssot` |
+| 잘못된 정책 버전 설정 거부 | `test_hard_stop_policy_version_rejects_invalid_config` |
 | 정책 버전·논리적 차단시각 기록 | `test_manual_review_gate_records_policy_and_logical_stop_time` |
 | 시각 근거 누락·오류에도 fail-closed | `test_missing_or_invalid_stop_metadata_never_breaks_hard_stop` |
 
