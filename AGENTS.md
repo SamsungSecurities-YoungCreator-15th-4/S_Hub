@@ -40,16 +40,26 @@ Orchestration/
 │   ├── hard_stop_policy.py # Hard Stop 정책 버전 로더·검증(SSOT 접근점)
 │   ├── nodes/         # 그래프 노드 (순수 함수, 바꾼 키만 반환)
 │   ├── engine/        # 결정론 계층 — langchain/llm import 금지
-│   ├── llm/           # AzureChatOpenAI 팩토리
+│   ├── llm/           # AzureChatOpenAI 팩토리·프롬프트 체인
+│   ├── rag/           # 검색·인용 검증·인덱스 배포
+│   ├── judge/         # judge 6축 루브릭 (런타임 판정)
+│   ├── evaluation/    # judge 캘리브레이션 (사람 라벨 대조 — 판정이 아니라 판정의 평가)
+│   ├── evidence/      # R4 증거 번들 스키마·state 덤프
+│   ├── observability/ # LangSmith 트레이싱
 │   └── utils/         # 해시 등 공용 유틸
-├── config/            # config.yaml (seed, as_of_date, VaR 설정)
+├── config/            # config.yaml · ips_policy.yaml · hard_stop_policy.yaml
 ├── corpus/            # RAG 근거 문서 (21건, 원문 PDF는 gitignore·로컬 전용 / manifest.md 참조)
 ├── data/              # 시장 데이터 (gitignore 대상 산출물 포함)
+├── docs/              # 계약·계획 문서 (mermaid.mmd 포함)
+├── goldenset/         # R1 사례집·라벨·평가 도구 (starter-kit·reports 포함, dist/는 생성물이라 gitignore)
 ├── scripts/           # CLI 진입점 (run_graph.py)
 ├── tests/             # pytest
 ├── ui/                # Streamlit UI
-└── .github/           # PR 템플릿·CI 등 GitHub 관련 설정
+└── .github/           # PR 템플릿·CI·커뮤니티 문서(CONTRIBUTING·SECURITY·CODE_OF_CONDUCT)
 ```
+
+디렉터리를 새로 만들기 전에 위 목록에 이미 맞는 자리가 있는지 먼저 본다.
+파일 한두 개를 위해 최상위 디렉터리를 만들지 않는다.
 
 ## 그래프 노드 흐름
 

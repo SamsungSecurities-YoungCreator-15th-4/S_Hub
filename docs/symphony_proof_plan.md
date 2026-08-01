@@ -122,8 +122,8 @@ case_00X.md
 ★ `numeric_consistency`는 `explanations` 텍스트만 스캔한다. 견본의 핵심 함정(1일 VaR × √10 ≠ 10일 VaR)은 **표 안**에 있으므로, 표 수치를 explanations로 옮겨주지 않으면 이 축이 무력화된다.
 
 ```bash
-python scripts/calibrate_judge.py --prompt-version v1 --out reports/calibration_v1.json
-python scripts/calibrate_judge.py --prompt-version v2 --compare-with reports/calibration_v1.json
+python scripts/calibrate_judge.py --prompt-version v1 --out goldenset/reports/calibration_v1.json
+python scripts/calibrate_judge.py --prompt-version v2 --compare-with goldenset/reports/calibration_v1.json
 ```
 
 **산출 지표** — "20건 중 17건 일치"보다 아래가 훨씬 설득력 있다.

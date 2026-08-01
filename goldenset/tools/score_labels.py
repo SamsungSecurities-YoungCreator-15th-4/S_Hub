@@ -22,7 +22,7 @@
 
 사용:
   python goldenset/tools/score_labels.py --labels goldenset/labels
-  python goldenset/tools/score_labels.py --labels goldenset/labels --out reports/agreement.md
+  python goldenset/tools/score_labels.py --labels goldenset/labels --out goldenset/reports/agreement.md
 """
 from __future__ import annotations
 

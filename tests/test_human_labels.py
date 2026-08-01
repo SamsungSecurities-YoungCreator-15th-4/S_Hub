@@ -11,7 +11,7 @@ from app.evaluation.human_labels import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
-STARTER_KIT = ROOT / "starter-kit"
+STARTER_KIT = ROOT / "goldenset" / "starter-kit"
 
 
 def _write(path: Path, frontmatter: str) -> Path:

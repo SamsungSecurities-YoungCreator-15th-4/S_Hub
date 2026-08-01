@@ -18,7 +18,7 @@ judge 일치율의 상한이 아닙니다 — judge는 조정된 gold label과 �
 
 ## 산출 결과
 
-- 사람 간 일치율 **18/20** (IAA) → `reports/agreement_before.md` §7
+- 사람 간 일치율 **18/20** (IAA) → `goldenset/reports/agreement_before.md` §7
 - 최종 라벨 **pass 10 / fail 10** → `../cases/case_*.md` frontmatter
 
 ## 재현 절차
@@ -26,7 +26,7 @@ judge 일치율의 상한이 아닙니다 — judge는 조정된 gold label과 �
 ```bash
 # 1. 합의 전 일치율
 python goldenset/tools/score_labels.py --labels goldenset/labels \
-       --out reports/agreement_before.md
+       --out goldenset/reports/agreement_before.md
 
 # 2. 불일치 건을 기준표 항목 번호 근거로 조정 (사람이 논의)
 
