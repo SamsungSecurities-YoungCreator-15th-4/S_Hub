@@ -4,14 +4,21 @@
 `citations[].extra.chunk_text`를 채우는 원천이고, 레포를 클론한 사람이 R2를
 재현하는 근거이기도 하다.
 
-가장 중요한 검사는 **실존/가상 경계**다. 코퍼스 문서 §2의 "실존 기관명을 붙인
-가상 문서 금지" 원칙은 문서에만 적어두면 지켜지는지 알 수 없다. 가상 문서
-(`synthetic: true`)는 `source`에 반드시 `(가상)` 표기를 달아, 사례 본문을 읽는
-사람이 실존 규정과 창작 규정을 혼동하지 않게 한다.
+가장 중요한 검사는 **실존/가상 경계**이며, 이를 `synthetic` 플래그와 `source`
+문자열의 **양방향 일치**로 건다. 라벨러와 judge가 실제로 보는 것은 `source`
+문자열이지 `synthetic` 플래그가 아니다. 둘이 어긋나면 라벨러가 창작 규정을
+"실존 규정인 줄 알고" 판정하게 되므로, 한쪽 방향만 막아서는 부족하다.
+
+카테고리 제약은 출처 진위와 분리해서 건다(#140 리뷰, R1 오너). `tax`(국세청)나
+`macro`(한은·FOMC 공개문)는 공공자료라 실존 인용이 가능하므로 "실존 문서는
+regulation만"으로 묶으면 나중에 정당한 인용을 게이트가 막는다. 반대로
+`house_view`는 저작권과 실존 기관 발표 날조 위험 때문에 **절대 실존일 수 없다** —
+막아야 할 것은 이쪽이다.
 """
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -22,9 +29,15 @@ CHUNKS_PATH = ROOT / "goldenset" / "corpus" / "chunks.json"
 REQUIRED_KEYS = ("chunk_id", "source", "category", "synthetic", "text")
 MIN_CHUNK_COUNT = 12
 SYNTHETIC_MARKER = "(가상)"
-# 실존 문서(synthetic=false)는 법령·규정 원문만 허용한다. 실존 하우스뷰·거시
-# 브리프를 사례집에 넣으면 저작권·인용 범위 문제가 생기므로 category로 막는다.
-REAL_DOCUMENT_CATEGORY = "regulation"
+# 실존 기관 발표를 날조하는 형태가 되므로 하우스뷰는 가상 문서만 허용한다.
+SYNTHETIC_ONLY_CATEGORIES = ("house_view",)
+# `chunks.json`은 인용 원문 대조용으로 라벨러에게 배포된다. `note`는 작성 원칙을
+# 적는 자리이지 출제 의도를 적는 자리가 아니다 — 사례 번호·함정 언급을 막는다.
+NOTE_LEAK_PATTERNS = (
+    (re.compile(r"case_\d+", re.I), "사례 번호"),
+    (re.compile(r"trap", re.I), "함정(trap) 언급"),
+    (re.compile(r"함정"), "함정 언급"),
+)
 
 
 def _load_chunks() -> list[dict]:
@@ -87,16 +100,35 @@ def validate_chunks(chunks: object) -> list[str]:
             )
             continue
 
-        if synthetic and SYNTHETIC_MARKER not in source:
+        marked = SYNTHETIC_MARKER in source
+        if synthetic and not marked:
             problems.append(
                 f"{chunk_id}: synthetic=true인데 source에 '{SYNTHETIC_MARKER}' 표기가 없습니다 "
                 f"— 실존 기관명을 붙인 가상 문서는 금지입니다 (source: {source!r})."
             )
-        if not synthetic and category != REAL_DOCUMENT_CATEGORY:
+        if not synthetic and marked:
             problems.append(
-                f"{chunk_id}: synthetic=false인 실존 문서는 category가 "
-                f"'{REAL_DOCUMENT_CATEGORY}'여야 합니다 (받은 값: {category!r})."
+                f"{chunk_id}: source에 '{SYNTHETIC_MARKER}' 표기가 있는데 synthetic=false입니다 "
+                f"— 표기와 플래그가 어긋나면 라벨러가 창작 규정을 실존으로 오인합니다 "
+                f"(source: {source!r})."
             )
+        if not synthetic and category in SYNTHETIC_ONLY_CATEGORIES:
+            problems.append(
+                f"{chunk_id}: category='{category}'는 가상 문서만 허용합니다 "
+                "— 실존 기관의 발표를 날조하는 형태가 됩니다."
+            )
+
+        note = chunk.get("note")
+        if note is not None:
+            if not isinstance(note, str):
+                problems.append(f"{chunk_id}: note는 문자열이어야 합니다 (받은 타입: {type(note).__name__}).")
+            else:
+                for pattern, what in NOTE_LEAK_PATTERNS:
+                    if pattern.search(note):
+                        problems.append(
+                            f"{chunk_id}: note에 {what}이 있습니다 — chunks.json은 라벨러에게 "
+                            "배포되므로 출제 의도를 적으면 그대로 새어나갑니다."
+                        )
     return problems
 
 
@@ -120,23 +152,34 @@ def test_chunk_ids_are_unique():
     assert not duplicates, f"chunk_id 중복: {duplicates}"
 
 
-def test_synthetic_documents_are_marked():
-    """가상 문서는 전건 source에 '(가상)' 표기가 있어야 한다."""
-    unmarked = [
+def test_synthetic_flag_and_source_marker_agree_both_ways():
+    """`synthetic == ('(가상)' in source)` — 어느 방향으로 어긋나도 잡는다."""
+    mismatched = [
         chunk["chunk_id"]
         for chunk in _load_chunks()
-        if chunk.get("synthetic") is True and SYNTHETIC_MARKER not in str(chunk.get("source", ""))
+        if chunk.get("synthetic") is not (SYNTHETIC_MARKER in str(chunk.get("source", "")))
     ]
-    assert not unmarked, f"'(가상)' 표기가 없는 synthetic 문서: {unmarked}"
+    assert not mismatched, f"synthetic 플래그와 '(가상)' 표기가 불일치: {mismatched}"
 
 
-def test_real_documents_are_regulation_only():
-    misfiled = [
-        (chunk["chunk_id"], chunk.get("category"))
+def test_house_view_documents_are_synthetic_only():
+    real = [
+        chunk["chunk_id"]
         for chunk in _load_chunks()
-        if chunk.get("synthetic") is False and chunk.get("category") != REAL_DOCUMENT_CATEGORY
+        if chunk.get("category") in SYNTHETIC_ONLY_CATEGORIES and chunk.get("synthetic") is False
     ]
-    assert not misfiled, f"실존 문서인데 category가 regulation이 아님: {misfiled}"
+    assert not real, f"가상만 허용되는 category인데 synthetic=false: {real}"
+
+
+def test_notes_do_not_leak_case_intent():
+    """note는 작성 원칙만 담는다 — 사례 번호·함정 언급이 들어가면 배포 시 유출된다."""
+    leaks = [
+        (chunk["chunk_id"], what)
+        for chunk in _load_chunks()
+        for pattern, what in NOTE_LEAK_PATTERNS
+        if isinstance(chunk.get("note"), str) and pattern.search(chunk["note"])
+    ]
+    assert not leaks, f"note에 출제 의도가 노출됨: {leaks}"
 
 
 # ---------------------------------------------------------------------------
@@ -171,18 +214,71 @@ def test_detects_synthetic_without_marker():
     assert any("fake-001" in p and SYNTHETIC_MARKER in p for p in problems), problems
 
 
-def test_detects_real_document_with_non_regulation_category():
+def test_detects_marker_without_synthetic_flag():
+    """역방향 — source에 '(가상)'인데 synthetic=false면 라벨러가 실존으로 오인한다."""
     problems = validate_chunks(
         _padded(
             _valid_chunk(
-                chunk_id="real-001",
+                chunk_id="mismatch-001",
                 synthetic=False,
-                category="house_view",
-                source="「금융소비자 보호에 관한 법률」 제19조",
+                category="regulation",
+                source="사내 리스크리포트 작성기준(가상) 제5조",
             )
         )
     )
-    assert any("real-001" in p and "regulation" in p for p in problems), problems
+    assert any("mismatch-001" in p and "synthetic=false" in p for p in problems), problems
+
+
+def test_detects_real_house_view():
+    problems = validate_chunks(
+        _padded(
+            _valid_chunk(
+                chunk_id="real-hv-001",
+                synthetic=False,
+                category="house_view",
+                source="삼성증권 하우스뷰 2026년 하반기 전망",
+            )
+        )
+    )
+    assert any("real-hv-001" in p and "house_view" in p for p in problems), problems
+
+
+def test_allows_real_public_document_outside_regulation():
+    """국세청·한은 같은 공공 실존 자료는 regulation이 아니어도 통과해야 한다.
+
+    이전 규칙(`synthetic=false ⇒ category=regulation`)이 막던 정당한 사례다.
+    """
+    problems = validate_chunks(
+        _padded(
+            _valid_chunk(
+                chunk_id="real-tax-001",
+                synthetic=False,
+                category="tax",
+                source="국세청 「소득세법 기본통칙」 88-0…1",
+            )
+        )
+    )
+    assert problems == [], problems
+
+
+def test_detects_note_leaking_case_intent():
+    problems = validate_chunks(
+        _padded(_valid_chunk(chunk_id="note-001", note="case_007 함정용 청크"))
+    )
+    assert any("note-001" in p and "note" in p for p in problems), problems
+
+
+def test_allows_note_with_authoring_principle():
+    """실제 코퍼스의 note는 작성 원칙이다 — 정상 note가 오탐으로 걸리면 안 된다."""
+    problems = validate_chunks(
+        _padded(
+            _valid_chunk(
+                chunk_id="note-002",
+                note="실존 기관명을 붙이지 않는다. '사내 하우스뷰(가상)'로 익명화.",
+            )
+        )
+    )
+    assert problems == [], problems
 
 
 def test_detects_duplicate_chunk_id():
