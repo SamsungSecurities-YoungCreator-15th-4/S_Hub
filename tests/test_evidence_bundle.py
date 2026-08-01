@@ -160,7 +160,9 @@ def _blocked_state() -> dict:
             "manual_review_gate": {
                 "status": "blocked",
                 "trigger": "judge_retries_exhausted",
+                "policy_version": "2026-08-01.v1",
                 "trace_id": "run-evidence-001",
+                "stopped_at": "2026-07-03T00:00:00+00:00",
                 "judge_passed": False,
                 "judge_retries": 3,
                 "judge_max_retries": 3,
@@ -270,6 +272,8 @@ def test_hard_stop_record_adopts_manual_review_gate_keys_verbatim(tmp_path):
     # manual_review_gate.py가 기록한 키를 이름 그대로 싣는다.
     assert gate["status"] == "blocked"
     assert gate["trigger"] == "judge_retries_exhausted"
+    assert gate["policy_version"] == "2026-08-01.v1"
+    assert gate["stopped_at"] == "2026-07-03T00:00:00+00:00"
     assert gate["failed_axes"] == ["citation_content_contract"]
     assert gate["decision_hash"] == "decision-hash-value"
 

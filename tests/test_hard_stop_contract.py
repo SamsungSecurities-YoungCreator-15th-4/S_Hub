@@ -10,10 +10,11 @@ import pytest
 from langgraph.graph import END, START, StateGraph
 
 from app.graph import route_after_judge
+from app.evidence.schema import MANUAL_REVIEW_GATE_KEYS
 from app.nodes.assemble_report import report_is_exportable
 from app.nodes.judge_eval import resolve_max_judge_retries
 from app.nodes.load_inputs import load_inputs
-from app.nodes.manual_review_gate import manual_review_gate
+from app.nodes.manual_review_gate import HARD_STOP_POLICY_VERSION, manual_review_gate
 from app.rag.citations import (
     Citation,
     citation_contract_issues,
@@ -33,7 +34,11 @@ def _failed_state(
     maximum = JUDGE_MAX_RETRIES if maximum is None else maximum
     retries = maximum if retries is None else retries
     return {
-        "run_config": {"judge_max_retries": maximum, "strict_citation_gate": True},
+        "run_config": {
+            "judge_max_retries": maximum,
+            "strict_citation_gate": True,
+            "as_of_date": "2026-07-03",
+        },
         "trace_id": "run-hard-stop",
         "metrics": {"meta": {"computation_hash": "calculation-hash"}},
         "judge_retries": retries,
@@ -172,6 +177,30 @@ def test_property_manual_review_gate_is_always_fail_closed(
     assert first["governance"]["export_allowed"] is False
     assert first["governance"]["manual_review_gate"]["decision_hash"]
     assert report_is_exportable(first) is False
+
+
+def test_decision_hash_excludes_trace_id_and_stopped_at_metadata():
+    """실행 식별자·시각이 달라도 동일한 차단 판단은 같은 지문이어야 한다."""
+    first_state = _failed_state()
+    second_state = deepcopy(first_state)
+    first_state["trace_id"] = "trace-first"
+    second_state["trace_id"] = "trace-second"
+    second_state["run_config"]["as_of_date"] = "2026-07-04"
+
+    first = manual_review_gate(first_state)["report"]["governance"]["manual_review_gate"]
+    second = manual_review_gate(second_state)["report"]["governance"]["manual_review_gate"]
+
+    assert first["trace_id"] != second["trace_id"]
+    assert first["stopped_at"] != second["stopped_at"]
+    assert first["decision_hash"] == second["decision_hash"]
+
+
+def test_manual_review_gate_records_policy_and_logical_stop_time():
+    gate = manual_review_gate(_failed_state())["report"]["governance"]["manual_review_gate"]
+
+    assert set(gate) == set(MANUAL_REVIEW_GATE_KEYS)
+    assert gate["policy_version"] == HARD_STOP_POLICY_VERSION
+    assert gate["stopped_at"] == "2026-07-03T00:00:00+00:00"
 
 
 def test_rule_1_retry_limit_requires_config_ssot():

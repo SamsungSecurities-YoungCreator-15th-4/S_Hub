@@ -119,9 +119,26 @@ provenance 지문 대조에서 실패한다.
 | `governance.manual_review_required` | `true` |
 | `governance.confirmation_blocked_reason` | Judge 실패 사유 |
 | `governance.manual_review_gate.status` | `blocked` |
+| `governance.manual_review_gate.trigger` | `judge_retries_exhausted` |
+| `governance.manual_review_gate.policy_version` | 적용한 Hard Stop 정책 버전 |
+| `governance.manual_review_gate.trace_id` | 해당 실행을 LangSmith·번들과 연결하는 식별자 |
+| `governance.manual_review_gate.stopped_at` | 승인 잠금일 또는 기준일에서 산출한 논리적 차단 기준시각(ISO 8601) |
+| `governance.manual_review_gate.judge_passed` | 차단 당시 Judge 통과 여부(`false`) |
+| `governance.manual_review_gate.judge_retries` | 차단 당시 누적 Judge 시도 횟수 |
+| `governance.manual_review_gate.judge_max_retries` | 적용한 재시도 상한 SSOT 값 |
 | `governance.manual_review_gate.failed_axes` | 실패한 필수 검사명 목록 |
 | `governance.manual_review_gate.decision_hash` | 동일 결정의 재현성 확인용 SHA-256 |
 | `governance.manual_review_gate.computation_hash` | 차단된 계산 결과 연결값 |
+
+`decision_hash`는 차단 판단 내용(`status`, `trigger`, `policy_version`, Judge 판정·
+시도 횟수·실패 축, `computation_hash`)만 해시한다. 실행마다 달라질 수 있는
+`trace_id`와 시각 메타데이터 `stopped_at`은 표시·추적에는 보존하지만 해시 입력에서는
+제외한다. 따라서 같은 계산과 같은 정책 판단이면 실행이 달라도 동일한 결정 지문이
+생성된다.
+
+`stopped_at`은 노드가 벽시계를 직접 읽지 않도록 `approval.locked_as_of` 또는
+`run_config.as_of_date`에서 결정론적으로 산출한 논리적 기준시각이다. 실제 실행·번들
+생성 시각은 LangSmith trace와 R4 `manifest.generated_at`이 담당한다.
 
 UI와 향후 다운로드 기능은 `report_is_exportable(report)`가 `true`일 때만 고객 제공
 동작을 허용한다. 단순히 `report.finalized=true` 한 필드만 보고 허용하지 않는다.
@@ -137,6 +154,8 @@ UI와 향후 다운로드 기능은 `report_is_exportable(report)`가 `true`일 
 | 속성 ① 모든 유효 상한의 경계 | `test_property_retry_limit_routes_every_exhausted_failure_to_gate` |
 | 속성 ② 어떤 선행 상태에서도 Hard Stop | `test_property_manual_review_gate_is_always_fail_closed` |
 | 속성 ③ 인용 identity 변조 전부 차단 | `test_property_citation_identity_tampering_never_passes` |
+| 결정 지문에서 실행 메타데이터 제외 | `test_decision_hash_excludes_trace_id_and_stopped_at_metadata` |
+| 정책 버전·논리적 차단시각 기록 | `test_manual_review_gate_records_policy_and_logical_stop_time` |
 
 ## 8. R1 사례집 20건 의존성
 
