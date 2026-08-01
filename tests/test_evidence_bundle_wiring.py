@@ -248,6 +248,85 @@ def test_rejected_citation_flows_from_node_to_bundle(tmp_path: Path):
     assert first["original_comparison"]["quote_found_in_chunk"] is False
 
 
+# ---------------------------------------------------------------------------
+# 재작성 루프 — 시도별 탈락 기록 누적
+# ---------------------------------------------------------------------------
+def _run_rag_attempts(attempts: int) -> dict:
+    """judge 재작성 루프를 흉내내 rag_cite를 연속 호출하고 최종 state를 돌려준다.
+
+    LangGraph가 노드 반환값을 state에 병합하는 것과 같게, 반환 키를 state에 덮어쓴다.
+    """
+    from tests.test_rag_cite_node import _FakeLLM, _FakeRetriever
+
+    from app.nodes.rag_cite import rag_cite
+
+    state: dict = {"metrics": {}}
+    for revision in range(attempts):
+        state["judge_retries"] = revision
+        state.update(
+            rag_cite(state, llm=_FakeLLM(), retriever=_FakeRetriever())
+        )
+    return state
+
+
+def test_rewrite_loop_preserves_every_attempt_rejections():
+    """3회 재작성해도 앞선 시도의 탈락 기록이 남아야 한다 (R3 감사 추적).
+
+    덮어쓰면 최종 state에는 마지막 시도의 탈락만 남아 "무엇이 왜 떨어졌나"의
+    이력이 끊긴다.
+    """
+    state = _run_rag_attempts(3)
+    rejections = state["citation_rejections"]
+
+    attempts = sorted({rejection["attempt"] for rejection in rejections})
+    assert attempts == [1, 2, 3], f"시도별 기록이 보존되지 않았다: {attempts}"
+
+    # 각 시도가 최소 1건씩 남았는지 — 마지막 시도만 살아남는 회귀를 잡는다.
+    for attempt in (1, 2, 3):
+        assert [r for r in rejections if r["attempt"] == attempt]
+
+    # attempt 오름차순으로 쌓여야 감사에서 시간순으로 읽힌다.
+    assert [r["attempt"] for r in rejections] == sorted(
+        r["attempt"] for r in rejections
+    )
+
+
+def test_same_attempt_rerun_does_not_duplicate_rejections():
+    """체크포인트 재생으로 같은 시도가 두 번 실행돼도 기록이 중복되면 안 된다."""
+    from tests.test_rag_cite_node import _FakeLLM, _FakeRetriever
+
+    from app.nodes.rag_cite import rag_cite
+
+    state: dict = {"metrics": {}, "judge_retries": 0}
+    state.update(rag_cite(state, llm=_FakeLLM(), retriever=_FakeRetriever()))
+    once = state["citation_rejections"]
+    state.update(rag_cite(state, llm=_FakeLLM(), retriever=_FakeRetriever()))
+
+    assert state["citation_rejections"] == once
+
+
+def test_bundle_carries_attempt_for_every_rejection(tmp_path: Path):
+    """누적된 시도 번호가 번들까지 이어져야 감사에서 구분된다."""
+    from make_evidence_bundle import make_bundle
+
+    state = _run_rag_attempts(2)
+    bundle = make_bundle(
+        {
+            "citations": state["citations"],
+            "citation_rejections": state["citation_rejections"],
+            "report": {},
+        },
+        tmp_path / "bundle",
+        run_id="run-test-002",
+        generated_at="2026-08-01T00:00:00+00:00",
+    )
+    payload = json.loads(
+        (bundle / CITATION_VERIFICATION_FILENAME).read_text(encoding="utf-8")
+    )
+    rejected = payload["rejected_citations"]
+    assert {row["attempt"] for row in rejected} == {1, 2}
+
+
 def test_empty_quote_is_not_reported_as_found_in_chunk():
     """빈 인용문은 원문 대조가 성립하지 않는다.
 
@@ -261,6 +340,7 @@ def test_empty_quote_is_not_reported_as_found_in_chunk():
         "VaR 해석",
         [],
         {"c1": {"chunk_id": "c1", "text": "실제 원문", "source": "문서(가상)"}},
+        attempt=1,
     )
     assert record["original_comparison"]["quote_found_in_chunk"] is False
 
@@ -288,6 +368,7 @@ def test_rag_cite_records_rejection_shape():
         "VaR 해석",
         [candidate],
         {"c1": {"chunk_id": "c1", "text": "실제 원문", "source": "리스크 계량 방법론(가상)"}},
+        attempt=1,
     )
     assert record["cited_locator"] == {"article": "제3조"}
     assert record["original_comparison"]["chunk_found"] is True

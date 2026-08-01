@@ -70,6 +70,42 @@ provenance 지문 대조에서 실패한다.
 법령처럼 조항 metadata가 있는 문서는 조항까지 일치해야 한다. 일반 방법론 PDF처럼
 조항 metadata가 없는 문서는 문서명·청크 ID·인용문·claim(topic)을 검사한다.
 
+### 탈락 인용 기록 — `state.citation_rejections`
+
+검증에서 **떨어진** 인용의 감사 기록이다. 통과한 인용은 `state.citations`에만
+실리고, 탈락분은 여기에만 남는다. 탈락분을 `citations`로 되살리면 judge 판정이
+달라지므로 두 키는 절대 섞지 않는다.
+
+| 구분 | 내용 |
+|---|---|
+| 생산자 | `app/nodes/rag_cite.py` (`rag_cite`) |
+| 소비자 | R4 증거 번들 — `citation_verification.json`의 `rejected_citations` |
+| 재시도 규칙 | **누적**(덮어쓰기 아님). 시도별 기록을 `attempt` 오름차순으로 보존 |
+
+레코드 필드:
+
+| 필드 | 의미 |
+|---|---|
+| `attempt` | 몇 번째 RAG 시도의 탈락인가 (`judge_retries + 1`) |
+| `topic` | 인용이 뒷받침하려던 설명 topic |
+| `chunk_id` | 인용이 속한다고 표기한 청크 |
+| `cited_source` | 인용이 "이 문서"라고 표기한 문서명 |
+| `cited_locator` | 인용이 표기한 조항/절/항 |
+| `quote` | 표기한 인용문 |
+| `reason` | 탈락 사유 (`verify_citations` 판정) |
+| `original_comparison` | 원문이 실제로 무엇이었나 — `chunk_found`, `chunk_source`, `chunk_locator`, `quote_found_in_chunk` |
+
+**누적하는 이유** — judge 재작성 루프에서 `rag_cite`는 여러 번 방문된다. LangGraph는
+리듀서가 없는 키를 덮어쓰므로 이번 시도분만 반환하면 최종 state와 번들에 마지막
+시도의 탈락만 남는다. 감사에서 묻는 것은 "무엇이 왜 떨어졌나"의 전체 이력이라
+시도별로 보존해야 추적이 끊기지 않는다.
+
+같은 `attempt`의 기존 기록은 버리고 새로 쓴다 — 체크포인트 재생으로 같은 시도가
+두 번 실행돼도 기록이 중복되지 않아야 한다(재현성).
+
+`citation_rejections` 키가 아예 없는 과거 실행의 state로도 번들 생성은 성공하며,
+그 경우 `rejected_citations`는 `available:false`로 표시된다.
+
 ## 6. R4 차단 증거 계약
 
 `manual_review_gate`는 `report.governance`에 아래 값을 제공한다.

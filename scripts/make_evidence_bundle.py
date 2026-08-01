@@ -247,6 +247,8 @@ def _rejected_citations(state: dict) -> object:
         )
     return [
         {
+            # 재작성 루프에서 시도별로 누적되므로, 어느 시도의 탈락인지 함께 싣는다.
+            "attempt": _get(rejection, "attempt"),
             "topic": _get(rejection, "topic"),
             "chunk_id": _get(rejection, "chunk_id"),
             "cited_source": _get(rejection, "cited_source"),

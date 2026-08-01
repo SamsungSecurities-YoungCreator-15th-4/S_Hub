@@ -9,6 +9,9 @@
 
 judge 재작성 루프로 재방문될 수 있으므로, 반환값은 항상 explanations/citations를
 통째로 새로 만들어 이전 결과를 덮어쓴다(누적 없음 → 재실행 안전).
+단 `citation_rejections`만은 예외로 시도별 기록을 누적한다 — 최종 보고서에 실리는
+것은 마지막 시도의 인용이지만, 감사에서 묻는 것은 "무엇이 왜 떨어졌나"의 전체
+이력이라 덮어쓰면 추적이 끊긴다. 각 기록의 `attempt`로 시도를 구분한다.
 
 인덱스나 Azure 키가 없는 로컬 스켈레톤 실행에서는 RAG 경로를 건너뛰고
 결정론적 설명 + 빈 인용으로 폴백해, 그래프 완주(run_graph.py)를 깨지 않는다.
@@ -691,6 +694,7 @@ def _rejection_record(
     topic: str,
     candidates: list[Citation],
     chunk_by_id: dict[str, dict],
+    attempt: int,
 ) -> dict:
     """탈락 인용 1건의 감사 기록을 만든다 — 표기한 것과 원문이 어떻게 어긋났는지.
 
@@ -714,6 +718,9 @@ def _rejection_record(
     normalized_chunk = normalize_ws(chunk_text) if isinstance(chunk_text, str) else ""
     normalized_quote = normalize_ws(quote)
     return {
+        # 몇 번째 RAG 시도의 탈락인가. 재작성 루프에서 기록이 누적되므로 이게 없으면
+        # 어느 시도의 탈락인지 구분할 수 없다.
+        "attempt": attempt,
         "topic": topic,
         "chunk_id": chunk_id,
         # 인용이 "이 문서의 이 조항"이라고 표기한 내용
@@ -735,12 +742,36 @@ def _rejection_record(
     }
 
 
+def _accumulated_rejections(
+    prior: list[dict],
+    current: list[dict],
+    *,
+    attempt: int,
+) -> list[dict]:
+    """앞선 RAG 시도의 탈락 기록을 이번 시도 기록 앞에 보존한다.
+
+    judge 재작성 루프에서 `rag_cite`는 여러 번 방문된다. LangGraph는 리듀서가 없는
+    키를 덮어쓰므로, 이번 시도분만 반환하면 최종 state와 증거 번들에는 마지막 시도의
+    탈락만 남아 감사 추적이 끊긴다. 시도별 기록을 attempt 오름차순으로 쌓아둔다.
+
+    같은 attempt의 기존 기록은 버리고 새로 쓴다 — 체크포인트 재생으로 같은 시도가
+    두 번 실행돼도 기록이 중복되지 않아야 한다(재현성).
+    """
+    kept = [
+        record
+        for record in prior
+        if isinstance(record, dict) and record.get("attempt") != attempt
+    ]
+    return kept + current
+
+
 def _result_with_audit(
     *,
     run_config: dict,
     explanations: list[dict],
     citations: list[dict],
     citation_rejections: list[dict],
+    prior_rejections: list[dict],
     revision: int,
     prompts: dict[str, str],
     routes: list[dict],
@@ -787,7 +818,9 @@ def _result_with_audit(
         "citations": citations,
         # 순수 추가 — explanations 텍스트와 citations는 한 글자도 바뀌지 않는다.
         # 탈락 인용을 citations로 되살리면 judge 판정이 달라진다.
-        "citation_rejections": citation_rejections,
+        "citation_rejections": _accumulated_rejections(
+            prior_rejections, citation_rejections, attempt=revision + 1
+        ),
     }
 
 
@@ -799,6 +832,8 @@ def rag_cite(state: RiskState, *, llm=None, retriever=None) -> dict:
     metrics = state.get("metrics") or {}
     run_config = state.get("run_config") or {}
     revision = state.get("judge_retries", 0)  # judge 루프 재작성 횟수
+    # 앞선 재작성 시도의 탈락 기록 — 이번 시도분과 합쳐 감사 추적을 잇는다.
+    prior_rejections = state.get("citation_rejections") or []
     judge_feedback = state.get("judge_feedback") or ""
     ips = state.get("ips") or {}
     meta = metrics.get("meta") or {}
@@ -830,6 +865,7 @@ def rag_cite(state: RiskState, *, llm=None, retriever=None) -> dict:
                 explanations=explanations,
                 citations=[],
                 citation_rejections=[],
+                prior_rejections=prior_rejections,
                 revision=revision,
                 prompts=prompts,
                 routes=routes,
@@ -848,6 +884,7 @@ def rag_cite(state: RiskState, *, llm=None, retriever=None) -> dict:
                 explanations=explanations,
                 citations=[],
                 citation_rejections=[],
+                prior_rejections=prior_rejections,
                 revision=revision,
                 prompts=prompts,
                 routes=routes,
@@ -944,7 +981,13 @@ def rag_cite(state: RiskState, *, llm=None, retriever=None) -> dict:
                 rejected_citation["quote"],
             )
             all_rejections.append(
-                _rejection_record(rejected_citation, topic, candidates, chunk_by_id)
+                _rejection_record(
+                    rejected_citation,
+                    topic,
+                    candidates,
+                    chunk_by_id,
+                    attempt=revision + 1,
+                )
             )
 
     unique_verified: list[Citation] = []
@@ -960,6 +1003,7 @@ def rag_cite(state: RiskState, *, llm=None, retriever=None) -> dict:
         explanations=explanations,
         citations=[citation.to_dict() for citation in unique_verified],
         citation_rejections=all_rejections,
+        prior_rejections=prior_rejections,
         revision=revision,
         prompts=prompts,
         routes=routes,
