@@ -19,7 +19,7 @@ from typing import Any, TypedDict
 from app.judge.axes import AXIS_EN_TO_KO
 from app.utils.hashing import sha256_of_dict
 
-BUNDLE_SCHEMA_VERSION = "1.0"
+BUNDLE_SCHEMA_VERSION = "1.1"
 
 # --- 파일명 ---------------------------------------------------------------
 MANIFEST_FILENAME = "manifest.json"
@@ -143,7 +143,10 @@ CITATION_VERIFICATION_REQUIRED_KEYS = (
 MANUAL_REVIEW_GATE_KEYS = (
     "status",
     "trigger",
+    "policy_version",
     "trace_id",
+    "stopped_at",
+    "stopped_at_basis",
     "judge_passed",
     "judge_retries",
     "judge_max_retries",
