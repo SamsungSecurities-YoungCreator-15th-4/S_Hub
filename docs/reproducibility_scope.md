@@ -82,23 +82,28 @@
 - **B**: `--auto-approve` (실 Azure·실 RAG) — N=10
 - **C**: `--auto-approve --offline --force-judge-fail 3` (차단 경로) — N=5
 
-| 대상 | A (N=10) | B (N=10) | C (N=5) |
-| --- | --- | --- | --- |
-| `config_hash` · `computation_hash` · `approval_hash` | 동일 | 동일 | 동일 |
-| `metrics` 전체 | 차이 0건 | 차이 0건 | 차이 0건 |
-| `explanations` 전체 | 차이 0건 | 차이 0건 | 차이 0건 |
-| `prompt_hash.rag_cite` | 동일 | 동일 | 동일 |
-| **judge 6축 판정** | **10회 6/6 동일** | **10회 6/6 동일** | **5회 6/6 동일** |
-| `judge.passed` | 10회 True | 10회 True | 5회 False |
-| `report.status` · `finalized` · `export_allowed` | 동일 | 동일 | 동일 |
-| `manual_review_gate.decision_hash` | 해당 없음 | 해당 없음 | 5회 동일 |
-| `citations` 건수 | 20~30 (중앙값 22.5) | 19~23 (중앙값 19.5) | 19~28 (중앙값 20) |
-| `citations` chunk_id 집합·순서 | 상이 | 상이 | 상이 |
-| `judge.rubric.*.reason` | 상이 | 상이 | 상이 |
-| `prompt_hash.judge_eval` | 상이 | 상이 | 상이 |
-| `ips.Unique` 등 IPS 추출 산출물 | 동일 | **상이** | 동일 |
+각 행이 어느 선언에 속하는지 함께 적는다. 이 표는 측정값이고, 무엇을 보장으로
+내세우는지는 §2·§2.1·§3이 정한다.
 
-차이 건수는 leaf 경로 단위이며, 1회차와 갈린 적이 있는 경로의 **합집합**이다. A 760 · B 609 · C 570이고, 쌍별로는 A 291~594 · B 21~585 · C 178~362다. 분류하면 검색 결과 파생(A 735 · B 578 · C 544), LLM 산문(12·12·12), 시각·ID(13·13·14), IPS 추출 LLM(0·6·0)이다. 미분류 경로는 0건이다. **§2의 보장 대상에서는 어느 모드·어느 실행에서도 차이가 발생하지 않았다(불일치 0건).**
+| 대상 | 선언 | A (N=10) | B (N=10) | C (N=5) |
+| --- | --- | --- | --- | --- |
+| `config_hash` · `computation_hash` · `approval_hash` | §2 | 동일 | 동일 | 동일 |
+| `metrics` 전체 | §2 | 차이 0건 | 차이 0건 | 차이 0건 |
+| `explanations` 전체 | §2 | 차이 0건 | 차이 0건 | 차이 0건 |
+| `prompt_hash.rag_cite` | §2 | 동일 | 동일 | 동일 |
+| **judge 6축 판정** | §2.1 | **10회 6/6 동일** | **10회 6/6 동일** | **5회 6/6 동일** |
+| `judge.passed` | §2.1 | 10회 True | 10회 True | 5회 False |
+| `report.status` · `finalized` · `export_allowed` | §2.1 | 동일 | 동일 | 동일 |
+| `manual_review_gate.decision_hash` | §2.1 | 해당 없음 | 해당 없음 | 5회 동일 |
+| `citations` 건수 | §3 | 20~30 (중앙값 22.5) | 19~23 (중앙값 19.5) | 19~28 (중앙값 20) |
+| `citations` chunk_id 집합·순서 | §3 | 상이 | 상이 | 상이 |
+| `judge.rubric.*.reason` | §3 | 상이 | 상이 | 상이 |
+| `prompt_hash.judge_eval` | §3 | 상이 | 상이 | 상이 |
+| `ips.Unique` 등 IPS 추출 산출물 | **미선언** | 동일 | **상이** | 동일 |
+
+차이 건수는 leaf 경로 단위이며, 1회차와 갈린 적이 있는 경로의 **합집합**이다. A 760 · B 609 · C 570이고, 쌍별로는 A 291~594 · B 21~585 · C 178~362다. 분류하면 검색 결과 파생(A 735 · B 578 · C 544), LLM 산문(12·12·12), 시각·ID(13·13·14), IPS 추출 LLM(0·6·0)이다. 미분류 경로는 0건이다. **§2의 무조건 보장 대상과 §2.1의 조건부 대상 모두에서 어느 모드·어느 실행에서도 차이가 발생하지 않았다(불일치 0건).**
+
+`ips.Unique`는 §2에도 §3에도 없다. 모드 B에서 실행마다 문구가 갈리고 `ips_extraction_meta.extraction_hash`·`output_hash` 등 6개 경로가 함께 움직이는데, 보장 대상도 제외 대상도 아닌 상태다. 선언을 추가할지는 팀에서 정한다.
 
 실행 시간: A 평균 36.8초(34.8~39.8) · B 평균 32.4초(31.6~33.7) · C 평균 116.0초(74.2~131.4).
 
