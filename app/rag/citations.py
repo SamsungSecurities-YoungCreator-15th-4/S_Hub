@@ -52,7 +52,12 @@ def _source_name(value: object) -> str:
     return PurePosixPath(value.replace("\\", "/")).name.strip()
 
 
-def _chunk_source(chunk: dict) -> str:
+def chunk_source(chunk: dict) -> str:
+    """청크의 표시 문서명. `source`가 없으면 chunk_id 접두에서 되살린다.
+
+    공개 API다 — 탈락 인용 감사 기록(`app/nodes/rag_cite.py`)이 검증기와 **같은**
+    정규화를 써야 해서 노드에서 직접 호출한다. 재구현하면 기록과 판정이 어긋난다.
+    """
     source = _source_name(chunk.get("source"))
     if source:
         return source
@@ -62,7 +67,8 @@ def _chunk_source(chunk: dict) -> str:
     return _source_name(chunk_id.rsplit("::", 1)[0])
 
 
-def _locator_metadata(value: object) -> dict[str, str]:
+def locator_metadata(value: object) -> dict[str, str]:
+    """조항/절/항 표기만 정규화해 뽑는다. 공개 API — `chunk_source`와 같은 이유."""
     if not isinstance(value, dict):
         return {}
     return {
@@ -70,6 +76,11 @@ def _locator_metadata(value: object) -> dict[str, str]:
         for key in LOCATOR_KEYS
         if isinstance((raw := value.get(key)), str) and normalize_ws(raw)
     }
+
+
+# 모듈 내부 기존 호출부 호환용 별칭.
+_chunk_source = chunk_source
+_locator_metadata = locator_metadata
 
 
 def _citation_provenance(citation: Citation, chunk: dict) -> dict:

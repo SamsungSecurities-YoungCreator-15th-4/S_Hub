@@ -125,6 +125,9 @@ def serialize_state(state: dict) -> dict:
     """state를 JSON 안전한 dict로 바꾸고 `_serialization_notes`를 덧붙인다."""
     notes: list[dict] = []
     converted = _convert(dict(state), "state", notes)
+    # 리스트는 sort_keys=True로도 정렬되지 않는다. 순회 순서에 기대면 내용이 같아도
+    # dict 삽입 순서가 달라질 때 덤프 바이트가 흔들려 재현 대조가 무의미해진다.
+    notes.sort(key=lambda note: (note["path"], note["converted_to"]))
     converted[SERIALIZATION_NOTES_KEY] = {
         "converted": bool(notes),
         "conversions": notes,

@@ -26,8 +26,8 @@ from app.llm.audit import with_llm_audit
 from app.observability.langsmith import annotate_current_run
 from app.rag.citations import (
     Citation,
-    _chunk_source,
-    _locator_metadata,
+    chunk_source,
+    locator_metadata,
     normalize_ws,
     verify_citations,
 )
@@ -708,10 +708,11 @@ def _rejection_record(
         ),
         None,
     )
-    cited_locator = _locator_metadata(candidate.extra if candidate else None)
+    cited_locator = locator_metadata(candidate.extra if candidate else None)
     chunk = chunk_by_id.get(chunk_id) or {}
     chunk_text = chunk.get("text")
     normalized_chunk = normalize_ws(chunk_text) if isinstance(chunk_text, str) else ""
+    normalized_quote = normalize_ws(quote)
     return {
         "topic": topic,
         "chunk_id": chunk_id,
@@ -723,10 +724,13 @@ def _rejection_record(
         # 원문이 실제로 무엇이었는지 — 표기와 대조한 결과
         "original_comparison": {
             "chunk_found": bool(chunk),
-            "chunk_source": _chunk_source(chunk) if chunk else None,
-            "chunk_locator": _locator_metadata(chunk),
-            "quote_found_in_chunk": bool(normalized_chunk)
-            and normalize_ws(quote) in normalized_chunk,
+            "chunk_source": chunk_source(chunk) if chunk else None,
+            "chunk_locator": locator_metadata(chunk),
+            # 빈 인용문은 원문 대조가 성립하지 않는다. `"" in text`가 True라서
+            # 그대로 두면 "빈 인용문" 탈락 사유와 대조 결과가 서로 모순된다.
+            "quote_found_in_chunk": bool(normalized_quote)
+            and bool(normalized_chunk)
+            and normalized_quote in normalized_chunk,
         },
     }
 

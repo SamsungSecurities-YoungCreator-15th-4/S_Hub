@@ -72,8 +72,11 @@ def generate_evidence_bundle(final: dict, root: Path) -> Path:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from make_evidence_bundle import make_bundle
 
-    generated_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    run_id = allocate_run_id(root, datetime.now(timezone.utc).strftime("%Y%m%d"))
+    # 한 번만 읽는다. 두 번 호출하면 자정 경계에서 generated_at과 run_id의
+    # 날짜가 갈린다(generated_at=08-01인데 run_id는 …20260731).
+    now = datetime.now(timezone.utc)
+    generated_at = now.isoformat(timespec="seconds")
+    run_id = allocate_run_id(root, now.strftime("%Y%m%d"))
     out_dir = make_bundle(final, root / run_id, run_id=run_id, generated_at=generated_at)
 
     from app.evidence.schema import BUNDLE_FILENAMES

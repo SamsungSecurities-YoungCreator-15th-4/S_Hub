@@ -124,6 +124,22 @@ def test_set_is_sorted_so_dump_is_deterministic():
     assert first == second
 
 
+def test_serialization_notes_are_sorted_by_path():
+    """conversions는 리스트라 sort_keys로 정렬되지 않는다 — 직접 정렬해야 한다.
+
+    내용이 같은데 dict 삽입 순서만 다른 두 state의 덤프가 바이트까지 같아야 한다.
+    """
+    from decimal import Decimal
+
+    value = {"z": Decimal("1"), "a": Decimal("2"), "m": Decimal("3")}
+    first = dumps_state(value)
+    second = dumps_state({"m": Decimal("3"), "z": Decimal("1"), "a": Decimal("2")})
+    assert first == second
+
+    paths = [c["path"] for c in serialize_state(value)[SERIALIZATION_NOTES_KEY]["conversions"]]
+    assert paths == sorted(paths)
+
+
 def test_unknown_type_is_marked_not_silently_stringified():
     class Opaque:
         def __repr__(self) -> str:
@@ -232,6 +248,23 @@ def test_rejected_citation_flows_from_node_to_bundle(tmp_path: Path):
     assert first["original_comparison"]["quote_found_in_chunk"] is False
 
 
+def test_empty_quote_is_not_reported_as_found_in_chunk():
+    """빈 인용문은 원문 대조가 성립하지 않는다.
+
+    `"" in text`가 True라, 그대로 두면 탈락 사유 '빈 인용문'과
+    `quote_found_in_chunk: true`가 동시에 기록돼 감사 기록이 자기모순이 된다.
+    """
+    from app.nodes.rag_cite import _rejection_record
+
+    record = _rejection_record(
+        {"chunk_id": "c1", "quote": "   ", "source": "문서(가상)", "reason": "빈 인용문"},
+        "VaR 해석",
+        [],
+        {"c1": {"chunk_id": "c1", "text": "실제 원문", "source": "문서(가상)"}},
+    )
+    assert record["original_comparison"]["quote_found_in_chunk"] is False
+
+
 def test_rag_cite_records_rejection_shape():
     """rag_cite의 탈락 기록이 계약대로 6개 필드를 담는지 — 노드 헬퍼 직접 검사."""
     from app.nodes.rag_cite import _rejection_record
@@ -286,7 +319,15 @@ def test_run_id_does_not_overwrite_existing_bundle(tmp_path: Path):
 # ---------------------------------------------------------------------------
 @pytest.fixture(scope="module")
 def normal_run(tmp_path_factory) -> tuple[Path, Path]:
-    """정상 경로 1회 실행 결과를 여러 검사가 공유한다 (그래프 실행이 비싸다)."""
+    """`--auto-approve --offline` 1회 실행 결과를 여러 검사가 공유한다 (실행이 비싸다).
+
+    ⚠️ 이 실행의 judge 통과 여부는 **환경에 따라 달라진다.** `--offline`은 시장
+    데이터와 IPS 추출만 스텁으로 바꾸고 RAG·judge LLM은 실제로 호출한다. Azure 키가
+    없는 CI에서는 인용 0건이 되어 `source_validity`·`hallucination`·`false_precision`이
+    떨어지고 정상적으로 차단된다. 따라서 pass/fail 결과를 단정하면 안 되고,
+    **환경과 무관하게 성립하는 것**(번들이 나오는가, 기록이 자기모순 없는가)만 본다.
+    확정 경로의 결과 단정은 강제 차단 테스트가 결정론적으로 담당한다.
+    """
     workdir = tmp_path_factory.mktemp("normal")
     out_root, state_path = workdir / "evidence", workdir / "state.json"
     result = _run_cli(
@@ -298,14 +339,32 @@ def normal_run(tmp_path_factory) -> tuple[Path, Path]:
     return _only_bundle_dir(out_root), state_path
 
 
-def test_cli_normal_path_generates_full_bundle(normal_run):
+def test_cli_generates_full_bundle_in_one_command(normal_run):
+    """명령 한 번으로 규정 파일이 전부 나오는가 — R4 DoD의 핵심."""
     bundle, _ = normal_run
     missing = [name for name in BUNDLE_FILENAMES if not (bundle / name).is_file()]
     assert not missing, f"규정 파일 누락: {missing}"
 
+
+def test_cli_hard_stop_record_is_self_consistent(normal_run):
+    """차단 여부가 어느 쪽이든 확정·제공 허용 필드가 함께 움직여야 한다.
+
+    judge 통과 여부는 환경에 좌우되지만, "차단인데 확정됨" 같은 조합은 어느
+    환경에서도 나오면 안 된다. 이게 hard stop 계약의 실질이다.
+    """
+    bundle, _ = normal_run
     hard_stop = json.loads((bundle / HARD_STOP_RECORD_FILENAME).read_text(encoding="utf-8"))
-    assert hard_stop["blocked"] is False
-    assert hard_stop["report_finalized"] is True
+    blocked = hard_stop["blocked"]
+    assert isinstance(blocked, bool)
+    if blocked:
+        assert hard_stop["report_finalized"] is False
+        assert hard_stop["export_allowed"] is False
+        assert hard_stop["manual_review_required"] is True
+        assert hard_stop["report_status"] == "pending_manual_review"
+    else:
+        assert hard_stop["report_finalized"] is True
+        assert hard_stop["export_allowed"] is True
+        assert hard_stop["report_status"] == "confirmed"
 
 
 def test_cli_manifest_records_generator_and_git_sha(normal_run):
