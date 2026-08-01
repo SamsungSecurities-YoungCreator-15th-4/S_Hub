@@ -11,3 +11,7 @@ Judge 실행 전용 입력입니다. R2 실행 담당자는 원본 정답 사례
 
 `manifest.json`의 사례별 SHA-256은 frontmatter를 제외한 본문 해시이며,
 `goldenset/case_hashes.json`의 R1 동결 해시와 일치해야 합니다.
+
+`input_set_hash`는 **사람 라벨을 포함하지 않은 20건 본문 집합의 해시**입니다.
+`app/evidence/schema.py`의 공식 `evalset_hash`와 다릅니다. 공식 값은 사례 본문과
+사람 라벨을 함께 고정하므로 calibration summary에는 반드시 그 값을 사용합니다.

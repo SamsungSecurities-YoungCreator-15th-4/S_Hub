@@ -6,6 +6,7 @@ import importlib.util
 import json
 from pathlib import Path
 
+import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -56,6 +57,24 @@ def test_sanitize_case_uses_allowlist_and_preserves_body(tmp_path):
     assert clean.endswith(body)
 
 
+@pytest.mark.parametrize(
+    "body",
+    (
+        "# 문제 본문\n\nlabel: pass\n",
+        "# 문제 본문\n\n## 정답\n통과입니다.\n",
+        "# 문제 본문\n\n## 최종 판정\n문제없음\n",
+        "# 문제 본문\n\nFAIL\n",
+    ),
+)
+def test_sanitize_case_rejects_answer_markers_in_body(tmp_path, body):
+    tool = _load_tool()
+    source = tmp_path / "case_001.md"
+    raw = f"---\nid: case_001\n---\n{body}"
+
+    with pytest.raises(ValueError, match="본문에 정답성 표기"):
+        tool.sanitize_case(raw, source=source)
+
+
 def test_committed_judge_inputs_match_generator():
     tool = _load_tool()
     problems = tool.check_outputs(tool.build_outputs())
@@ -70,8 +89,39 @@ def test_judge_inputs_contain_20_cases_without_answer_metadata():
     for path in files:
         metadata = _frontmatter(path.read_text(encoding="utf-8"))
         assert set(metadata) <= set(tool.ALLOWED_FRONTMATTER_FIELDS)
-        assert not set(metadata) & set(tool.ANSWER_FIELDS)
         assert metadata["id"] == path.stem
+
+
+def test_check_rejects_every_unexpected_directory_entry(monkeypatch, tmp_path):
+    tool = _load_tool()
+    monkeypatch.setattr(tool, "OUTPUT_DIR", tmp_path)
+    outputs = {
+        tmp_path / "README.md": "readme",
+        tmp_path / "manifest.json": "{}\n",
+        tmp_path / "case_001.md": "case",
+    }
+    for path, content in outputs.items():
+        path.write_text(content, encoding="utf-8")
+    (tmp_path / "answer_sheet_leak.md").write_text("leak", encoding="utf-8")
+    (tmp_path / "nested_leak").mkdir()
+
+    problems = tool.check_outputs(outputs)
+
+    assert "허용되지 않은 항목: judge_inputs/answer_sheet_leak.md" in problems
+    assert "허용되지 않은 항목: judge_inputs/nested_leak" in problems
+
+
+def test_write_rejects_unexpected_entry_with_recovery_instruction(
+    monkeypatch,
+    tmp_path,
+):
+    tool = _load_tool()
+    monkeypatch.setattr(tool, "OUTPUT_DIR", tmp_path)
+    outputs = {tmp_path / "README.md": "readme"}
+    (tmp_path / "answer_sheet_leak.md").write_text("leak", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="직접 제거한 뒤 다시 실행"):
+        tool.write_outputs(outputs)
 
 
 def test_manifest_hashes_match_frozen_r1_case_hashes():
@@ -86,4 +136,5 @@ def test_manifest_hashes_match_frozen_r1_case_hashes():
     assert {
         case["id"]: case["case_content_sha256"] for case in manifest["cases"]
     } == frozen
-    assert len(manifest["evalset_hash"]) == 64
+    assert len(manifest["input_set_hash"]) == 64
+    assert "evalset_hash" not in manifest

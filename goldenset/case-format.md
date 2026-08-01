@@ -59,7 +59,7 @@ v1과 v2가 같은 조건이었음을 감사에서 증명해야 합니다.
 |---|---|
 | `freeze_commit` | `git rev-parse v1-freeze^{commit}` |
 | `case_content_sha256` | `goldenset/case_hashes.json` (사례별) |
-| `evalset_hash` | 20건 해시의 집합 해시 |
+| `input_set_hash` | 사람 라벨을 제외한 20건 본문 해시의 집합 해시. 공식 `evalset_hash`와 다름 |
 | `executed_at` | 실행 시각 (UTC) |
 | `langsmith_run` | LangSmith run id |
 

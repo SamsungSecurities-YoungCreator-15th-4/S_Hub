@@ -40,6 +40,28 @@ ANSWER_FIELDS = (
     "initial_agreement",
     "labeling_method",
 )
+BODY_ANSWER_PATTERNS = (
+    (
+        re.compile(
+            r"^\s*(?:label|fail_axes|trap_type|rationale|labelers|"
+            r"initial_agreement|labeling_method)\s*:",
+            re.IGNORECASE | re.MULTILINE,
+        ),
+        "정답 키 YAML 표기",
+    ),
+    (
+        re.compile(r"정답|오답|gold[_ -]?label|함정", re.IGNORECASE),
+        "정답·오답·Gold Label·함정 표기",
+    ),
+    (
+        re.compile(r"^#{1,6}\s+.*(?:판정|채점|라벨)", re.MULTILINE),
+        "판정·채점·라벨 제목",
+    ),
+    (
+        re.compile(r"\b(?:pass|fail)\b", re.IGNORECASE),
+        "PASS/FAIL 표기",
+    ),
+)
 FRONTMATTER_RE = re.compile(
     r"\A---\r?\n(?P<frontmatter>.*?)\r?\n---\r?\n(?P<body>.*)\Z",
     re.DOTALL,
@@ -58,6 +80,10 @@ Judge 실행 전용 입력입니다. R2 실행 담당자는 원본 정답 사례
 
 `manifest.json`의 사례별 SHA-256은 frontmatter를 제외한 본문 해시이며,
 `goldenset/case_hashes.json`의 R1 동결 해시와 일치해야 합니다.
+
+`input_set_hash`는 **사람 라벨을 포함하지 않은 20건 본문 집합의 해시**입니다.
+`app/evidence/schema.py`의 공식 `evalset_hash`와 다릅니다. 공식 값은 사례 본문과
+사람 라벨을 함께 고정하므로 calibration summary에는 반드시 그 값을 사용합니다.
 """
 
 
@@ -77,6 +103,14 @@ def _body_hash(body: str) -> str:
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
 
 
+def _validate_body_has_no_answers(body: str, *, source: Path) -> None:
+    leaked = [description for pattern, description in BODY_ANSWER_PATTERNS if pattern.search(body)]
+    if leaked:
+        raise ValueError(
+            f"{source}: 사례 본문에 정답성 표기가 있습니다: {', '.join(leaked)}"
+        )
+
+
 def sanitize_case(text: str, *, source: Path) -> tuple[str, str, str]:
     """정답 메타데이터를 제거하고 ``(id, 본문 해시, 출력문)``을 반환한다."""
     metadata, body = _split_case(text, source=source)
@@ -85,6 +119,7 @@ def sanitize_case(text: str, *, source: Path) -> tuple[str, str, str]:
         raise ValueError(f"{source}: 비어 있지 않은 id가 필요합니다.")
     if case_id != source.stem:
         raise ValueError(f"{source}: id({case_id})와 파일명({source.stem})이 다릅니다.")
+    _validate_body_has_no_answers(body, source=source)
 
     clean_metadata = {
         key: metadata[key]
@@ -148,24 +183,24 @@ def build_outputs() -> dict[Path, str]:
             }
         )
 
-    evalset_payload = [
+    input_set_payload = [
         {"id": case["id"], "case_content_sha256": case["case_content_sha256"]}
         for case in cases
     ]
-    evalset_hash = hashlib.sha256(
+    input_set_hash = hashlib.sha256(
         json.dumps(
-            evalset_payload,
+            input_set_payload,
             ensure_ascii=False,
             sort_keys=True,
             separators=(",", ":"),
         ).encode("utf-8")
     ).hexdigest()
     manifest = {
-        "schema_version": "2026-08-02.v1",
+        "schema_version": "2026-08-02.v2",
         "case_count": len(cases),
         "allowed_frontmatter_fields": list(ALLOWED_FRONTMATTER_FIELDS),
         "answer_fields_removed": list(ANSWER_FIELDS),
-        "evalset_hash": evalset_hash,
+        "input_set_hash": input_set_hash,
         "cases": cases,
     }
     outputs[OUTPUT_DIR / "manifest.json"] = (
@@ -174,16 +209,21 @@ def build_outputs() -> dict[Path, str]:
     return outputs
 
 
+def _unexpected_output_entries(outputs: dict[Path, str]) -> list[str]:
+    if not OUTPUT_DIR.exists():
+        return []
+    allowed_names = {path.name for path in outputs}
+    return sorted(path.name for path in OUTPUT_DIR.iterdir() if path.name not in allowed_names)
+
+
 def write_outputs(outputs: dict[Path, str]) -> None:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    expected_cases = {path.name for path in outputs if path.match("case_*.md")}
-    stale_cases = {
-        path.name for path in OUTPUT_DIR.glob("case_*.md")
-    } - expected_cases
-    if stale_cases:
+    unexpected = _unexpected_output_entries(outputs)
+    if unexpected:
         raise ValueError(
-            "자동 삭제하지 않은 오래된 입력 파일이 있습니다: "
-            + ", ".join(sorted(stale_cases))
+            "허용되지 않은 입력 디렉터리 항목이 있습니다: "
+            + ", ".join(unexpected)
+            + ". 해당 항목을 직접 제거한 뒤 다시 실행하세요."
         )
     for path, content in outputs.items():
         path.write_text(content, encoding="utf-8")
@@ -197,10 +237,8 @@ def check_outputs(outputs: dict[Path, str]) -> list[str]:
         elif path.read_text(encoding="utf-8") != expected:
             problems.append(f"불일치: {path.relative_to(ROOT)}")
 
-    expected_cases = {path.name for path in outputs if path.match("case_*.md")}
-    actual_cases = {path.name for path in OUTPUT_DIR.glob("case_*.md")}
-    for filename in sorted(actual_cases - expected_cases):
-        problems.append(f"예상하지 않은 파일: judge_inputs/{filename}")
+    for name in _unexpected_output_entries(outputs):
+        problems.append(f"허용되지 않은 항목: judge_inputs/{name}")
     return problems
 
 
