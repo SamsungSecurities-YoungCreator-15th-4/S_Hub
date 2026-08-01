@@ -78,22 +78,17 @@ def locator_metadata(value: object) -> dict[str, str]:
     }
 
 
-# 모듈 내부 기존 호출부 호환용 별칭.
-_chunk_source = chunk_source
-_locator_metadata = locator_metadata
-
-
 def _citation_provenance(citation: Citation, chunk: dict) -> dict:
     """검색 원문과 검증된 인용의 결정론적 감사 지문을 만든다."""
     chunk_text = chunk.get("text")
     normalized_chunk_text = chunk_text if isinstance(chunk_text, str) else ""
     return {
-        "source": _chunk_source(chunk),
+        "source": chunk_source(chunk),
         "chunk_id": citation.chunk_id,
         "claim": citation.claim,
         "quote_sha256": _sha256_text(citation.quote),
         "chunk_text_sha256": _sha256_text(normalized_chunk_text),
-        "locator": _locator_metadata(chunk),
+        "locator": locator_metadata(chunk),
     }
 
 
@@ -162,8 +157,8 @@ def citation_contract_issues(
         ):
             issues.append("원문 청크 provenance 지문 불일치")
 
-        expected_locator = _locator_metadata(provenance.get("locator"))
-        cited_locator = _locator_metadata(citation) or _locator_metadata(extra)
+        expected_locator = locator_metadata(provenance.get("locator"))
+        cited_locator = locator_metadata(citation) or locator_metadata(extra)
         if expected_locator and not cited_locator:
             issues.append("문서 조항/절/항 표기 누락")
         elif cited_locator and cited_locator != expected_locator:
@@ -213,10 +208,10 @@ def verify_citations(
             reason = f"존재하지 않는 chunk_id: {cit.chunk_id}"
         else:
             chunk = chunk_by_id[cit.chunk_id]
-            expected_source = _chunk_source(chunk)
+            expected_source = chunk_source(chunk)
             cited_source = _source_name(cit.source)
-            cited_locator = _locator_metadata(cit.extra)
-            expected_locator = _locator_metadata(chunk)
+            cited_locator = locator_metadata(cit.extra)
+            expected_locator = locator_metadata(chunk)
 
         if reason is None and expected_source and cited_source != expected_source:
             reason = (
