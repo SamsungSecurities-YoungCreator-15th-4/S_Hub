@@ -354,7 +354,7 @@ def false_precision(explanations: list, llm) -> tuple[bool, str]:
             "파라미터이므로 fail하지 않는다. 표에 기재된 정밀한 소수점 수치는 원본 "
             "기록이므로 그 자체로 fail하지 않으나, 불확실성 표기 요건은 별도로 "
             "충족해야 한다. 스트레스 손익처럼 \"(가상 설정)\" 표기가 있는 가정값, "
-            "불확실성 문구만 있고 CI 수치가 없는 경우, VaR·CVaR 중 한쪽 지표에서만 "
+            "불확실성 문구만 있고 CI 수치가 없는 경우, VaR과 CVaR 중 한쪽에만 "
             "신뢰구간을 제시한 경우는 이 규칙만으로 fail하지 않는다."
         ),
         payload={"explanations": _explanation_text(explanations)},
