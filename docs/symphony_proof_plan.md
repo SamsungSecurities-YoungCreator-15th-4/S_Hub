@@ -154,7 +154,7 @@ mode는 `dev_mock`·`offline_rehearsal`·`official`·`official_code_change`·
 
 **judge 개선 — 범위를 먼저 정해야 한다**
 
-judge 프롬프트는 `rubric.py:290`에 문자열로 박혀 있다 → `app/judge/prompts/v1.py`·`v2.py`로 분리하고 `--prompt-version`으로 선택.
+judge 프롬프트는 `rubric.py:306`에 문자열로 박혀 있다 → `app/judge/prompts/v1.py`·`v2.py`로 분리하고 `--prompt-version`으로 선택.
 
 단, 우리 6축 중 **결정론 4축은 프롬프트가 아니라 코드**다(LLM은 환각·위조정밀도 2축뿐). 캘리브레이션에서 나올 미탐 중 상당수는 프롬프트만 고쳐서는 안 잡힌다. 예를 들어 `PROHIBITED_TERMS`에 과제가 지목한 '최적'이 없고, `source_validity`는 `verified=True`가 1건이라도 있으면 통과시킨다.
 
@@ -377,7 +377,7 @@ LLM 2축이 유일한 약점이다. **재현 데모는 `--offline` 또는 캐시
 | 6축 루브릭 · `AXIS_NAMES` | `app/judge/rubric.py:12` |
 | 금지어 목록 (R2 개선 후보) | `app/judge/rubric.py:21` |
 | `source_validity` (R2 개선 후보) | `app/judge/rubric.py:65` |
-| judge LLM 프롬프트 (v1/v2 분리) | `app/judge/rubric.py:290` |
+| judge LLM 프롬프트 (v1/v2 분리) | `app/judge/rubric.py:306` |
 | Hard Stop 라우팅 | `app/graph.py:30` (`route_after_judge`) |
 | 재시도 상한 SSOT | `config/config.yaml: judge_max_retries` · `app/nodes/judge_eval.py: resolve_max_judge_retries()` |
 | 미확정 상태·차단 기록 | `app/nodes/manual_review_gate.py` |
