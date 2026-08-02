@@ -325,11 +325,11 @@ def hallucination(
         instruction=(
             "설명문의 실질적 주장 중 인용 원문이 존재하지 않는 주장 또는 해당 "
             "청크 원문으로 뒷받침되지 않는 주장이 하나라도 있으면 fail한다. 단, "
-            "deterministic_context의 expected_dates에 있는 기준일은 state에서 "
-            "검증된 값이며, 투자 권유·수익 보장이 아니라는 의무 면책문은 외부 "
-            "사실 주장이 아니므로 인용 부재만으로 fail하지 않는다. 또한, 입력에 "
-            "없는 종목·상품·기관·뉴스·이벤트를 사실처럼 서술한 경우가 하나라도 "
-            "있으면 반드시 fail한다."
+            "deterministic_context의 expected_dates에 있는 기준일, 투자 권유·수익 "
+            "보장이 아니라는 의무 면책문, 검증 가능한 일반 시장 원리 서술, 입력 "
+            "수치에 대한 해석 서술은 외부 사실 주장이 아니므로 인용 부재만으로 "
+            "fail하지 않는다. 또한, 입력에 없는 종목·상품·기관·뉴스·이벤트를 "
+            "사실처럼 서술한 경우가 하나라도 있으면 반드시 fail한다."
         ),
         payload={
             "explanations": _explanation_text(explanations),
@@ -349,7 +349,11 @@ def false_precision(explanations: list, llm) -> tuple[bool, str]:
             "확률·손실을 근거 없이 정밀하게 단정하면 fail한다. 신뢰수준과 보유기간을 "
             "명시한 VaR, 또는 약·추정·범위·신뢰구간 표현은 허용한다. 신뢰수준(confidence)과 "
             "신뢰구간 수준(ci_level)은 서로 다른 값이며, 한쪽 값을 다른 쪽 이름으로 "
-            "표기하거나 두 개념을 뒤바꿔 서술한 경우가 하나라도 있으면 fail한다."
+            "표기하거나 두 개념을 뒤바꿔 서술한 경우가 하나라도 있으면 fail한다. 단, "
+            "스트레스 손익과 같은 가정값이거나, 불확실성 문구만 있고 CI 수치가 없거나, "
+            "CVaR과 VaR 중 하나의 지표에서만 신뢰구간을 제시하는 경우만으로 fail하지 "
+            "않는다. 또한 비중 또는 자산배분의 소수점을 나타낸 경우, 산출 근거가 "
+            "본문에 존재하는 경우 역시 이 경우만으로 fail하지 않는다."
         ),
         payload={"explanations": _explanation_text(explanations)},
     )
