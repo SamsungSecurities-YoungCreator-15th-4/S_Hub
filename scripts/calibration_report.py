@@ -89,7 +89,9 @@ def _print_overall(records: list[CalibrationRecord], *, title: str) -> None:
     overall = calculate_overall_metrics(records)
     matrix = build_confusion_matrix(records)
     print(f"\n=== {title}: 전체 일치율 ===")
-    print(f"  총 {overall.total}건 | 일치 {overall.match}건 | 일치율 {overall.match_rate:.1%}")
+    # 일치율은 분수로 쓴다. 20건 표본에서 1건은 5%p를 움직이므로 `85.0%` 같은
+    # 백분율 소수점은 없는 정밀도를 만든다 — labeling-guide.md §3.
+    print(f"  총 {overall.total}건 | 일치 {overall.match}건 | 일치율 {overall.match}/{overall.total}")
     print(f"  결함 놓침(FN, 사람 fail→judge pass): {overall.false_negative}건")
     print(f"  과잉 차단(FP, 사람 pass→judge fail): {overall.false_positive}건")
     print("  혼동행렬 (행=사람, 열=judge):")
@@ -100,10 +102,15 @@ def _print_overall(records: list[CalibrationRecord], *, title: str) -> None:
     print(f"\n=== {title}: 6축별 일치율 ===")
     axis_metrics = calculate_axis_metrics(records)
     for axis, metrics in axis_metrics.items():
-        recall = "N/A" if metrics.defect_recall is None else f"{metrics.defect_recall:.1%}"
+        # recall도 분수로 — 분모(결함사례 수)가 보여야 "0/1"과 "0/10"을 구분한다.
+        recall = (
+            "N/A"
+            if metrics.defect_recall is None
+            else f"{metrics.true_positive}/{metrics.human_fail_support}"
+        )
         print(
-            f"  {metrics.axis_ko:10} 일치율 {metrics.match_rate:6.1%}  "
-            f"결함탐지율(recall) {recall:>6}  (결함사례 {metrics.human_fail_support}건)"
+            f"  {metrics.axis_ko:10} 일치율 {f'{metrics.match}/{metrics.total}':>7}  "
+            f"결함탐지율(recall) {recall:>7}"
         )
 
 
@@ -126,8 +133,10 @@ def _print_mismatches(records: list[CalibrationRecord], *, title: str) -> None:
 
 def _print_version_comparison(comparison) -> None:
     print("\n=== v1 → v2 비교 ===")
-    print(f"  일치율: {comparison.before.match_rate:.1%} → {comparison.after.match_rate:.1%} "
-          f"(Δ {comparison.match_rate_delta:+.1%})")
+    # Δ도 건수로 — "+5.0%"는 20건에서 "+1건"이라는 사실을 가린다.
+    match_delta = comparison.after.match - comparison.before.match
+    print(f"  일치율: {comparison.before.match}/{comparison.before.total} → "
+          f"{comparison.after.match}/{comparison.after.total} (Δ {match_delta:+d}건)")
     print(f"  FN(결함 놓침): {comparison.before.false_negative} → {comparison.after.false_negative} "
           f"(Δ {comparison.false_negative_delta:+d})")
     print(f"  FP(과잉 차단): {comparison.before.false_positive} → {comparison.after.false_positive} "
@@ -135,11 +144,11 @@ def _print_version_comparison(comparison) -> None:
     print(f"  code_sha: {comparison.before_code_sha[:12]} → {comparison.after_code_sha[:12]}")
     print("  6축별 결함탐지율(recall) 변화:")
     for axis in comparison.axis_before:
-        before_r = comparison.axis_before[axis].defect_recall
-        after_r = comparison.axis_after[axis].defect_recall
-        before_s = "N/A" if before_r is None else f"{before_r:.1%}"
-        after_s = "N/A" if after_r is None else f"{after_r:.1%}"
-        print(f"    {comparison.axis_before[axis].axis_ko:10} {before_s:>6} → {after_s:>6}")
+        b, a = comparison.axis_before[axis], comparison.axis_after[axis]
+        # 여기도 분수 — 결함사례가 1~3건인 축이라 백분율은 0%/100% 사이를 널뛴다.
+        before_s = "N/A" if b.defect_recall is None else f"{b.true_positive}/{b.human_fail_support}"
+        after_s = "N/A" if a.defect_recall is None else f"{a.true_positive}/{a.human_fail_support}"
+        print(f"    {b.axis_ko:10} {before_s:>7} → {after_s:>7}")
 
 
 def _to_jsonable(records: list[CalibrationRecord]) -> list[dict]:
