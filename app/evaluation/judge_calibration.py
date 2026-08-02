@@ -331,9 +331,12 @@ def compare_versions(
             f"v2에만 있음: {sorted(after_ids - before_ids)}"
         )
     _assert_same_evaluation_target(before_records, after_records)
-    # 지연 import — app/evidence/schema.py는 calibration 집계를 부를 때 이 모듈을
-    # 함수 안에서 import한다. 여기서 모듈 최상단에 걸면 두 모듈이 서로를 최상단에서
-    # 부르는 순간 순환 import가 된다.
+    # 지연 import. **지금 최상단에 걸어도 순환은 생기지 않는다** — app/evidence/
+    # schema.py가 이 모듈을 함수 안에서만 부르고(calibration_summary), 그 최상단
+    # import(app.judge.axes·app.utils.hashing)에도 여기로 돌아오는 경로가 없다.
+    # 그럼에도 함수 안에 두는 이유는 그 사정에 기대지 않기 위해서다: schema.py가
+    # 이 모듈을 최상단에서 부르도록 바뀌는 순간 순환이 되는데, 그 변경은 이 파일을
+    # 보지 않고 일어난다. 양쪽 모두 함수 안에서 부르면 그 결합이 애초에 안 생긴다.
     from app.evidence.schema import evalset_hash  # noqa: PLC0415
 
     before = calculate_overall_metrics(before_records)
