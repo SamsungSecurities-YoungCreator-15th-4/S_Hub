@@ -787,6 +787,49 @@ class TestCompareVersions:
         assert comparison.before_code_sha == "deadbeef"
         assert comparison.after_code_sha == "cafef00d"
 
+    def test_evalset_hash_is_carried_and_matches_both_sides(self, records_v1):
+        """비교가 '같은 시험지·같은 정답지'에서 나왔음을 값으로 증명한다.
+
+        code_sha는 무엇으로 쟀는지만 말한다. 이 값이 없으면 일치율 변화를 judge
+        개선으로 귀속할 수 없다.
+        """
+        from app.evidence.schema import evalset_hash
+
+        judge_v2 = [
+            _judge("case_001", True, prompt_version="v2"),
+            _judge("case_002", True, prompt_version="v2"),
+            _judge("case_003", False, ("disclaimer",), prompt_version="v2"),
+            _judge("case_004", False, ("numeric_consistency",), prompt_version="v2"),
+        ]
+        records_v2 = merge_records(HUMAN_LABELS_V1, judge_v2)
+
+        comparison = compare_versions(records_v1, records_v2)
+
+        # 한 값이 v1·v2 양쪽의 해시와 모두 같아야 "같은 평가셋"이 증명된다.
+        assert comparison.evalset_hash == evalset_hash(records_v1)
+        assert comparison.evalset_hash == evalset_hash(records_v2)
+
+    def test_different_evalset_never_reaches_comparison(self, records_v1):
+        """v1·v2의 evalset_hash가 갈리는 입력은 비교 자체가 거부된다.
+
+        evalset_hash는 case_id·사례 본문·사람 라벨에서만 계산되고 그 셋은 전부
+        비교 전에 검사된다. 그래서 '해시가 다른 비교 결과'라는 산출물은 존재할 수
+        없다 — 폴백으로 통과시키지 않고 ValueError로 끊는다.
+        """
+        from app.evidence.schema import evalset_hash
+
+        judge_v2 = [
+            _judge("case_001", True, prompt_version="v2", case_content_seed="case_001-rewritten"),
+            _judge("case_002", True, prompt_version="v2"),
+            _judge("case_003", False, ("disclaimer",), prompt_version="v2"),
+            _judge("case_004", False, ("numeric_consistency",), prompt_version="v2"),
+        ]
+        records_v2 = merge_records(HUMAN_LABELS_V1, judge_v2)
+        assert evalset_hash(records_v1) != evalset_hash(records_v2)
+
+        with pytest.raises(ValueError):
+            compare_versions(records_v1, records_v2)
+
     def test_mismatched_case_ids_raise(self, records_v1):
         with pytest.raises(ValueError, match="동일 case_id"):
             compare_versions(records_v1, records_v1[:-1])

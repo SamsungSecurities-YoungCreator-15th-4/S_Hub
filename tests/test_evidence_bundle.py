@@ -672,6 +672,37 @@ def test_calibration_comparison_slot_is_filled_only_when_v2_exists(tmp_path):
     assert both["v1"]["prompt_version"] != both["v2"]["prompt_version"]
 
 
+def test_comparison_requires_evalset_hash():
+    """비교 계약에 evalset_hash가 있어야 '같은 사례·같은 라벨로 쟀다'가 증명된다.
+
+    code_sha 두 개는 '무엇으로 쟀는가'만 말한다. 이 키가 빠지면 감사에서 "일치율이
+    오른 게 judge가 좋아진 겁니까, 그 사이에 사례나 정답을 바꾼 겁니까"에 답할 수 없다.
+    """
+    assert "evalset_hash" in CALIBRATION_COMPARISON_REQUIRED_KEYS
+
+
+def test_calibration_comparison_without_evalset_hash_is_rejected(tmp_path):
+    """evalset_hash가 없는 비교는 빈칸으로 싣지 않고 통째로 '없음' 표기로 나간다.
+
+    부분 결과를 만들면 감사자가 "비교는 했는데 평가셋만 안 적었다"로 읽는다.
+    검증 실패를 통과로 만드는 폴백은 두지 않는다(fail-closed).
+    """
+    report = _calibration_report(with_v2=True)
+    del report["comparison"]["evalset_hash"]
+
+    payload = _read_json(
+        _build(tmp_path, _passing_state(), run_id="run-no-evalset", calibration=report),
+        CALIBRATION_FILENAME,
+    )
+
+    assert payload["comparison"]["available"] is False
+    # 어느 키가 빠졌는지 사유에 적는다 — "없음"만 적으면 원인을 못 찾는다.
+    assert "evalset_hash" in payload["comparison"]["note"]
+    # 다른 키는 그대로였으므로 v1·v2 수치 자체는 살아 있다 — 비교만 막힌다.
+    assert "available" not in payload["v1"]
+    assert payload["v1"]["derived"]["match_rate"] is not None
+
+
 def test_calibration_never_carries_human_rationale(tmp_path):
     """사람 라벨 원문은 번들에 실리지 않는다 — 답안지가 증거물로 새면 안 된다."""
     payload = _read_json(

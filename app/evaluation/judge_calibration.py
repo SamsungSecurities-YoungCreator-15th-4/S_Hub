@@ -198,6 +198,10 @@ class VersionComparison:
     axis_after: dict[str, AxisMetrics]
     before_code_sha: str
     after_code_sha: str
+    # 이 비교가 **어느 평가셋에서** 나왔는가. 사례 본문과 사람 라벨을 함께 해시한
+    # 값이라, code_sha가 증명하지 못하는 "같은 시험지·같은 정답지로 두 번 쟀다"를
+    # 못박는다. 값이 하나인 이유는 아래 compare_versions 주석 참조.
+    evalset_hash: str
 
 
 def _system_check_signature(record: CalibrationRecord) -> dict[str, tuple[bool, bool]]:
@@ -309,6 +313,14 @@ def compare_versions(
     통과시킨다. 이 사실이 docstring에만 있고 산출물에 없으면 증거를 검토하는
     사람이 v1·v2 코드가 달랐다는 것 자체를 알 수 없으므로, 두 code_sha를 결과에
     그대로 남긴다.
+
+    evalset_hash를 before/after 두 개가 아니라 **하나만** 싣는 이유: 이 함수는
+    case_id 집합 동일성을 확인한 뒤 _assert_same_evaluation_target()으로 사례
+    본문(case_content_sha256)과 사람 라벨이 v1·v2에서 같은지를 검사한다.
+    evalset_hash는 정확히 그 세 가지에서만 계산되므로, 아래 반환 지점에 도달했다면
+    두 값은 같을 수밖에 없다. 두 칸으로 실으면 "다를 수도 있는 값"으로 읽혀 검사가
+    이미 막았다는 사실이 가려진다. 다른 평가셋으로 비교하려는 시도는 반환까지
+    오지 못하고 위 검사에서 ValueError로 끊긴다.
     """
     before_ids = {record.case_id for record in before_records}
     after_ids = {record.case_id for record in after_records}
@@ -319,6 +331,14 @@ def compare_versions(
             f"v2에만 있음: {sorted(after_ids - before_ids)}"
         )
     _assert_same_evaluation_target(before_records, after_records)
+    # 지연 import. **지금 최상단에 걸어도 순환은 생기지 않는다** — app/evidence/
+    # schema.py가 이 모듈을 함수 안에서만 부르고(calibration_summary), 그 최상단
+    # import(app.judge.axes·app.utils.hashing)에도 여기로 돌아오는 경로가 없다.
+    # 그럼에도 함수 안에 두는 이유는 그 사정에 기대지 않기 위해서다: schema.py가
+    # 이 모듈을 최상단에서 부르도록 바뀌는 순간 순환이 되는데, 그 변경은 이 파일을
+    # 보지 않고 일어난다. 양쪽 모두 함수 안에서 부르면 그 결합이 애초에 안 생긴다.
+    from app.evidence.schema import evalset_hash  # noqa: PLC0415
+
     before = calculate_overall_metrics(before_records)
     after = calculate_overall_metrics(after_records)
     return VersionComparison(
@@ -331,6 +351,7 @@ def compare_versions(
         axis_after=calculate_axis_metrics(after_records),
         before_code_sha=before_records[0].code_sha,
         after_code_sha=after_records[0].code_sha,
+        evalset_hash=evalset_hash(before_records),
     )
 
 

@@ -314,6 +314,18 @@ CALIBRATION_COMPARISON_REQUIRED_KEYS = (
     "axis_after",
     "before_code_sha",
     "after_code_sha",
+    "evalset_hash",
+)
+
+#: evalset_hash가 비교에 필요한 이유 — `before_code_sha`·`after_code_sha`는
+#: "judge 코드가 v1에서 v2로 바뀌었다"를 증명하지만, **그 두 번을 같은 사례·같은
+#: 라벨로 쟀는지**는 증명하지 못한다. 그 값이 없으면 "일치율이 오른 게 judge가
+#: 좋아진 겁니까, 그 사이에 사례나 정답을 바꾼 겁니까"에 답할 수 없다.
+#: `evalset_hash()`는 사례 본문과 사람 라벨을 함께 해시하므로 둘 다 못박는다.
+CALIBRATION_COMPARISON_EVALSET_HASH_RATIONALE = (
+    "code_sha는 '무엇으로 쟀는가'만 증명한다. 같은 시험지·같은 정답지로 두 번을 "
+    "쟀다는 것은 evalset_hash가 증명한다 — 없으면 일치율 변화를 judge 개선으로 "
+    "귀속할 수 없다."
 )
 
 #: calibration 입력의 원본 경로. state가 아니라 `scripts/calibration_report.py --out`이
