@@ -24,6 +24,12 @@ app.evaluation.judge_calibration의 집계 함수를 실행해 콘솔 표 + (선
     - "official": --official (LangSmith 포함) 통과 — R2 공식 제출 요건 충족
     - "offline_rehearsal": --official --no-langsmith — 구조는 검증됐으나
       LangSmith 증거가 없어 공식 제출로 쓸 수 없음
+    - "official_code_change": --official --no-prompt-change-required — v2→v3처럼
+      프롬프트는 그대로 두고 결정론 규칙 코드만 고친 비교. 20건·1차 판정·run
+      일관성 등은 전부 검증되지만, "프롬프트만 바뀌었다"는 단일 변수 귀속
+      주장은 하지 않는다(대신 code_sha 변경으로 증명한다)
+    - "official_offline_code_change": 위 --no-langsmith와 --no-prompt-change-required가
+      동시에 적용된 경우
     - "dev_mock": --official 없음 — 개수·ID·run 일관성 등 아무 검증도 하지
       않은 개발용 실행. 절대 증거로 쓰지 않는다
 """
@@ -136,6 +142,8 @@ def _to_jsonable(records: list[CalibrationRecord]) -> list[dict]:
 def _resolve_mode(args: argparse.Namespace) -> str:
     if not args.official:
         return "dev_mock"
+    if args.no_prompt_change_required:
+        return "official_offline_code_change" if args.no_langsmith else "official_code_change"
     if args.no_langsmith:
         return "offline_rehearsal"
     return "official"
@@ -158,10 +166,21 @@ def main() -> None:
         action="store_true",
         help="--official과 함께 쓸 때 LangSmith run ID 필수 요건을 낮춘다(오프라인 리허설용).",
     )
+    parser.add_argument(
+        "--no-prompt-change-required",
+        action="store_true",
+        help=(
+            "--official과 함께 쓸 때 '두 버전의 prompt_hash가 달라야 한다'는 요건을 "
+            "code_sha 변경 요건으로 바꾼다(v2→v3처럼 프롬프트는 그대로 두고 결정론 "
+            "규칙 코드만 고친 비교용 — v1→v2 프롬프트 단독 비교에는 쓰지 않는다)."
+        ),
+    )
     parser.add_argument("--out", type=Path, help="리포트를 JSON으로도 저장할 경로(증거번들·서류철용).")
     args = parser.parse_args()
     if args.no_langsmith and not args.official:
         parser.error("--no-langsmith는 --official과 함께 써야 합니다(비공식 실행은 애초에 LangSmith를 요구하지 않습니다).")
+    if args.no_prompt_change_required and not args.official:
+        parser.error("--no-prompt-change-required는 --official과 함께 써야 합니다(비공식 실행은 이 요건 자체가 없습니다).")
 
     require_langsmith = not args.no_langsmith
     mode = _resolve_mode(args)
@@ -199,7 +218,12 @@ def main() -> None:
         _print_mismatches(records_v2, title="v2")
 
         if args.official:
-            comparison = compare_official_versions(records, records_v2, require_langsmith=require_langsmith)
+            comparison = compare_official_versions(
+                records,
+                records_v2,
+                require_langsmith=require_langsmith,
+                require_prompt_change=not args.no_prompt_change_required,
+            )
         else:
             comparison = compare_versions(records, records_v2)
         _print_version_comparison(comparison)
