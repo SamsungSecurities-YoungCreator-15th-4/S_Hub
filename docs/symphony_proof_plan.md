@@ -121,10 +121,24 @@ case_00X.md
 
 ★ `numeric_consistency`는 `explanations` 텍스트만 스캔한다. 견본의 핵심 함정(1일 VaR × √10 ≠ 10일 VaR)은 **표 안**에 있으므로, 표 수치를 explanations로 옮겨주지 않으면 이 축이 무력화된다.
 
+계획 단계에서는 `calibrate_judge.py` 하나로 잡았으나, **실제 구현은 judge 실행과
+집계를 두 스크립트로 나눴다** — 실행(Azure 호출)과 분석(순수 집계)을 분리해야
+같은 판정 결과로 집계만 다시 돌릴 수 있기 때문이다.
+
 ```bash
-python scripts/calibrate_judge.py --prompt-version v1 --out goldenset/reports/calibration_v1.json
-python scripts/calibrate_judge.py --prompt-version v2 --compare-with goldenset/reports/calibration_v1.json
+# ① judge 실행 — 사례를 judge에 돌려 JudgeResult JSON으로 기록
+python scripts/judge_runner.py --prompt-version v1 --out out/v1.json
+python scripts/judge_runner.py --prompt-version v2 --out out/v2.json
+
+# ② 집계·비교 — 사람 라벨과 합쳐 일치율·혼동행렬·v1↔v2 비교를 뽑는다
+python scripts/calibration_report.py --judge-results out/v1.json \
+    --judge-results-v2 out/v2.json --human-labels-dir goldenset/cases \
+    --official --out out/calibration_report.json
 ```
+
+`--out` 산출물은 R4 증거 번들이 `--calibration`으로 받아 그대로 싣는다. 이때
+`mode == "official"`이어야 공식 증거가 된다 — 상세는
+[`docs/evidence_bundle_schema.md`](evidence_bundle_schema.md) §4.8.
 
 **산출 지표** — "20건 중 17건 일치"보다 아래가 훨씬 설득력 있다.
 
@@ -156,7 +170,7 @@ judge 프롬프트는 `rubric.py:290`에 문자열로 박혀 있다 → `app/jud
 - [ ] 프롬프트/루브릭 v1→v2 후 **같은 20건**으로 재측정, 전/후 비교표
 - [ ] LangSmith에 실행 기록이 남고 실측 수치를 제출
 
-**산출**: `goldenset/case-format.md`(R1 제공) · 로더는 다경의 `scripts/judge_runner.py`, `scripts/calibrate_judge.py`, `app/judge/prompts/`, `docs/judge_calibration_report.md`
+**산출**: `goldenset/case-format.md`(R1 제공) · 무라벨 입력본 `goldenset/judge_inputs/` · 다경의 `scripts/judge_runner.py`(실행) + `scripts/calibration_report.py`(집계)
 
 > LangSmith 데이터셋 등록은 기존 `scripts/register_judge_dataset.py`에 dry-run/upload 구조가 이미 있다. 패턴을 복사한다.
 
@@ -256,10 +270,15 @@ evidence/<run_id>/
 ├── judge_rationale.json  judge.checks / rubric 축별 판정 사유 전문
 ├── hard_stop_record.json ★ 멈춘 기록 (없으면 성공 번들임을 명시)
 ├── replay_diff.json      같은 입력 2회 실행 해시 대조
-├── calibration_before_after.md   개선 전후 비교표 (R2 산출물)
+├── citation_verification.json  인용 검증 결과·탈락 인용 이력
+├── calibration_summary.json    R2 실행 등급·일치율·개선 전후 비교
 ├── llm_audit.json        프롬프트·모델버전·응답 감사기록
 └── bundle_hash.txt       번들 루트 해시
 ```
+
+> 위는 계획 시점 스케치이며 **실제 목록의 SSOT는 `app/evidence/schema.py`의
+> `BUNDLE_FILENAMES`**다. 계약 상세는
+> [`docs/evidence_bundle_schema.md`](evidence_bundle_schema.md)를 따른다.
 
 **설계 시 반영할 점**
 
@@ -346,7 +365,7 @@ LLM 2축이 유일한 약점이다. **재현 데모는 `--offline` 또는 캐시
 |---|---|---|
 | **A** 사례집 | `goldenset/cases/` 20건 본문, 라벨링 가이드 최종본, 사례 코퍼스 | 즉시 |
 | **B** 라벨·검증 | 독립 라벨 20건, A와 합의, `initial_agreement`, 스키마 테스트 | A 본문 후 |
-| **C** 캘리브레이션 | 로더 연결(다경과 협업), `calibrate_judge.py`, 프롬프트 v1/v2, 오답 분석, LangSmith | 견본 3건으로 선행 가능 |
+| **C** 캘리브레이션 | 로더 연결(다경과 협업), `judge_runner.py`(실행)+`calibration_report.py`(집계), 프롬프트 v1/v2, 오답 분석, LangSmith | 견본 3건으로 선행 가능 |
 | **D** hard stop | `hard_stop_policy.md`, 인용 출처 대조 강화, 속성 테스트 3건, (가 선택 시) `manual_review_gate` | 즉시 |
 | **E** 증거·재현 | `make_evidence_bundle.py`, `replay_verify.py`, 범위 선언, 번들 3건 | D 후 |
 
