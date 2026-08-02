@@ -117,6 +117,88 @@ def test_v1_v2_share_case_content_hash_but_differ_in_prompt_version():
     assert v2["prompt_version"] == "v2"
 
 
+def test_freeze_commit_is_recorded_when_provided():
+    """freeze_commit을 넘기면 결과에 감사 앵커로 기록된다(계약은 미지 필드로 무시)."""
+    case = {
+        "case_id": DETERMINISTIC_CASE_IDS[0],
+        "state": build_eval_case(DETERMINISTIC_CASE_IDS[0])["state"],
+    }
+    result = record_case(
+        case,
+        llm=_PassingLLM(),
+        prompt_version="v1",
+        code_sha=FAKE_CODE_SHA,
+        freeze_commit="58d5e2b0",
+    )
+    assert result["freeze_commit"] == "58d5e2b0"
+
+
+def test_langsmith_none_when_no_project():
+    """langsmith_project 미지정(오프라인/키 없음)이면 run id/URL을 None으로 둔다.
+
+    실제 기록이 없는데 run id만 채워 '유령 링크'를 만들지 않기 위한 정직한 기본값.
+    """
+    case = {
+        "case_id": DETERMINISTIC_CASE_IDS[0],
+        "state": build_eval_case(DETERMINISTIC_CASE_IDS[0])["state"],
+    }
+    result = record_case(
+        case, llm=_PassingLLM(), prompt_version="v1", code_sha=FAKE_CODE_SHA
+    )
+    assert result["langsmith_run_id"] is None
+    assert result["langsmith_trace_url"] is None
+
+
+def test_prompt_hash_is_recorded():
+    """결과에 프롬프트 집계 해시가 기록된다(v1↔v2 '프롬프트만 달랐다' 증명 앵커)."""
+    case = {
+        "case_id": DETERMINISTIC_CASE_IDS[0],
+        "state": build_eval_case(DETERMINISTIC_CASE_IDS[0])["state"],
+    }
+    result = record_case(
+        case, llm=_PassingLLM(), prompt_version="v1", code_sha=FAKE_CODE_SHA
+    )
+    assert len(result["prompt_hash"]) == 64
+
+
+def test_freeze_commit_absent_by_default():
+    """freeze_commit 미지정(EC 리허설)이면 결과에 필드를 남기지 않는다."""
+    case = {
+        "case_id": DETERMINISTIC_CASE_IDS[0],
+        "state": build_eval_case(DETERMINISTIC_CASE_IDS[0])["state"],
+    }
+    result = record_case(
+        case, llm=_PassingLLM(), prompt_version="v1", code_sha=FAKE_CODE_SHA
+    )
+    assert "freeze_commit" not in result
+
+
+def test_run_manifest_has_auto_fields_and_empty_verifications(tmp_path):
+    """실행 요약 카드는 자동 4필드를 채우고 verifications는 빈 배열로 둔다.
+
+    verifications는 사람이 사후에 손으로 채우는 자리라 러너는 비워만 둔다(계약).
+    """
+    from scripts.judge_runner import manifest_path_for, write_run_manifest
+
+    out = tmp_path / "judge_v1_results.json"
+    manifest_out = write_run_manifest(
+        out,
+        prompt_version="v1",
+        code_sha="deadbeef",
+        freeze_commit="58d5e2b4",
+        input_set_hash="a" * 64,
+    )
+    assert manifest_out == manifest_path_for(out) == tmp_path / "judge_v1_results.manifest.json"
+    manifest = json.loads(manifest_out.read_text(encoding="utf-8"))
+    assert manifest["prompt_version"] == "v1"
+    assert manifest["code_sha"] == "deadbeef"
+    assert manifest["freeze_commit"] == "58d5e2b4"
+    assert manifest["input_set_hash"] == "a" * 64
+    assert manifest["executed_at"]  # ISO 시각 문자열 존재
+    assert "langsmith_run" in manifest
+    assert manifest["verifications"] == []
+
+
 def test_write_results_roundtrip_is_stable(tmp_path):
     results = record_cases(
         _ec_cases(), llm=_PassingLLM(), prompt_version="v1", code_sha=FAKE_CODE_SHA
