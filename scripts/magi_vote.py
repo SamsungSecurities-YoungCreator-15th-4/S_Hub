@@ -17,8 +17,10 @@ R2 일치율 숫자를 어떻게 읽어야 하는지가 이 구분에 달려 있
 (config_hash·computation_hash·approval_hash)에도 들어가지 않는다.**
 
 leakage 경계: judge_runner와 동일하다 — 무라벨 `goldenset/judge_inputs`만 읽고
-사람 라벨은 읽지도 출력하지도 않는다. 표본 목록은 아래 동결 상수이며 실행 시점에
-라벨을 보고 고르지 않는다.
+사람 라벨은 읽지도 출력하지도 않는다. 표본 목록은 실행 전에 동결돼 있고 실행
+시점에 라벨을 보고 고르지 않는다. **그 목록 자체가 사람 라벨의 파생값이라 소스에
+적지 않는다** — 사전 고정은 소금 섞은 해시(`MAGI_TARGETS_SHA256`)로 증명하고,
+목록 원본은 git 밖 비공개 파일에 둔다.
 
 사용:
     python scripts/magi_vote.py --dry-run
@@ -29,6 +31,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -36,6 +39,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from app.judge.rubric import AXIS_NAMES  # noqa: E402
+from app.utils.hashing import sha256_of_dict  # noqa: E402
 
 # R2 러너와 **같은 로더·같은 LLM 팩토리**를 쓴다. 여기서 별도 경로를 만들면 측정된
 # 흔들림이 judge의 것인지 하네스의 것인지 구분할 수 없다. 비공개 이름을 가져오는
@@ -48,27 +52,103 @@ from scripts.judge_runner import (  # noqa: E402
     resolve_code_sha,
 )
 
-# --- 표본 (동결 상수) --------------------------------------------------------
+# --- 표본 (해시로 동결, 목록은 비공개) ----------------------------------------
 #
 # 선정 규칙: 사람 라벨의 fail_axes에 환각 또는 위조정밀도가 포함된 사례.
 # v1-freeze 시점 라벨 기준으로 R1 소유자가 집계해 확정했다.
 # 통제군: 두 LLM 축이 관여하지 않고 다른 축에서도 조용한 pass 사례 2건.
 #
 # **실행 시점에 라벨을 읽어 선정하지 않는다.** 채점 결과를 보기 전에 목록이
-# 고정돼 있었다는 것이 이 표본의 방어 논거이고, 코드가 라벨을 읽는 순간
-# "결과를 보고 표본을 골랐다"는 반론을 막을 수 없게 된다.
+# 고정돼 있었다는 것이 이 표본의 방어 논거다.
+#
+# 그런데 그 목록을 소스에 적으면 위 선정 규칙과 합쳐져 **사람 정답이 평문으로
+# 드러난다** — 어느 사례가 어느 축에서 fail인지, 어느 사례가 pass인지가 ID만으로
+# 읽힌다. R2 실행 담당이 정답 일부를 아는 상태가 되면 "결과를 보고 튜닝한 것
+# 아니냐"를 막을 수 없고, 그것이 방화벽을 세운 이유 자체다. 라벨을 동적으로 읽지
+# 않으려던 결정이 오히려 정적·영구 노출을 만든 셈이다.
+#
+# 그래서 **사전 고정은 해시로 증명하고 목록 원본은 비공개 파일에 둔다.** 코드와
+# PR에는 커밋값만 남는다. 목록이 나중에 바뀌면 해시가 어긋나 실행이 멈춘다.
 SELECTION_RULE = (
     "사람 라벨 fail_axes에 환각 또는 위조정밀도가 포함된 사례 (v1-freeze 시점 라벨 "
     "기준, R1 소유자 집계·확정). 통제군은 두 LLM 축이 관여하지 않고 다른 축에서도 "
     "조용한 pass 사례 2건."
 )
 
-MAGI_PRIMARY_TARGETS = ("case_003", "case_011", "case_012", "case_017", "case_018")
-MAGI_CONTROL_TARGETS = ("case_002", "case_019")
-MAGI_TARGETS = MAGI_PRIMARY_TARGETS + MAGI_CONTROL_TARGETS
+#: 표본 목록 원본. git 추적 대상이 아니며 R1 소유자가 보관해 실행자에게 전달한다.
+MAGI_TARGETS_FILE = ROOT / "goldenset" / ".sealed" / "magi_targets.json"
+
+#: 표본 목록의 커밋값 — `sha256_of_dict({"salt", "primary", "control"})`.
+#:
+#: **소금값(salt)을 함께 해시하는 이유**: 사례집이 20건뿐이라 소금이 없으면 5건·2건
+#: 조합을 전수 대입(약 160만 가지)해 목록을 되찾을 수 있다. 그러면 커밋값을 공개하는
+#: 것이 목록을 공개하는 것과 같아진다. 소금은 비공개 파일 안에만 있다.
+MAGI_TARGETS_SHA256 = "9a789850573f8ef7cd96ac2e6429fab94b07249b2988ab3b2c1f767b763f4478"
+
+#: 표본 규모. 건수는 어느 사례인지를 드러내지 않으므로 코드에 남긴다.
+MAGI_PRIMARY_COUNT = 5
+MAGI_CONTROL_COUNT = 2
 
 #: 한 사례를 몇 번 독립 호출하는가.
 MAGI_RUNS = 3
+
+
+@dataclass(frozen=True)
+class MagiTargets:
+    """동결된 표본 목록. 커밋값 검증을 통과한 것만 만들어진다."""
+
+    primary: tuple[str, ...]
+    control: tuple[str, ...]
+
+    @property
+    def all(self) -> tuple[str, ...]:
+        return self.primary + self.control
+
+    def group_of(self, case_id: str) -> str:
+        return "primary" if case_id in self.primary else "control"
+
+
+def load_targets(
+    path: Path | None = None, *, expected_sha256: str = MAGI_TARGETS_SHA256
+) -> MagiTargets:
+    """비공개 목록을 읽고 커밋값과 대조한다. 어긋나면 실행하지 않는다.
+
+    이 검증이 "결과를 보고 표본을 고치지 않았다"의 증명이다. 목록을 소스에 적지
+    않는 대신 해시로 묶어 두므로, 파일이 바뀌면 여기서 멈춰야 그 증명이 성립한다.
+    맞춰 주는 폴백은 두지 않는다.
+    """
+    path = path or MAGI_TARGETS_FILE
+    if not path.is_file():
+        raise SystemExit(
+            f"표본 목록 파일이 없습니다: {path}\n"
+            "  이 파일은 사람 라벨에서 파생된 값이라 git에 없습니다. "
+            "R1 소유자에게 받아 위 경로에 두고 다시 실행하세요."
+        )
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as error:
+        raise SystemExit(f"표본 목록 파일을 읽을 수 없습니다: {path} — {error}") from error
+
+    actual = sha256_of_dict(payload)
+    if actual != expected_sha256:
+        raise SystemExit(
+            "표본 목록이 동결된 커밋값과 다릅니다 — 실행을 멈춥니다.\n"
+            f"  기대: {expected_sha256}\n  실제: {actual}\n"
+            "  목록을 바꾸려면 커밋값(MAGI_TARGETS_SHA256)을 함께 갱신하고, "
+            "왜 바꿨는지 PR에 남기세요. 채점 결과를 본 뒤의 변경이면 표본의 "
+            "사전 고정 논거가 무너집니다."
+        )
+
+    primary = tuple(payload.get("primary") or ())
+    control = tuple(payload.get("control") or ())
+    if len(primary) != MAGI_PRIMARY_COUNT or len(control) != MAGI_CONTROL_COUNT:
+        raise SystemExit(
+            f"표본 규모가 다릅니다: 주 표본 {len(primary)}건(기대 {MAGI_PRIMARY_COUNT}), "
+            f"통제군 {len(control)}건(기대 {MAGI_CONTROL_COUNT})"
+        )
+    if set(primary) & set(control):
+        raise SystemExit("주 표본과 통제군이 겹칩니다 — 목록을 확인하세요.")
+    return MagiTargets(primary=primary, control=control)
 
 # --- 축 분류 ----------------------------------------------------------------
 #
@@ -112,6 +192,15 @@ NULL_RESULT_PHRASING = (
     "흔들림이 관측되지 않더라도 '흔들림 없음'으로 일반화하지 않는다. "
     "'header.temperature·header.seed 설정 아래에서는 흔들림이 관측되지 않음'으로 "
     "조건을 명시한다 — 이 하네스는 한 가지 샘플링 설정만 관측했다."
+)
+#: 표본의 축 순수성 한계(R1 소유자 리뷰). 골든셋 구성에서 온 제약이라 표본을
+#: 바꿔도 해소되지 않는다 — 결론 문장에 걸리는 값이므로 산출물에 남긴다.
+#: 어느 사례가 어느 축인지는 적지 않는다(그것이 곧 사람 라벨이다).
+AXIS_PURITY_CAVEAT = (
+    "주 표본 5건 중 LLM 축이 단독으로 걸린 사례는 1건뿐이고, 나머지 4건은 결정론 "
+    "축과 복합이다. 따라서 관측된 흔들림을 LLM 축 고유의 변동으로 단정하지 않는다 "
+    "— 같은 사례의 결정론 축 결함이 LLM 판정 문맥에 영향을 준 것일 수 있고, 이 "
+    "표본으로는 둘을 분리할 수 없다."
 )
 REPRODUCIBILITY_NOTE = (
     "judge 판정(pass/fail)은 docs/reproducibility_scope.md §2.1 조건부 항목이고 "
@@ -160,12 +249,15 @@ def _vote_block(votes: list[bool]) -> dict:
 
 # --- 실행 -------------------------------------------------------------------
 def expected_calls(
-    targets: tuple[str, ...] = MAGI_TARGETS, runs: int = MAGI_RUNS
+    case_count: int = MAGI_PRIMARY_COUNT + MAGI_CONTROL_COUNT, runs: int = MAGI_RUNS
 ) -> dict:
-    """예상 호출 수. 실행 전에 출력하고 산출물 헤더에도 남긴다."""
-    invocations = len(targets) * runs
+    """예상 호출 수. 실행 전에 출력하고 산출물 헤더에도 남긴다.
+
+    사례 목록이 아니라 **건수**만 받는다 — 목록은 비공개라 이 계산에 필요하지 않다.
+    """
+    invocations = case_count * runs
     return {
-        "cases": len(targets),
+        "cases": case_count,
         "runs_per_case": runs,
         "judge_invocations": invocations,
         "llm_calls": invocations * LLM_CALLS_PER_INVOCATION,
@@ -193,7 +285,9 @@ def _axis_snapshot(judge_output: dict) -> dict:
     return snapshot
 
 
-def run_case(case: dict, *, llm, runs: int = MAGI_RUNS, retries: int = 1) -> dict:
+def run_case(
+    case: dict, *, llm, group: str, runs: int = MAGI_RUNS, retries: int = 1
+) -> dict:
     """사례 1건을 judge에 `runs`회 독립 호출한다.
 
     호출 간 상태를 공유하지 않는다 — 매 호출에 state 사본을 넘긴다. 병렬화하지
@@ -209,7 +303,7 @@ def run_case(case: dict, *, llm, runs: int = MAGI_RUNS, retries: int = 1) -> dic
     state = case["state"]
     record = {
         "case_id": case_id,
-        "group": "primary" if case_id in MAGI_PRIMARY_TARGETS else "control",
+        "group": group,
         "case_content_sha256": case_content_sha256(state),
         "status": "ok",
         "runs": [],
@@ -262,9 +356,14 @@ def _model_version(judge_output: dict) -> dict:
     return model_version if isinstance(model_version, dict) else {}
 
 
-def run_targets(cases: list[dict], *, llm, runs: int = MAGI_RUNS) -> list[dict]:
+def run_targets(
+    cases: list[dict], *, llm, targets: MagiTargets, runs: int = MAGI_RUNS
+) -> list[dict]:
     """대상 사례를 순서대로 3회씩 돌린다. 한 사례가 실패해도 나머지는 진행한다."""
-    return [run_case(case, llm=llm, runs=runs) for case in cases]
+    return [
+        run_case(case, llm=llm, group=targets.group_of(case["case_id"]), runs=runs)
+        for case in cases
+    ]
 
 
 # --- 집계 -------------------------------------------------------------------
@@ -380,6 +479,7 @@ def aggregate(records: list[dict]) -> dict:
 def build_header(
     records: list[dict],
     *,
+    targets: MagiTargets,
     code_sha: str,
     evalset_hash: str,
     temperature: float | None,
@@ -422,12 +522,19 @@ def build_header(
             "한다. 이 하네스는 샘플링 파라미터를 바꾸지 않는다."
         ),
         "null_result_phrasing": NULL_RESULT_PHRASING,
+        "axis_purity_caveat": AXIS_PURITY_CAVEAT,
         "selection_rule": SELECTION_RULE,
         "targets": {
-            "primary": list(MAGI_PRIMARY_TARGETS),
-            "control": list(MAGI_CONTROL_TARGETS),
+            "primary": list(targets.primary),
+            "control": list(targets.control),
         },
-        **expected_calls(MAGI_TARGETS, runs),
+        # 목록의 사전 고정 증명. 소스·PR에는 이 값만 남고 목록은 비공개 파일에 있다.
+        "targets_sha256": MAGI_TARGETS_SHA256,
+        "targets_disclosure_note": (
+            "이 산출물에는 사례 ID가 들어간다(분석에 필요). 파일 자체는 git 추적 "
+            "대상이 아니며, 목록의 사전 고정은 targets_sha256으로 증명한다."
+        ),
+        **expected_calls(len(targets.all), runs),
         "reproducibility_note": REPRODUCIBILITY_NOTE,
     }
 
@@ -468,20 +575,22 @@ def write_report(report: dict, out_path: Path) -> Path:
 
 
 # --- CLI --------------------------------------------------------------------
-def select_cases(all_cases: list[dict], targets: tuple[str, ...] = MAGI_TARGETS) -> list[dict]:
-    """동결 표본만 골라 targets 순서로 돌려준다. 없는 사례는 즉시 실패시킨다."""
+def select_cases(all_cases: list[dict], targets: MagiTargets) -> list[dict]:
+    """동결 표본만 골라 목록 순서로 돌려준다. 없는 사례는 즉시 실패시킨다."""
     by_id = {case["case_id"]: case for case in all_cases}
-    missing = [case_id for case_id in targets if case_id not in by_id]
+    missing = [case_id for case_id in targets.all if case_id not in by_id]
     if missing:
         raise SystemExit(f"표본 사례를 찾을 수 없습니다: {missing}")
-    return [by_id[case_id] for case_id in targets]
+    return [by_id[case_id] for case_id in targets.all]
 
 
-def _print_plan(runs: int) -> None:
-    plan = expected_calls(MAGI_TARGETS, runs)
+def _print_plan(runs: int, targets: MagiTargets | None = None) -> None:
+    """실행 계획. **사례 ID는 찍지 않는다** — 목록 자체가 사람 라벨의 파생값이다."""
+    case_count = len(targets.all) if targets else MAGI_PRIMARY_COUNT + MAGI_CONTROL_COUNT
+    plan = expected_calls(case_count, runs)
     print("MAGI 반복 호출 하네스 — 관측 전용 (v3 공식 판정에 반영하지 않음)")
-    print(f"  주 표본 {len(MAGI_PRIMARY_TARGETS)}건: {', '.join(MAGI_PRIMARY_TARGETS)}")
-    print(f"  통제군 {len(MAGI_CONTROL_TARGETS)}건: {', '.join(MAGI_CONTROL_TARGETS)}")
+    print(f"  주 표본 {MAGI_PRIMARY_COUNT}건 · 통제군 {MAGI_CONTROL_COUNT}건")
+    print(f"  표본 커밋값: {MAGI_TARGETS_SHA256[:12]} (목록은 비공개 파일)")
     print(f"  사례당 {plan['runs_per_case']}회 · judge 호출 {plan['judge_invocations']}회")
     print(f"  예상 LLM 호출 {plan['llm_calls']}회 (사례당 LLM 축 {LLM_CALLS_PER_INVOCATION}개)")
 
@@ -517,19 +626,23 @@ def main() -> None:
     if args.runs < 1:
         parser.error("--runs 는 1 이상이어야 합니다")
 
-    _print_plan(args.runs)
     if args.dry_run:
+        # 목록 파일 없이도 계획은 출력된다 — 건수와 커밋값만 쓰기 때문이다.
+        _print_plan(args.runs)
         print("  --dry-run: Azure를 호출하지 않고 종료합니다.")
         raise SystemExit(EXIT_OK)
 
     from app.evaluation.goldenset_loader import input_set_hash  # noqa: PLC0415
 
-    cases = select_cases(_load_r1_cases())
+    targets = load_targets()
+    _print_plan(args.runs, targets)
+    cases = select_cases(_load_r1_cases(), targets)
     llm = _offline_llm() if args.offline else _real_llm()
-    records = run_targets(cases, llm=llm, runs=args.runs)
+    records = run_targets(cases, llm=llm, targets=targets, runs=args.runs)
 
     header = build_header(
         records,
+        targets=targets,
         code_sha=resolve_code_sha(),
         evalset_hash=input_set_hash(),
         # 있는 그대로 읽는다 — 이 하네스는 샘플링 파라미터를 정하지 않는다.
