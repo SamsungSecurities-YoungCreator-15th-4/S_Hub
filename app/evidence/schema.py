@@ -30,6 +30,7 @@ CITATION_VERIFICATION_FILENAME = "citation_verification.json"
 HARD_STOP_RECORD_FILENAME = "hard_stop_record.json"
 REPLAY_DIFF_FILENAME = "replay_diff.json"
 LLM_AUDIT_FILENAME = "llm_audit.json"
+CALIBRATION_FILENAME = "calibration_summary.json"
 BUNDLE_HASH_FILENAME = "bundle_hash.txt"
 
 #: manifest에 sha256이 기록되는 대상. manifest 자신과 bundle_hash는 제외한다
@@ -42,6 +43,7 @@ HASHED_FILENAMES = (
     HARD_STOP_RECORD_FILENAME,
     REPLAY_DIFF_FILENAME,
     LLM_AUDIT_FILENAME,
+    CALIBRATION_FILENAME,
 )
 
 #: 번들 디렉터리에 반드시 생성되는 전체 파일 목록.
@@ -265,6 +267,73 @@ CALIBRATION_SUMMARY_REQUIRED_KEYS = (
 #: 사람이 적는 값이 아니라는 것을 계약으로 못박는다.
 CALIBRATION_DERIVED_KEYS = ("match", "match_rate", "false_negative", "false_positive")
 
+#: `calibration_summary.json`의 최상위 골격. `v1`·`v2`·`comparison`은 R2 진행 상태와
+#: 무관하게 **항상 존재한다** — 채울 값이 없으면 `unavailable(...)`이 들어간다.
+#: `hard_stop_record`가 성공 실행에서도 `blocked=false`로 반드시 생성되는 것과 같은
+#: 원칙이다. 파일이 없는 것과 "아직 측정하지 않았다"는 감사에서 다른 의미다.
+CALIBRATION_FILE_REQUIRED_KEYS = (
+    "source",
+    "v1",
+    "v2",
+    "comparison",
+    "mismatch_detail_excluded",
+)
+
+#: 수치가 **어떤 등급의 실행에서 나왔는가**. 일치율만 싣고 등급을 빼면, 개발용
+#: mock으로 뽑은 수치와 공식 실행 수치가 번들에서 똑같이 보인다 — 감사에서
+#: 치명적이다. `scripts/calibration_report.py`가 리포트 최상위에 남기는 값을
+#: 이름 그대로 옮긴다.
+#:
+#: `mode`는 `dev_mock` · `offline_rehearsal` · `official` 셋 중 하나다.
+#: `langsmith_required=false`면 `--no-langsmith`로 LangSmith 요건을 낮춘 실행이라
+#: R2 공식 제출 등급이 아니다(`validate_official_case_set`의 기본값은 요구함).
+CALIBRATION_GRADE_KEYS = (
+    "schema_version",
+    "mode",
+    "official_validation_passed",
+    "langsmith_required",
+)
+
+#: 이 어댑터가 해석할 수 있는 calibration 리포트 스키마 버전.
+#: `scripts/calibration_report.py`의 `SCHEMA_VERSION`과 같아야 하며,
+#: `tests/test_evidence_bundle.py`가 두 값을 대조한다. 모르는 버전의 리포트는
+#: 필드 뜻이 달라졌을 수 있으므로 수치를 옮기지 않고 "없음"으로 처리한다.
+CALIBRATION_REPORT_SCHEMA_VERSION = "1"
+
+#: v1·v2 비교가 들어갈 자리. 필드명은 `app/evaluation/judge_calibration.py`의
+#: `VersionComparison`을 그대로 옮긴다 — 번들이 이름을 새로 만들면 원본과 어긋난다.
+#: 값은 R2가 v2를 재측정한 뒤에만 채워지며, 그 전에는 지어내지 않고 비워 둔다.
+CALIBRATION_COMPARISON_REQUIRED_KEYS = (
+    "before",
+    "after",
+    "match_rate_delta",
+    "false_negative_delta",
+    "false_positive_delta",
+    "axis_before",
+    "axis_after",
+    "before_code_sha",
+    "after_code_sha",
+)
+
+#: calibration 입력의 원본 경로. state가 아니라 `scripts/calibration_report.py --out`이
+#: 만드는 별도 산출물이라, 없을 때의 `unavailable(...)` 사유가 이 경로를 가리킨다.
+CALIBRATION_SOURCE_PATH = "R2 calibration 리포트 입력"
+
+#: 왜 state가 아닌 외부 입력인가 — calibration은 실행 1회분 state가 아니라
+#: 사례집 전체를 judge에 돌린 결과라, 그래프 한 번의 최종 state에는 존재할 수 없다.
+CALIBRATION_UNAVAILABLE_NOTE = (
+    "calibration은 실행 1회분 state가 아니라 사례집 전체 judge 결과의 집계다. "
+    "scripts/calibration_report.py --out 산출물을 --calibration으로 넘기면 실린다."
+)
+
+#: 오판 사례 상세(`find_mismatches`)는 번들에 싣지 않는다. `Mismatch.human_rationale`이
+#: 사람 라벨 원문이라 번들에 실으면 답안지가 증거물로 새어 나간다. 원인 분석은
+#: `scripts/calibration_report.py --out` 산출물이 담당하고, 번들은 집계값만 싣는다.
+CALIBRATION_MISMATCH_EXCLUSION_REASON = (
+    "오판 사례 상세는 사람 라벨 원문(human_rationale)을 포함하므로 번들에 싣지 않는다. "
+    "scripts/calibration_report.py --out 산출물을 참조한다."
+)
+
 #: prompt_version이 필요한 이유 — 일치율은 프롬프트가 바뀌면 함께 움직인다.
 #: 어떤 프롬프트로 잰 수치인지 붙어 있지 않으면 개선 전후 비교가 성립하지 않고,
 #: LangSmith 감사 로그의 prompt_hash와 대조할 수도 없다.
@@ -371,3 +440,56 @@ def calibration_summary(records: list, *, prompt_version: str) -> dict:
             for axis_en, metrics in axis_metrics.items()
         },
     }
+
+
+#: `asdict()`가 tuple을 list로 풀어 놓는 필드. 되돌릴 때 원래 타입으로 맞춘다.
+_RECORD_TUPLE_FIELDS = (
+    "human_fail_axes",
+    "judge_fail_axes",
+    "judge_checks",
+    "judge_failed_required_checks",
+    "manual_review_flags",
+)
+
+
+def calibration_summary_from_report(side: object) -> dict | None:
+    """`scripts/calibration_report.py --out`의 `v1`/`v2` 한쪽을 번들 요약으로 바꾼다.
+
+    리포트에 이미 `overall`·`axis_metrics`가 들어 있지만 그것을 그대로 옮기지
+    않는다. 옮기면 집계 로직이 두 벌이 되어 한쪽만 고쳐지는 순간 번들과 리포트가
+    갈린다 — 이 파일이 처음부터 막으려던 것이 그 상황이다. 대신 `records`를
+    `CalibrationRecord`로 되돌려 `calibration_summary()`에 그대로 태운다.
+    계산 경로가 하나뿐이면 두 산출물은 구조적으로 같은 값을 낼 수밖에 없다.
+
+    입력이 이 형태가 아니면 추측해서 채우지 않고 `None`을 돌려준다 —
+    호출자가 `unavailable(...)`로 사유를 남긴다.
+    """
+    from app.evaluation.calibration_schema import CalibrationRecord
+
+    if not isinstance(side, dict):
+        return None
+    raw_records = side.get("records")
+    if not isinstance(raw_records, list) or not raw_records:
+        return None
+
+    records = []
+    for raw in raw_records:
+        if not isinstance(raw, dict):
+            return None
+        fields = dict(raw)
+        for name in _RECORD_TUPLE_FIELDS:
+            if name in fields and isinstance(fields[name], list):
+                fields[name] = tuple(fields[name])
+        try:
+            records.append(CalibrationRecord(**fields))
+        except TypeError:
+            # 필드가 늘거나 줄면 조용히 일부만 채우지 않고 통째로 없음 처리한다.
+            return None
+
+    prompt_versions = {record.prompt_version for record in records}
+    if len(prompt_versions) != 1:
+        # 한 run 안에서 prompt_version이 갈리면 "어느 프롬프트로 잰 수치인가"가
+        # 성립하지 않는다. validate_run_consistency가 막는 상황이지만,
+        # 검증을 건너뛴 입력이 들어와도 번들이 값을 지어내지 않도록 여기서도 막는다.
+        return None
+    return calibration_summary(records, prompt_version=prompt_versions.pop())
