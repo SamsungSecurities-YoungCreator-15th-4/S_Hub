@@ -433,6 +433,26 @@ def test_disclaimer_requires_both_e1_and_e3():
     assert disclaimer(_explanations(both), {AS_OF_DATE})[0] is True
 
 
+def test_disclaimer_e3_accepts_alternate_wordings_and_order():
+    """PR #178 리뷰(다경) — E3 정규식이 "의사결정|판단 → 책임 → 주체 → 있|귀속"
+    어순만 받아들여 정당한 면책문을 놓치는 문제를 재현·검증한다."""
+    prefix = f"기준일 {AS_OF_DATE} 기준 "
+    e1 = "투자 권유가 아니며 원금 또는 수익을 보장하지 않습니다. "
+
+    subject_after_responsibility = prefix + e1 + "투자의 최종 책임은 고객에게 있습니다."
+    assert disclaimer(_explanations(subject_after_responsibility), {AS_OF_DATE})[0] is True
+
+    responsibility_attribution = (
+        prefix + e1 + "본 자료에 따른 책임은 투자자 본인에게 귀속됩니다."
+    )
+    assert disclaimer(_explanations(responsibility_attribution), {AS_OF_DATE})[0] is True
+
+    subject_first_reversed_order = (
+        prefix + e1 + "고객님의 책임 하에 판단하시기 바랍니다."
+    )
+    assert disclaimer(_explanations(subject_first_reversed_order), {AS_OF_DATE})[0] is True
+
+
 def test_prohibited_expression_negated_pass_and_positive_fail():
     assert prohibited_expression(_explanations("원금은 보장되지 않습니다."))[0] is True
     assert prohibited_expression(_explanations("원금은 보장 안 됨을 명시합니다."))[0] is True
