@@ -284,7 +284,8 @@ CALIBRATION_FILE_REQUIRED_KEYS = (
 #: 치명적이다. `scripts/calibration_report.py`가 리포트 최상위에 남기는 값을
 #: 이름 그대로 옮긴다.
 #:
-#: `mode`는 `dev_mock` · `offline_rehearsal` · `official` 셋 중 하나다.
+#: 허용 `mode`는 `app.evaluation.calibration_modes.CALIBRATION_MODES`가 SSOT다.
+#: 공식 제출 가능 모드는 `OFFICIAL_CALIBRATION_MODES`로 별도 구분한다.
 #: `langsmith_required=false`면 `--no-langsmith`로 LangSmith 요건을 낮춘 실행이라
 #: R2 공식 제출 등급이 아니다(`validate_official_case_set`의 기본값은 요구함).
 CALIBRATION_GRADE_KEYS = (

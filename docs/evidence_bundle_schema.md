@@ -205,12 +205,14 @@ python scripts/run_graph.py --auto-approve --evidence-bundle
 | 키 | 의미 |
 | --- | --- |
 | `schema_version` | 리포트 스키마 버전 |
-| `mode` | `dev_mock` · `offline_rehearsal` · `official` 중 하나 |
+| `mode` | `dev_mock` · `offline_rehearsal` · `official` · `official_code_change` · `official_offline_code_change` 중 하나 (`app/evaluation/calibration_modes.py`가 SSOT) |
 | `official_validation_passed` | `--official` 검증을 통과했는가 |
 | `langsmith_required` | LangSmith run ID 요건을 적용했는가 |
 
-- **`langsmith_required=false`는 공식 등급이 아니다.** R2는 LangSmith 실행 기록 제출이 과제 요구사항이라 `validate_official_case_set`의 `require_langsmith` 기본값이 True다. `--no-langsmith`로 이를 낮춰 돌린 실행은 `mode=offline_rehearsal`이 되며, 번들은 그 사실을 감추지 않는다.
+- **공식 증거 모드는 `official`과 `official_code_change` 두 가지다.** 전자는 프롬프트 변경 비교, 후자는 프롬프트 해시는 그대로 두고 결정론 규칙 코드만 바꾼 비교다. 둘 다 정확히 20건·1차 판정·run 일관성·LangSmith 요건을 통과한다. 허용값과 공식 모드 집합은 각각 `CALIBRATION_MODES`·`OFFICIAL_CALIBRATION_MODES`가 정한다.
+- **`langsmith_required=false`는 공식 등급이 아니다.** R2는 LangSmith 실행 기록 제출이 과제 요구사항이라 `validate_official_case_set`의 `require_langsmith` 기본값이 True다. `--no-langsmith`로 이를 낮춰 돌린 실행은 프롬프트 비교라면 `offline_rehearsal`, 코드 변경 비교라면 `official_offline_code_change`가 되며, 번들은 그 사실을 감추지 않는다.
 - **등급을 아는 한, 등급이 낮아도 수치는 그대로 싣는다.** `dev_mock`이든 `offline_rehearsal`이든 수치는 나가고 등급이 그 옆에 붙는다. 감추는 것이 아니라 밝히는 것이 이 블록의 목적이다.
+- **알 수 없는 mode나 모순된 검증 플래그는 등급 부재로 처리한다.** 예를 들어 `mode=official`인데 `langsmith_required=false`이거나 mode에 오타가 있으면 `source`와 수치 전체를 `available:false`로 전환한다. 키가 존재한다는 이유만으로 미등록 등급을 공식 수치처럼 전달하지 않는다.
 
 **등급을 모르면 수치도 싣지 않는다 — fail-closed.** 아래 세 경우 `v1`·`v2`·`comparison`이 **전부** "없음" 표기로 나간다. 등급만 "없음"으로 적고 일치율은 그대로 내보내면, 감사자가 등급 줄을 지나쳤을 때 출처를 알 수 없는 수치를 공식 결과로 읽는다.
 
@@ -237,7 +239,7 @@ python scripts/make_evidence_bundle.py --state run_state.json --out evidence/run
 
 계약은 `app/evidence/schema.py`의 `calibration_summary()`와 `CALIBRATION_SUMMARY_REQUIRED_KEYS`에 정의돼 있다. 필수 키는 `prompt_version`·`evalset_hash`·`evalset_case_count`·`total`·`confusion_matrix`·`derived`·`per_axis`다.
 
-리포트에 이미 `overall`·`axis_metrics`가 들어 있지만 번들은 **그것을 옮겨 적지 않는다.** `app/evidence/schema.py:455` (calibration_summary_from_report)가 리포트의 `records`를 `CalibrationRecord`로 되돌려 `calibration_summary()`에 그대로 태운다. 옮겨 적으면 집계 로직이 두 벌이 되어 한쪽만 고쳐지는 순간 번들과 리포트가 갈리는데, 그 상황이 이 문서가 처음부터 막으려던 것이다.
+리포트에 이미 `overall`·`axis_metrics`가 들어 있지만 번들은 **그것을 옮겨 적지 않는다.** `app/evidence/schema.py:456` (calibration_summary_from_report)가 리포트의 `records`를 `CalibrationRecord`로 되돌려 `calibration_summary()`에 그대로 태운다. 옮겨 적으면 집계 로직이 두 벌이 되어 한쪽만 고쳐지는 순간 번들과 리포트가 갈리는데, 그 상황이 이 문서가 처음부터 막으려던 것이다.
 
 #### `comparison`의 계약 — `CALIBRATION_COMPARISON_REQUIRED_KEYS`
 
@@ -379,7 +381,7 @@ state에 원문이 없다. 이것은 결함이 아니라 `app/llm/audit.py`의 *
 
 다만 R2가 측정을 끝내기 전까지, 또는 `--calibration`을 넘기지 않은 실행에서는 `source`·`v1`·`v2`·`comparison` 네 자리가 `available: false`로 나간다. 이것은 감추는 것이 아니라 §5 규약대로 **못 잰 것을 못 쟀다고 적는 것**이다. 사유에는 원본 경로(`R2 calibration 리포트 입력`)와 복원 방법(`scripts/calibration_report.py --out` 산출물을 `--calibration`으로 전달)이 함께 실린다.
 
-R4 최종 DoD는 **`source.mode=official`인 v1·v2가 채워진 번들**이 제출될 때 닫힌다. `offline_rehearsal` 등급으로 채워진 번들은 파일은 완성돼 보여도 R2 제출 요건을 만족하지 않는다 — `source` 블록이 그 구분을 드러내라고 있는 것이다. 배선은 이제 R2 산출물을 기다릴 뿐이다.
+R4 최종 DoD는 **`source.mode`가 `OFFICIAL_CALIBRATION_MODES`(`official` 또는 `official_code_change`)에 속하는 v1·v2가 채워진 번들**이 제출될 때 닫힌다. `offline_rehearsal`·`official_offline_code_change` 등급으로 채워진 번들은 파일은 완성돼 보여도 LangSmith 제출 요건을 만족하지 않는다 — `source` 블록이 그 구분을 드러내라고 있는 것이다. 배선은 이제 R2 산출물을 기다릴 뿐이다.
 
 ### 8.5 `hard_stop_record.manual_review_gate` — 차단되지 않은 실행
 

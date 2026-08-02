@@ -75,13 +75,7 @@ HINT_WINDOW = 3
 #: 행이 밀린 것을 확인했지만 아직 문서를 고치지 않은 인용.
 #: (문서 파일명, 인용 경로, 시작행, 끝행) — 문서 안에서의 위치가 아니라 인용 자체를
 #: 키로 쓴다. 문서를 편집해 인용이 다른 줄로 옮겨가도 등록이 유지되도록 하기 위해서다.
-KNOWN_STALE = frozenset(
-    {
-        # app/graph.py:29는 빈 줄이고, 문서가 가리키려는 route_after_judge는 30행이다.
-        # 문서 수정은 이 테스트를 추가한 작업의 범위 밖이라 등록만 해 둔다.
-        ("symphony_proof_plan.md", "app/graph.py", 29, 29),
-    }
-)
+KNOWN_STALE = frozenset()
 
 
 class Citation:
