@@ -958,6 +958,18 @@ class TestCompareOfficialVersions:
         with pytest.raises(ValueError, match="동일한 model_version"):
             compare_official_versions(v2, v3, require_prompt_change=False)
 
+    def test_require_prompt_change_false_raises_when_prompt_hash_also_changed(self):
+        """require_prompt_change=False의 주장은 "프롬프트는 그대로, 코드만
+        바뀌었다"이므로, code_sha가 다르다는 것만으로는 부족하다 — 프롬프트도
+        같이 바뀌었다면(예: v3의 "루브릭 구체화"가 프롬프트 문구를 건드린 경우)
+        "코드만 바뀌었다"는 주장이 거짓이 되므로 잡아야 한다(다경님 리뷰 반영)."""
+        v2 = _official_20_records(prompt_version="v2")
+        v3_raw = _official_20_records(prompt_version="v3")
+        # prompt_hash를 강제로 맞추지 않는다 — v3의 자체 prompt_hash(다름)를 그대로 둔다.
+        v3 = [replace(record, code_sha="cafef00d") for record in v3_raw]
+        with pytest.raises(ValueError, match="prompt_hash가 다릅니다"):
+            compare_official_versions(v2, v3, require_prompt_change=False)
+
 
 class TestBuildJudgeResultCrossChecks:
     def test_as_of_date_matching_run_config_is_accepted(self):

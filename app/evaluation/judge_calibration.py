@@ -368,6 +368,13 @@ def compare_official_versions(
     prompt_hash에서 code_sha로 옮긴다 — 검증을 느슨하게 푸는 게 아니라 어느
     축으로 그 사실을 증명할지 바꾸는 것이다. code_sha가 그대로면 이 경우에도
     거부한다(프롬프트도 코드도 안 바뀐 비교를 통과시키지 않는다).
+
+    이 모드의 주장은 "프롬프트는 그대로, 코드만 바뀌었다"는 것이므로,
+    code_sha가 다르다는 것만으로는 부족하다 — prompt_hash가 case_id별로
+    전부 같은지도 확인한다. 실수로 프롬프트도 같이 고친 채 이 인자를 쓰면
+    (예: v3에서 "루브릭 구체화"가 프롬프트 문구를 건드린 경우) "코드만
+    바뀌었다"는 주장이 거짓이 되므로, 여기서 잡아 require_prompt_change=True
+    (기본값)를 쓰라고 안내한다.
     """
     validate_official_case_set(before_records, require_langsmith=require_langsmith)
     validate_official_case_set(after_records, require_langsmith=require_langsmith)
@@ -379,9 +386,9 @@ def compare_official_versions(
         )
     if before_first.prompt_version == after_first.prompt_version:
         raise ValueError(f"두 버전의 prompt_version이 같습니다({before_first.prompt_version}) — 비교할 변화가 없습니다.")
+    before_by_id = {record.case_id: record for record in before_records}
+    after_by_id = {record.case_id: record for record in after_records}
     if require_prompt_change:
-        before_by_id = {record.case_id: record for record in before_records}
-        after_by_id = {record.case_id: record for record in after_records}
         unchanged_prompt_hash_cases = sorted(
             case_id
             for case_id in before_by_id
@@ -392,9 +399,21 @@ def compare_official_versions(
                 "prompt_version은 다르지만 다음 사례는 두 버전의 prompt_hash가 같습니다 — "
                 f"실제 judge 프롬프트가 안 바뀌었거나 렌더링이 비결정적일 수 있습니다: {unchanged_prompt_hash_cases}"
             )
-    elif before_first.code_sha == after_first.code_sha:
-        raise ValueError(
-            "require_prompt_change=False(코드 개선 비교)인데 code_sha가 "
-            f"동일합니다({before_first.code_sha}) — 프롬프트도 코드도 안 바뀐 비교입니다."
+    else:
+        if before_first.code_sha == after_first.code_sha:
+            raise ValueError(
+                "require_prompt_change=False(코드 개선 비교)인데 code_sha가 "
+                f"동일합니다({before_first.code_sha}) — 프롬프트도 코드도 안 바뀐 비교입니다."
+            )
+        changed_prompt_hash_cases = sorted(
+            case_id
+            for case_id in before_by_id
+            if before_by_id[case_id].prompt_hash != after_by_id[case_id].prompt_hash
         )
+        if changed_prompt_hash_cases:
+            raise ValueError(
+                "require_prompt_change=False(코드 개선 비교)인데 다음 사례는 prompt_hash가 "
+                "다릅니다 — 프롬프트도 같이 바뀐 것으로 보입니다. 프롬프트가 실제로 바뀌었다면 "
+                f"require_prompt_change=True(기본값)를 쓰세요: {changed_prompt_hash_cases}"
+            )
     return compare_versions(before_records, after_records)
