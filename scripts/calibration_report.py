@@ -133,6 +133,8 @@ def _print_version_comparison(comparison) -> None:
     print(f"  FP(과잉 차단): {comparison.before.false_positive} → {comparison.after.false_positive} "
           f"(Δ {comparison.false_positive_delta:+d})")
     print(f"  code_sha: {comparison.before_code_sha[:12]} → {comparison.after_code_sha[:12]}")
+    # 같은 시험지·같은 정답지로 두 번 쟀다는 앵커. 한 값인 이유는 compare_versions 참조.
+    print(f"  evalset_hash: {comparison.evalset_hash[:12]} (v1·v2 공통)")
     print("  6축별 결함탐지율(recall) 변화:")
     for axis in comparison.axis_before:
         before_r = comparison.axis_before[axis].defect_recall

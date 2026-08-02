@@ -239,13 +239,15 @@ python scripts/make_evidence_bundle.py --state run_state.json --out evidence/run
 
 계약은 `app/evidence/schema.py`의 `calibration_summary()`와 `CALIBRATION_SUMMARY_REQUIRED_KEYS`에 정의돼 있다. 필수 키는 `prompt_version`·`evalset_hash`·`evalset_case_count`·`total`·`confusion_matrix`·`derived`·`per_axis`다.
 
-리포트에 이미 `overall`·`axis_metrics`가 들어 있지만 번들은 **그것을 옮겨 적지 않는다.** `app/evidence/schema.py:456` (calibration_summary_from_report)가 리포트의 `records`를 `CalibrationRecord`로 되돌려 `calibration_summary()`에 그대로 태운다. 옮겨 적으면 집계 로직이 두 벌이 되어 한쪽만 고쳐지는 순간 번들과 리포트가 갈리는데, 그 상황이 이 문서가 처음부터 막으려던 것이다.
+리포트에 이미 `overall`·`axis_metrics`가 들어 있지만 번들은 **그것을 옮겨 적지 않는다.** `app/evidence/schema.py:468` (calibration_summary_from_report)가 리포트의 `records`를 `CalibrationRecord`로 되돌려 `calibration_summary()`에 그대로 태운다. 옮겨 적으면 집계 로직이 두 벌이 되어 한쪽만 고쳐지는 순간 번들과 리포트가 갈리는데, 그 상황이 이 문서가 처음부터 막으려던 것이다.
 
 #### `comparison`의 계약 — `CALIBRATION_COMPARISON_REQUIRED_KEYS`
 
-필드명은 `app/evaluation/judge_calibration.py`의 `VersionComparison`을 그대로 옮긴다: `before`·`after`·`match_rate_delta`·`false_negative_delta`·`false_positive_delta`·`axis_before`·`axis_after`·`before_code_sha`·`after_code_sha`.
+필드명은 `app/evaluation/judge_calibration.py`의 `VersionComparison`을 그대로 옮긴다: `before`·`after`·`match_rate_delta`·`false_negative_delta`·`false_positive_delta`·`axis_before`·`axis_after`·`before_code_sha`·`after_code_sha`·`evalset_hash`.
 
 - **계약 키가 하나라도 없으면 부분 결과를 만들지 않는다.** 일부만 실으면 감사자가 "비교했는데 값이 빈 칸"으로 읽는다. 통째로 "없음" 표기로 나가고 누락 키를 사유에 적는다.
+- `evalset_hash`는 **그 두 번을 같은 사례·같은 라벨로 쟀다**를 증명한다. `code_sha`는 "무엇으로 쟀는가"만 말하므로, 이 값이 없으면 "일치율이 오른 게 judge가 좋아진 겁니까, 그 사이에 사례나 정답을 바꾼 겁니까"에 답할 수 없다. 해시 대상은 `app/evidence/schema.py:370` (evalset_hash)가 정하며 사례 본문과 사람 라벨을 함께 고정한다.
+- **값이 하나인 이유** — `compare_versions()`가 case_id 집합·사례 본문·사람 라벨의 동일성을 먼저 검사하고 다르면 `ValueError`로 끊는다. 반환 지점에 도달했다면 v1·v2의 `evalset_hash`는 같을 수밖에 없다. `before`/`after` 두 칸으로 실으면 "다를 수도 있는 값"으로 읽혀 그 검사가 이미 막았다는 사실이 가려진다.
 - `before_code_sha`·`after_code_sha`를 함께 싣는 이유는 v1·v2의 `code_sha` 동일성을 요구하지 않기 때문이다. judge LLM축 프롬프트가 코드에 하드코딩돼 있어 진짜 개선이면 `code_sha`가 바뀌는 것이 정상이지만, 그렇다고 "프롬프트만 바뀌었다"는 보장은 없다. 두 값을 그대로 남겨 증거를 검토하는 사람이 직접 판단하게 한다.
 
 #### 오판 사례 상세는 싣지 않는다
