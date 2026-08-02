@@ -119,7 +119,7 @@ S.ymphony는 이 문제를 두 축으로 해결한다.
 
 노드 9개 · 조건부 분기 2개(① 상충 재추출 ② Judge 재작성/Hard Stop) ·
 PB 승인용 HITL 인터럽트 1개. LLM/결정론/HITL 3계층 표식이 포함된 전체 다이어그램은
-[`mermaid.mmd`](mermaid.mmd) 참조.
+[`docs/mermaid.mmd`](docs/mermaid.mmd) 참조.
 
 ```
 START
@@ -272,7 +272,7 @@ fake LLM을 쓴다.
 | 요구사항 | 구현 |
 | --- | --- |
 | R0-1 StateGraph 9노드+조건부 분기 | `app/graph.py` — 상충 분기·승인 게이트·Judge 재작성·`manual_review_gate` Hard Stop |
-| R0-2 Mermaid 3계층 표식 | [`mermaid.mmd`](mermaid.mmd) — LLM/결정론/HITL 색상 분리 |
+| R0-2 Mermaid 3계층 표식 | [`docs/mermaid.mmd`](docs/mermaid.mmd) — LLM/결정론/HITL 색상 분리 |
 | R0-3 LangSmith 풀스택 | trace·judge 역추적·평가셋 20건+정확도·감사 로그(trace_id+프롬프트 해시+모델 버전)·형상관리 |
 | R0-4 LangChain 표준 부품 | RAG retriever(langchain-chroma)·Structured Output, 원시 API 직접 호출 금지 |
 | R0-5 도구 적정 사용 정당화 | 위 "도구 적정 사용 정당화" 절 |

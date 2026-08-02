@@ -36,3 +36,8 @@ judge_v*_results.json
 .DS_Store
 .claude/*
 !.claude/settings.json
+
+# goldenset/dist 는 goldenset/tools/make_blind.py 가 생성하는 배포 패키지다.
+# 내용이 전부 cases_blind/ · corpus/chunks.json · labels/ 답안지의 사본이라
+# 정답 사본이 여러 곳에 흩어지지 않도록 추적하지 않는다. 필요하면 재생성한다.
+/goldenset/dist/

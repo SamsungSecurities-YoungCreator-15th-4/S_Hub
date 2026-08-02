@@ -65,7 +65,7 @@ EXPECTED_CASE_IDS = frozenset(f"case_{i:03d}" for i in range(1, EXPECTED_CASE_CO
 class HumanLabel(TypedDict, total=False):
     """R1 사례집 frontmatter를 그대로 옮긴 사람 정답 레코드.
 
-    필드명·표기는 starter-kit/labeling-guide-template.md §4와 동일해야 한다.
+    필드명·표기는 goldenset/starter-kit/labeling-guide-template.md §4와 동일해야 한다.
     fail_axes는 한글 축 이름(§4 허용값)이며, label=fail일 때만 채운다.
     """
 

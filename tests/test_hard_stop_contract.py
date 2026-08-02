@@ -265,7 +265,7 @@ def test_hard_stop_policy_version_rejects_invalid_config(
 def test_rule_3_starter_kit_source_marking_mismatch_is_rejected():
     """강사 제공 FAIL 견본의 실제 인용 블록을 사용해 출처 표기 오류를 회귀 검증한다."""
     sample = (
-        ROOT / "starter-kit" / "sample-case-02-fail-citation.md"
+        ROOT / "goldenset" / "starter-kit" / "sample-case-02-fail-citation.md"
     ).read_text(encoding="utf-8")
     match = re.search(
         r'> "([^"]+)"\n> — 출처: (.+?), chunk_id: ([^\s]+)',
