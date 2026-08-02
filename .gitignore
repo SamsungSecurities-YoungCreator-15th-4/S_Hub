@@ -29,6 +29,7 @@ data/rag-index-cache/
 # 커밋하지 않는다. 공식 v1/v2 결과 파일 공유 방식은 팀 합의 후 별도로 정한다.
 /out/
 judge_v*_results.json
+judge_v*_results.manifest.json
 
 # 에디터/OS
 .idea/
