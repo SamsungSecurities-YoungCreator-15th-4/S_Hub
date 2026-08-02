@@ -1,0 +1,410 @@
+"""MAGI 반복 호출 하네스의 집계·불변식 검증 — judge는 전부 모의한다.
+
+실제 Azure 호출 테스트는 만들지 않는다. 이 하네스가 재는 것은 judge의 흔들림이고,
+그 흔들림을 테스트에서 재현하려면 비결정성에 의존해야 해서 테스트 자체가 흔들린다.
+여기서 고정하는 것은 **3표가 주어졌을 때 하네스가 무엇을 답하는가**다.
+"""
+from __future__ import annotations
+
+import pytest
+
+import json
+import re
+from pathlib import Path
+
+from scripts import magi_vote
+from app.judge.rubric import AXIS_NAMES
+from app.utils.hashing import sha256_of_dict
+from scripts.magi_vote import (
+    DETERMINISTIC_AXES,
+    EXIT_DETERMINISTIC_DRIFT,
+    EXIT_OK,
+    EXIT_RUN_FAILURE,
+    LLM_AXES,
+    MAGI_CONTROL_COUNT,
+    MAGI_PRIMARY_COUNT,
+    MAGI_RUNS,
+    MAGI_TARGETS_FILE,
+    MAGI_TARGETS_SHA256,
+    MagiTargets,
+    aggregate,
+    build_report,
+    deterministic_violations,
+    exit_code_for,
+    expected_calls,
+    is_split,
+    load_targets,
+    majority_passed,
+    run_case,
+    unanimous_passed,
+)
+
+# 테스트는 **실제 표본 ID를 쓰지 않는다.** 그 목록이 곧 사람 라벨의 파생값이라
+# 소스에 적으면 비공개로 돌린 의미가 없다. 합성 ID로 동작만 검증한다.
+FAKE_PRIMARY = tuple(f"case_9{index:02d}" for index in range(1, MAGI_PRIMARY_COUNT + 1))
+FAKE_CONTROL = tuple(f"case_8{index:02d}" for index in range(1, MAGI_CONTROL_COUNT + 1))
+FAKE_TARGETS = MagiTargets(primary=FAKE_PRIMARY, control=FAKE_CONTROL)
+
+PASS_AXES = {name: True for name in AXIS_NAMES}
+
+
+def judge_output(axes: dict) -> dict:
+    """judge_eval 반환값 중 이 하네스가 읽는 부분만 만든 모의 출력."""
+    return {
+        "judge": {
+            "passed": all(axes.values()),
+            "rubric": {
+                name: {"passed": passed, "reason": f"{name}:{passed}"}
+                for name, passed in axes.items()
+            },
+        },
+        "run_config": {
+            "audit": {
+                "llm": {
+                    "judge_eval": {
+                        "latest": {
+                            "prompt_hash": {"aggregate_sha256": "ph-fixed"},
+                            "model_version": {
+                                "deployment": "test-deployment",
+                                "model": "test-model",
+                                "api_version": "2024-10-21",
+                            },
+                        }
+                    }
+                }
+            }
+        },
+    }
+
+
+@pytest.fixture
+def scripted_judge(monkeypatch):
+    """호출 순서대로 정해진 축 판정을 돌려주는 가짜 judge를 심는다."""
+
+    def install(sequences: list[dict]):
+        remaining = list(sequences)
+
+        def fake_judge_eval(state, *, llm=None):
+            if not remaining:
+                raise AssertionError("예상보다 많이 호출됐습니다")
+            axes = remaining.pop(0)
+            if isinstance(axes, Exception):
+                raise axes
+            return judge_output(axes)
+
+        monkeypatch.setattr("app.nodes.judge_eval.judge_eval", fake_judge_eval)
+        return remaining
+
+    return install
+
+
+def make_case(case_id: str = "case_901") -> dict:
+    return {"case_id": case_id, "state": {"metrics": {}, "explanations": [], "citations": []}}
+
+
+def write_targets(tmp_path, payload: dict):
+    path = tmp_path / "magi_targets.json"
+    path.write_text(json.dumps(payload, ensure_ascii=False, sort_keys=True), encoding="utf-8")
+    return path, sha256_of_dict(payload)
+
+
+# --- 표본 (해시로 동결, 목록은 비공개) ----------------------------------------
+def test_sample_size_is_five_primary_and_two_control():
+    """표본 규모는 코드에 남는다 — 건수는 어느 사례인지를 드러내지 않는다."""
+    assert MAGI_PRIMARY_COUNT == 5
+    assert MAGI_CONTROL_COUNT == 2
+
+
+def test_target_ids_are_not_in_source():
+    """표본 ID가 소스에 평문으로 남으면 선정 규칙과 합쳐져 사람 라벨이 드러난다.
+
+    라벨을 동적으로 읽지 않으려던 결정이 정적 노출로 바뀌지 않도록, 목록은
+    비공개 파일에 두고 소스에는 커밋값만 남긴다.
+    """
+    assert MAGI_TARGETS_FILE.name == "magi_targets.json"  # 경로만 상수로 남는다
+    assert len(MAGI_TARGETS_SHA256) == 64
+
+    module_source = Path(magi_vote.__file__).read_text(encoding="utf-8")
+    # `case_NNN` 형식의 사례 ID가 모듈 어디에도 없어야 한다.
+    assert not re.search(r"case_\d{3}", module_source)
+
+
+def test_load_targets_verifies_commitment(tmp_path):
+    """목록이 커밋값과 다르면 실행하지 않는다 — 맞춰 주는 폴백은 없다."""
+    payload = {"salt": "abc123", "primary": list(FAKE_PRIMARY), "control": list(FAKE_CONTROL)}
+    path, digest = write_targets(tmp_path, payload)
+
+    targets = load_targets(path, expected_sha256=digest)
+    assert targets.primary == FAKE_PRIMARY
+    assert targets.control == FAKE_CONTROL
+    assert targets.group_of(FAKE_PRIMARY[0]) == "primary"
+    assert targets.group_of(FAKE_CONTROL[0]) == "control"
+
+    with pytest.raises(SystemExit, match="동결된 커밋값과 다릅니다"):
+        load_targets(path, expected_sha256="0" * 64)
+
+
+def test_load_targets_rejects_missing_file(tmp_path):
+    with pytest.raises(SystemExit, match="표본 목록 파일이 없습니다"):
+        load_targets(tmp_path / "없는파일.json")
+
+
+def test_load_targets_rejects_wrong_sample_size(tmp_path):
+    """건수가 어긋나면 커밋값이 맞아도 거부한다."""
+    payload = {"salt": "abc123", "primary": list(FAKE_PRIMARY[:2]), "control": list(FAKE_CONTROL)}
+    path, digest = write_targets(tmp_path, payload)
+    with pytest.raises(SystemExit, match="표본 규모가 다릅니다"):
+        load_targets(path, expected_sha256=digest)
+
+
+def test_axis_split_covers_all_six_axes():
+    """LLM 2축 + 결정론 4축이 AXIS_NAMES를 빠짐없이 나눈다."""
+    assert set(LLM_AXES) | set(DETERMINISTIC_AXES) == set(AXIS_NAMES)
+    assert not set(LLM_AXES) & set(DETERMINISTIC_AXES)
+    assert len(DETERMINISTIC_AXES) == 4
+
+
+# --- 예상 호출 수 ------------------------------------------------------------
+def test_expected_calls():
+    """사례 7건 × 3회 = judge 21회, LLM 축이 2개라 LLM 호출 42회."""
+    plan = expected_calls()
+    assert plan == {
+        "cases": 7,
+        "runs_per_case": 3,
+        "judge_invocations": 21,
+        "llm_calls": 42,
+    }
+    assert expected_calls(1, 3)["llm_calls"] == 6
+
+
+# --- 투표 규칙 ---------------------------------------------------------------
+@pytest.mark.parametrize(
+    "votes, unanimous, majority, split",
+    [
+        ([True, True, True], True, True, False),
+        ([True, True, False], False, True, True),
+        ([True, False, False], False, False, True),
+        ([False, False, False], False, False, False),
+    ],
+)
+def test_vote_rules(votes, unanimous, majority, split):
+    """3표 조합 4가지 전부 — 만장일치·다수결·갈림 여부."""
+    assert unanimous_passed(votes) is unanimous
+    assert majority_passed(votes) is majority
+    assert is_split(votes) is split
+
+
+def test_rules_disagree_exactly_when_split():
+    """두 규칙이 갈리는 조합만 rules_disagree로 잡힌다 (2-1일 때)."""
+    record = _record_with_llm_votes([True, True, False])
+    summary = aggregate([record])
+    block = summary["per_case"][0]["axes"]["hallucination"]
+    assert block["unanimous_passed"] is False
+    assert block["majority_passed"] is True
+    assert block["rules_disagree"] is True
+    assert summary["rule_comparison"]["divergent_count"] >= 1
+
+
+# --- 집계 -------------------------------------------------------------------
+def _record_with_llm_votes(hallucination_votes: list[bool]) -> dict:
+    """hallucination 축만 갈린 3회 실행 기록을 만든다."""
+    runs = []
+    for index, vote in enumerate(hallucination_votes, 1):
+        axes = dict(PASS_AXES)
+        axes["hallucination"] = vote
+        runs.append(
+            {
+                "run_index": index,
+                "judge_passed": all(axes.values()),
+                "axes": {
+                    name: (
+                        {"passed": passed, "reason": "r"}
+                        if name in LLM_AXES
+                        else {"passed": passed}
+                    )
+                    for name, passed in axes.items()
+                },
+                "prompt_hash": "ph-fixed",
+                "model_version": {"model": "test-model"},
+            }
+        )
+    return {
+        "case_id": FAKE_PRIMARY[0],
+        "group": "primary",
+        "case_content_sha256": "sha",
+        "status": "ok",
+        "runs": runs,
+    }
+
+
+def test_canonical_unit_is_llm_axes_combined():
+    """정본 단위는 LLM 축 합산 — 한 축만 갈려도 '흔들린 사례' 1건이다."""
+    summary = aggregate([_record_with_llm_votes([True, False, True])])
+    assert summary["canonical_unit"] == "llm_axes_combined"
+    assert summary["unstable_cases"] == 1
+    assert summary["unstable_case_ids"] == [FAKE_PRIMARY[0]]
+    assert summary["per_case"][0]["llm_axis_unstable"] is True
+    # 축별 분리도 함께 나오되 주의 문구가 붙는다.
+    assert summary["per_axis"]["hallucination"]["split_cases"] == 1
+    assert summary["per_axis"]["false_precision"]["split_cases"] == 0
+    assert "위조정밀도 표본이 2건" in summary["per_axis_caveat"]
+
+
+def test_stable_case_is_not_counted_as_unstable():
+    summary = aggregate([_record_with_llm_votes([True, True, True])])
+    assert summary["unstable_cases"] == 0
+    assert summary["per_case"][0]["llm_axis_unstable"] is False
+    assert summary["rule_comparison"]["divergent_count"] == 0
+
+
+# --- 결정론 축 불변식 ---------------------------------------------------------
+def test_deterministic_axis_split_is_flagged_as_violation():
+    """결정론 4축이 3회 중 갈리면 흔들림이 아니라 결함으로 잡는다."""
+    record = _record_with_llm_votes([True, True, True])
+    record["runs"][1]["axes"]["source_validity"]["passed"] = False
+
+    violations = deterministic_violations([record])
+    assert len(violations) == 1
+    assert violations[0]["case_id"] == FAKE_PRIMARY[0]
+    assert violations[0]["axis"] == "source_validity"
+    assert violations[0]["votes"] == [True, False, True]
+    # 흔들림 통계에는 섞이지 않는다.
+    assert aggregate([record])["unstable_cases"] == 0
+    assert aggregate([record])["per_case"][0]["deterministic_stable"] is False
+
+
+def test_llm_axis_split_is_not_a_deterministic_violation():
+    assert deterministic_violations([_record_with_llm_votes([True, False, True])]) == []
+
+
+# --- 종료 코드 ---------------------------------------------------------------
+def test_exit_code_ok():
+    report = build_report([_record_with_llm_votes([True, False, True])], header={})
+    assert exit_code_for(report) == EXIT_OK
+
+
+def test_exit_code_deterministic_drift():
+    record = _record_with_llm_votes([True, True, True])
+    record["runs"][0]["axes"]["disclaimer"]["passed"] = False
+    report = build_report([record], header={})
+    assert report["deterministic_axis_violation_count"] == 1
+    assert exit_code_for(report) == EXIT_DETERMINISTIC_DRIFT
+
+
+def test_call_failure_records_case_and_exits_nonzero(scripted_judge):
+    """재시도 후에도 실패하면 사례를 실패로 남기고 비정상 종료 코드로 끝낸다."""
+    boom = RuntimeError("Azure 429")
+    scripted_judge([boom, boom])  # 최초 호출 + 재시도 1회 모두 실패
+
+    record = run_case(make_case(), llm=object(), group="primary", runs=MAGI_RUNS)
+    assert record["status"] == "failed"
+    assert record["failure"]["run_index"] == 1
+    assert record["failure"]["error_type"] == "RuntimeError"
+    assert record["runs"] == []  # 반쪽 표본은 투표에 쓰지 않는다
+
+    report = build_report([record], header={})
+    assert report["summary"]["cases_failed"] == [FAKE_PRIMARY[0]]
+    assert exit_code_for(report) == EXIT_RUN_FAILURE
+
+
+def test_failure_wins_over_drift():
+    """둘 다 나면 실행 실패가 우선한다 — 실패 사례는 3표를 못 채운다."""
+    drifted = _record_with_llm_votes([True, True, True])
+    drifted["runs"][0]["axes"]["disclaimer"]["passed"] = False
+    failed = {
+        "case_id": FAKE_PRIMARY[1],
+        "group": "primary",
+        "status": "failed",
+        "runs": [],
+        "failure": {"run_index": 1, "error_type": "RuntimeError", "error": "boom"},
+    }
+    report = build_report([drifted, failed], header={})
+    assert exit_code_for(report) == EXIT_RUN_FAILURE
+
+
+# --- 실행 배선 ---------------------------------------------------------------
+def test_run_case_retries_once_then_succeeds(scripted_judge):
+    """1회 재시도로 회복되면 정상 기록이다."""
+    axes = dict(PASS_AXES)
+    scripted_judge([RuntimeError("일시 오류"), axes, axes, axes])
+
+    record = run_case(make_case(), llm=object(), group="primary", runs=MAGI_RUNS)
+    assert record["status"] == "ok"
+    assert len(record["runs"]) == MAGI_RUNS
+
+
+def test_run_case_records_three_independent_votes(scripted_judge):
+    """3회 호출의 축별 판정과 LLM 축 이유 문구가 원본 그대로 남는다."""
+    votes = []
+    for vote in (True, False, True):
+        axes = dict(PASS_AXES)
+        axes["false_precision"] = vote
+        votes.append(axes)
+    scripted_judge(votes)
+
+    record = run_case(make_case(), llm=object(), group="primary", runs=3)
+    assert [run["run_index"] for run in record["runs"]] == [1, 2, 3]
+    assert [
+        run["axes"]["false_precision"]["passed"] for run in record["runs"]
+    ] == [True, False, True]
+    # LLM 축은 이유 문구까지, 결정론 축은 판정만 남긴다.
+    assert "reason" in record["runs"][0]["axes"]["false_precision"]
+    assert "reason" not in record["runs"][0]["axes"]["source_validity"]
+    assert record["group"] == "primary"
+    assert record["runs"][0]["prompt_hash"] == "ph-fixed"
+
+
+def test_header_records_sampling_condition_and_null_result_phrasing():
+    """흔들림 0을 '흔들림 없음'으로 일반화하지 않도록 조건이 산출물에 남는다."""
+    from scripts.magi_vote import build_header
+
+    header = build_header(
+        [_record_with_llm_votes([True, True, True])],
+        targets=FAKE_TARGETS,
+        code_sha="deadbeef",
+        evalset_hash="evalset-sha",
+        temperature=0.0,
+        seed=None,
+        runs=3,
+    )
+    assert header["temperature"] == 0.0
+    assert header["seed"] is None
+    assert "일반화하지 않는다" in header["null_result_phrasing"]
+    assert header["prompt_hash"] == "ph-fixed"
+    # 사전 고정 증명은 커밋값으로 남는다.
+    assert header["targets_sha256"] == MAGI_TARGETS_SHA256
+
+
+def test_header_records_axis_purity_limit():
+    """LLM 축 단독 사례가 1건뿐이라는 해석 한계가 산출물에 남는다(R1 소유자 리뷰).
+
+    어느 사례가 어느 축인지는 적지 않는다 — 그것이 곧 사람 라벨이다.
+    """
+    from scripts.magi_vote import build_header
+
+    header = build_header(
+        [_record_with_llm_votes([True, False, True])],
+        targets=FAKE_TARGETS,
+        code_sha="deadbeef",
+        evalset_hash="evalset-sha",
+        temperature=0.0,
+        seed=None,
+        runs=3,
+    )
+    caveat = header["axis_purity_caveat"]
+    assert "단독으로 걸린 사례는 1건" in caveat
+    assert "단정하지 않는다" in caveat
+    assert not re.search(r"case_\d{3}", caveat)
+
+
+def test_control_group_is_labelled():
+    assert run_case.__doc__  # 문서화된 공개 함수
+    from scripts.magi_vote import aggregate_case
+
+    record = _record_with_llm_votes([True, True, True])
+    record["case_id"] = FAKE_CONTROL[0]
+    record["group"] = "control"
+    summary = aggregate([record])
+    assert summary["by_group"]["control"]["cases"] == 1
+    assert summary["by_group"]["primary"]["cases"] == 0
+    assert aggregate_case(record)["group"] == "control"
