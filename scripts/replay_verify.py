@@ -39,6 +39,30 @@ EXIT_NOTHING_TO_COMPARE = 3  # 대조된 항목이 하나도 없음 — 빈 덤�
 MARK = {MATCH: "일치", MISMATCH: "불일치", ABSENT: "해당 없음"}
 
 
+def force_utf8_output() -> None:
+    """콘솔 기본 인코딩과 무관하게 출력이 깨지지 않게 한다.
+
+    출력에 `—`·`✔`·`✘` 같은 문자를 쓰는데, Windows 기본 콘솔(cp949)에 그대로
+    `print()`하면 `UnicodeEncodeError`로 **스크립트가 그 자리에서 죽는다.**
+    결과가 안 예쁘게 나오는 정도가 아니라 종료 코드가 판정과 무관해진다.
+
+    이 스크립트는 현장 3분 재실행에서 라이브로 도는 것이 목적이라, 발표
+    노트북 콘솔이 cp949인 것만으로 시연이 멈추면 안 된다. 재현 대조가 막으려는
+    실패와 같은 종류라 여기서 막는다.
+
+    `reconfigure`가 없는 스트림(테스트 캡처 등)은 건드리지 않는다.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(encoding="utf-8")
+        except (ValueError, OSError):
+            # 이미 닫혔거나 재설정할 수 없는 스트림이면 그대로 둔다.
+            pass
+
+
 def _input_error(message: str) -> SystemExit:
     """입력 문제로 끝낸다. 사유는 stderr로 내보내 대조 결과와 섞이지 않게 한다."""
     print(f"오류: {message}", file=sys.stderr)
@@ -129,6 +153,7 @@ def render(results: dict[str, list[ItemResult]], left: Path, right: Path) -> tup
 
 
 def main() -> None:
+    force_utf8_output()
     parser = argparse.ArgumentParser(
         description="같은 입력 2회 실행의 state 덤프를 재현 선언 기준으로 대조한다."
     )

@@ -170,3 +170,70 @@ def test_fingerprints_show_values(tmp_path):
 
     for value in ("cfg-1", "comp-1", "appr-1"):
         assert value in result.stdout
+
+
+def _run_with_env(env_extra: dict, *paths: Path) -> subprocess.CompletedProcess:
+    import os
+
+    env = {**os.environ, **env_extra}
+    return subprocess.run(
+        [sys.executable, str(SCRIPT), *(str(p) for p in paths)],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        env=env,
+    )
+
+
+@pytest.mark.parametrize("console_encoding", ["cp949", "ascii", "latin-1"])
+def test_runs_on_non_utf8_console(tmp_path, console_encoding):
+    """콘솔 기본 인코딩이 UTF-8이 아니어도 죽지 않아야 한다.
+
+    출력에 `—`·`✔` 같은 문자를 쓰는데, Windows 기본 콘솔(cp949)에 그대로
+    print하면 UnicodeEncodeError로 **스크립트가 그 자리에서 죽고** 종료 코드가
+    판정과 무관해진다. 이 스크립트는 현장 3분 재실행에서 라이브로 도는 것이
+    목적이라, 발표 노트북 콘솔 인코딩만으로 시연이 멈추면 안 된다.
+    """
+    result = _run_with_env(
+        {"PYTHONIOENCODING": console_encoding},
+        _write(tmp_path, "a.json", _passing_dump()),
+        _write(tmp_path, "b.json", _passing_dump()),
+    )
+
+    assert result.returncode == EXIT_MATCH, result.stderr
+    assert "UnicodeEncodeError" not in result.stderr
+    assert "일치" in result.stdout
+
+
+@pytest.mark.parametrize(
+    ("code", "make_args"),
+    [
+        (EXIT_MISMATCH, "mismatch"),
+        (EXIT_INPUT_ERROR, "missing"),
+        (EXIT_NOTHING_TO_COMPARE, "empty"),
+    ],
+)
+def test_exit_codes_survive_non_utf8_console(tmp_path, code, make_args):
+    """인코딩 방어가 종료 코드를 바꾸지 않아야 한다.
+
+    출력이 죽으면 종료 코드가 판정이 아니라 크래시를 뜻하게 된다 — 그러면
+    CI든 시연이든 결과를 믿을 수 없다.
+    """
+    if make_args == "mismatch":
+        diverged = _passing_dump()
+        diverged["metrics"]["var"] = 9.9
+        paths = (
+            _write(tmp_path, "a.json", _passing_dump()),
+            _write(tmp_path, "b.json", diverged),
+        )
+    elif make_args == "missing":
+        paths = (tmp_path / "없는파일.json", _write(tmp_path, "b.json", _passing_dump()))
+    else:
+        paths = (_write(tmp_path, "a.json", {}), _write(tmp_path, "b.json", {}))
+
+    result = _run_with_env({"PYTHONIOENCODING": "cp949"}, *paths)
+
+    assert result.returncode == code
+    assert "UnicodeEncodeError" not in result.stderr
