@@ -140,6 +140,20 @@ def test_numeric_consistency_accepts_portfolio_weight_without_citation():
     assert "engine_metric=2" in reason
 
 
+def test_numeric_consistency_weight_context_inert_without_portfolio():
+    """PR #181 리뷰(다경) — R2 calibration 로더는 portfolio를 안 넘긴다.
+    portfolio가 없으면 "비중" 문맥이 엔진 수치로 재분류되지 않고 기존
+    citation 경로 그대로 동작해야 한다(새 오탐 회귀 방지)."""
+    topic = "거시환경·스트레스 개연성"
+    text = f"기준일 {AS_OF_DATE} 기준 국내주식 비중은 50%입니다."
+    explanations = [{"topic": topic, "text": text, "revision": 0}]
+
+    passed, reason = numeric_consistency(explanations, METRICS, {AS_OF_DATE}, None, None)
+
+    assert passed is False
+    assert "같은 topic의 검증 인용에 없음" in reason
+
+
 def test_numeric_consistency_fails_when_weights_do_not_sum_to_100():
     portfolio = [
         {"asset_class": "domestic_equity", "value_krw": 500, "weight": 0.5},

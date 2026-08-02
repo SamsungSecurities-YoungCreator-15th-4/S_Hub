@@ -349,7 +349,7 @@ RAG 검색·rag_cite·judge_eval은 실제 Azure를 호출한다 (`reproducibili
 
 `--offline`이어도 RAG·judge는 Azure를 호출하므로(§4의 마지막 줄) **재실행 자체가 성립하지 않는다.**
 네트워크가 없으면 인용이 0건이 되고, `config/config.yaml`의 `strict_citation_gate`가 켜져 있으면 출처 축이 실패해
-정상적으로 차단된다 — `app/judge/rubric.py:85` (source_validity). 결함이 아니라 설계된 fail-closed 동작이지만,
+정상적으로 차단된다 — `app/judge/rubric.py:89` (source_validity). 결함이 아니라 설계된 fail-closed 동작이지만,
 **재현 데모로는 쓸 수 없다.**
 
 대응 — 제출된 번들 파일만으로 되는 **오프라인 무결성 검증 2종**으로 전환한다. 둘 다 네트워크가 필요 없다.
