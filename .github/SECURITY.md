@@ -40,4 +40,4 @@
 - **GitHub 자동 스캔**: Secret scanning(비밀 푸시 감지), Code scanning(CodeQL),
   Dependabot alerts(의존성 취약점) 활성화.
 
-자세한 협업 규칙은 [`AGENTS.md`](AGENTS.md)를 참고하세요.
+자세한 협업 규칙은 [`AGENTS.md`](../AGENTS.md)를 참고하세요.
