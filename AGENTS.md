@@ -38,6 +38,7 @@ Orchestration/
 │   ├── state.py       # RiskState/IPSProfile — 팀 데이터 계약(SSOT), 임의 수정 금지
 │   ├── graph.py       # StateGraph 조립 (9노드 + 조건부 분기 2개)
 │   ├── hard_stop_policy.py # Hard Stop 정책 버전 로더·검증(SSOT 접근점)
+│   ├── deployment_validation.py # 실제 배포 계약 검증(--validate-deployment)
 │   ├── nodes/         # 그래프 노드 (순수 함수, 바꾼 키만 반환)
 │   ├── engine/        # 결정론 계층 — langchain/llm import 금지
 │   ├── llm/           # AzureChatOpenAI 팩토리·프롬프트 체인
@@ -47,7 +48,7 @@ Orchestration/
 │   ├── evidence/      # R4 증거 번들 스키마·state 덤프
 │   ├── observability/ # LangSmith 트레이싱
 │   └── utils/         # 해시 등 공용 유틸
-├── config/            # config.yaml · ips_policy.yaml · hard_stop_policy.yaml
+├── config/            # config.yaml · ips_policy.yaml · hard_stop_policy.yaml · rag_sources.json
 ├── corpus/            # RAG 근거 문서 (21건, 원문 PDF는 gitignore·로컬 전용 / manifest.md 참조)
 ├── data/              # 시장 데이터 (gitignore 대상 산출물 포함)
 ├── docs/              # 계약·계획 문서 (mermaid.mmd 포함)
@@ -64,6 +65,10 @@ Orchestration/
 ## 그래프 노드 흐름
 
 `app/graph.py`의 실제 조립 기준. 노드 9개, 조건부 분기 2개, HITL 인터럽트 1개.
+
+아래 ①②③은 분기 번호가 아니라 **제어 지점 번호**다 — ① 충돌 재추출 분기 ·
+② HITL 인터럽트 · ③ judge 재작성 분기. 조건부 분기는 ①·③ 둘이고 ②는 인터럽트라
+번호가 ①·③으로 건너뛴다. `scripts/run_graph.py`의 실행 요약 출력과 같은 표기다.
 
 ```
 START
@@ -184,4 +189,6 @@ RAG 근거 문서는 `corpus/`에 카테고리별로 둔다. 상세 목록은 [`
 
 ## 브랜치 전략
 
-- GitFlow: `feature/* → develop → main`. `main` 직접 커밋 금지, 모든 변경은 PR + 리뷰 1명.
+- GitFlow: `feature/*` · `fix/*` · `chore/*` 등 목적별 브랜치 → `develop` → `main`.
+  `main` 직접 커밋 금지, 모든 변경은 PR + 리뷰 1명.
+  상세 규약은 [`.github/CONTRIBUTING.md`](.github/CONTRIBUTING.md)를 따른다.

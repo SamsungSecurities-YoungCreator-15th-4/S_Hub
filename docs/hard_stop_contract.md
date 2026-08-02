@@ -174,15 +174,28 @@ UI와 향후 다운로드 기능은 `report_is_exportable(report)`가 `true`일 
 ## 8. R1 사례집 20건 의존성
 
 R1 사례집은 `case_001`~`case_020`의 사람 라벨 20건(정상 10·결함 10)이며,
-R2가 동일한 사례집으로 Judge 개선 전·후를 평가해야 한다. 기존
+R2가 동일한 사례집으로 Judge 개선 전·후를 평가한다. 기존
 `tests/test_judge_eval_evalset.py`의 `EC-01`~`EC-20`은 7월 시스템 회귀용
 코드 생성 평가셋으로, R1 사례집을 대신하지 않는다.
 
-현재 저장소에는 스타터킷 견본 3건만 있고 R1 실제 20건은 아직 없다. 따라서 R3는
-제공된 FAIL 견본을 직접 사용하는 출처 회귀 테스트까지 수행하며, 실제 20건 기반
-Judge 테스트·일치율·혼동행렬은 R1 사례집 병합 후 R2 파이프라인에서 수행한다.
-R3 Hard Stop 테스트는 그 결과의 `judge.passed`, `judge.checks`,
-`judge_feedback`, `judge_retries` 계약을 소비한다.
+**R1 사례집은 병합됐다.** `goldenset/cases/`에 20건이 있고 라벨링도 끝났으며,
+`goldenset/case_hashes.json`이 동결 해시를 보관한다. 따라서 이 절이 예고했던
+"병합 후"는 이미 지난 상태다.
+
+R3의 출처 회귀 테스트는 여전히 스타터킷 FAIL 견본을 직접 쓴다
+(`test_rule_3_starter_kit_source_marking_mismatch_is_rejected`, §7 표 참조).
+견본이 R1 20건으로 대체된 것이 아니라, **규칙 하나를 좁게 고정하는 회귀
+테스트**라서 사례집과 별개로 유지한다.
+
+20건 기반 일치율·혼동행렬은 R2 파이프라인이 담당하며, R3 Hard Stop 테스트는
+그 결과의 `judge.passed`, `judge.checks`, `judge_feedback`, `judge_retries`
+계약을 소비한다. **R3가 소비하는 계약은 R1 병합 전후로 바뀌지 않는다** — R2가
+어떤 사례집으로 재든 judge 반환 형태는 §4가 정한 그대로다.
+
+> **R2 실행은 무라벨 입력본을 쓴다.** Judge에 넣는 것은 `goldenset/cases/`가
+> 아니라 정답 frontmatter를 제거한 `goldenset/judge_inputs/`다. 자세한 계약은
+> 그 디렉터리의 `README.md`를 따른다. 이 구분이 무너지면 judge가 정답을 미리
+> 본 것이 되어 과제 무효 조건 ①에 걸린다.
 
 실행:
 
