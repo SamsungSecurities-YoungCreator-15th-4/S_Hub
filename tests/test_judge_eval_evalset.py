@@ -24,7 +24,8 @@ JUDGE_MAX_RETRIES = load_inputs({})["run_config"]["judge_max_retries"]
 BASE_TEXT = (
     f"기준일 {AS_OF_DATE} 기준 1일 99% VaR는 79,181,272원입니다. "
     "본 설명은 과거 데이터 기반 추정치이며 투자 권유가 아니고 "
-    "원금 또는 수익을 보장하지 않습니다. 실제 결과와 다를 수 있습니다."
+    "원금 또는 수익을 보장하지 않습니다. 실제 결과와 다를 수 있습니다. "
+    "최종 의사결정 책임은 고객과 담당 PB에게 있습니다."
 )
 BASE_METRICS = {
     "confidence": 0.99,
@@ -174,7 +175,8 @@ def _case(case_id: str) -> dict:
     elif case_id == "EC-14":
         text = (
             f"기준일 {AS_OF_DATE} 기준 원금은 보장되지 않습니다. "
-            "투자 권유가 아니며 실제 결과와 다를 수 있습니다."
+            "투자 권유가 아니며 실제 결과와 다를 수 있습니다. "
+            "최종 의사결정 책임은 고객과 담당 PB에게 있습니다."
         )
         _set_text(state, text)
     elif case_id == "EC-15":
@@ -218,7 +220,8 @@ def _case(case_id: str) -> dict:
         text = (
             f"기준일 {AS_OF_DATE} 기준 시장 참고자료입니다. {fact} "
             "투자 권유가 아니고 원금 또는 수익을 보장하지 않습니다. "
-            "실제 결과와 다를 수 있습니다."
+            "실제 결과와 다를 수 있습니다. "
+            "최종 의사결정 책임은 고객과 담당 PB에게 있습니다."
         )
         state["explanations"] = [{"topic": topic, "text": text, "revision": 0}]
         state["citations"] = [

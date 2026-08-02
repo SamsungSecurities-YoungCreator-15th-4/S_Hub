@@ -18,7 +18,22 @@ AXIS_NAMES = (
     "prohibited_expression",
 )
 
-PROHIBITED_TERMS = ("보장", "확정", "반드시", "무조건", "절대", "확실히")
+PROHIBITED_TERMS = (
+    "최적",
+    "최선",
+    "가장 좋은",
+    "보장",
+    "확정",
+    "손실 없음",
+    "반드시",
+    "무조건",
+    "절대",
+    "확실히",
+)
+# "최적화"(평균-분산 최적화 등 방법론 명칭)는 우월성 주장이 아니므로 금지어
+# 판정에서 제외한다 — 라벨링 가이드 §2⑥ B3. "우월한"은 안내서 금지 목록에
+# 없어 의도적으로 PROHIBITED_TERMS에서 제외한다(가이드 §2⑥ B5).
+_TERM_SAFE_SUFFIXES: dict[str, tuple[str, ...]] = {"최적": ("화",)}
 NEGATION_MARKERS = ("않", "아니", "못", "없")
 NEGATION_WINDOW = 15
 DOUBLE_NEGATION_WINDOW = 40
@@ -369,20 +384,30 @@ def disclaimer(
     dates = set(_DATE_RE.findall(text))
     expected = expected_dates or set()
     date_ok = bool(dates & expected) if expected else bool(dates)
-    disclaimer_patterns = (
+    # E1(비권유): 투자 권유·수익 보장이 아님을 명시적으로 부정한다.
+    e1_patterns = (
         r"투자\s*권유.{0,12}(?:아니|않)",
         r"보장.{0,15}(?:않|아니|못|없)",
-        r"실제\s*결과.{0,12}다를\s*수",
     )
-    disclaimer_ok = any(re.search(pattern, text) for pattern in disclaimer_patterns)
+    # E3(책임 소재): 최종 판단·책임이 고객에게 귀속됨을 명시한다. 불확실성
+    # 고지("실제 결과와 다를 수 있다")는 위조정밀도 P2가 담당하므로 이
+    # 축에서는 E1·E3 어느 쪽으로도 세지 않는다 — 라벨링 가이드 §2⑤ 참조.
+    e3_patterns = (
+        r"(?:최종\s*)?(?:의사결정|판단).{0,15}책임.{0,20}"
+        r"(?:고객|본인|투자자).{0,15}(?:있|귀속)",
+    )
+    e1_ok = any(re.search(pattern, text) for pattern in e1_patterns)
+    e3_ok = any(re.search(pattern, text) for pattern in e3_patterns)
     missing: list[str] = []
     if not date_ok:
         missing.append("state와 일치하는 기준일")
-    if not disclaimer_ok:
-        missing.append("투자 권유·손실 가능성 면책 문구")
+    if not e1_ok:
+        missing.append("투자 권유가 아니라는 비권유 고지(E1)")
+    if not e3_ok:
+        missing.append("최종 판단·책임 소재 고지(E3)")
     if missing:
         return False, "누락: " + ", ".join(missing)
-    return True, "기준일과 면책 문구가 존재합니다."
+    return True, "기준일과 면책 문구(E1·E3)가 존재합니다."
 
 
 def _scan_prohibited(explanations: list) -> tuple[list[str], list[str]]:
@@ -390,7 +415,13 @@ def _scan_prohibited(explanations: list) -> tuple[list[str], list[str]]:
     ambiguous: list[str] = []
     text = _explanation_text(explanations)
     for term in PROHIBITED_TERMS:
+        safe_suffixes = _TERM_SAFE_SUFFIXES.get(term, ())
         for match in re.finditer(re.escape(term), text):
+            if any(
+                text[match.end() : match.end() + len(suffix)] == suffix
+                for suffix in safe_suffixes
+            ):
+                continue
             context = text[match.end() : match.end() + NEGATION_WINDOW]
             extended_context = text[match.end() : match.end() + DOUBLE_NEGATION_WINDOW]
             context = _CLAUSE_BOUNDARY_RE.split(context, maxsplit=1)[0]
