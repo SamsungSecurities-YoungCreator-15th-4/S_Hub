@@ -12,7 +12,13 @@
 
 ⚠️ 이 스크립트는 pass/fail을 판정하지 않는다. 라벨은 사람이 매긴다(무효 조건 ①).
 
-사용: python goldenset/tools/make_blind.py [--seed 문구]
+⚠️ **라벨 확정 후에는 실행이 거부된다.** `cases_blind/`는 라벨러가 실제로 본
+   본문의 유일한 사본이고, 재라벨한 사례는 `cases/`와 의도적으로 다르다.
+   `case_hashes.json`이 있으면 `--force` 없이 돌지 않는다.
+   · judge 실행 입력이 필요하면  → `goldenset/tools/export_judge_inputs.py`
+   · 그래도 재생성해야 하면      → `--force` + 사유를 `labeling-guide.md` §4에 기록
+
+사용: python goldenset/tools/make_blind.py [--seed 문구]        # 라벨링 전에만
 """
 from __future__ import annotations
 
