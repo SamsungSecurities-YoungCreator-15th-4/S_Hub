@@ -7,6 +7,7 @@ import re
 import subprocess
 import sys
 import uuid
+from dataclasses import replace
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -15,7 +16,11 @@ from app.evidence.schema import (
     BUNDLE_FILENAMES,
     BUNDLE_HASH_FILENAME,
     BUNDLE_SCHEMA_VERSION,
+    CALIBRATION_COMPARISON_REQUIRED_KEYS,
     CALIBRATION_DERIVED_KEYS,
+    CALIBRATION_FILE_REQUIRED_KEYS,
+    CALIBRATION_FILENAME,
+    CALIBRATION_SOURCE_PATH,
     CALIBRATION_SUMMARY_REQUIRED_KEYS,
     CITATION_VERIFICATION_FILENAME,
     HARD_STOP_RECORD_FILENAME,
@@ -24,6 +29,7 @@ from app.evidence.schema import (
     JUDGE_RATIONALE_FILENAME,
     LLM_AUDIT_FILENAME,
     MANIFEST_FILENAME,
+    REPLAY_DIFF_FILENAME,
     SUMMARY_FILENAME,
     TRACE_FILENAME,
     calibration_summary,
@@ -176,8 +182,21 @@ def _blocked_state() -> dict:
     return state
 
 
-def _build(tmp_path: Path, state: dict, *, run_id="run-evidence-001", at=GENERATED_AT) -> Path:
-    return make_bundle(state, tmp_path / run_id, run_id=run_id, generated_at=at)
+def _build(
+    tmp_path: Path,
+    state: dict,
+    *,
+    run_id="run-evidence-001",
+    at=GENERATED_AT,
+    calibration=None,
+) -> Path:
+    return make_bundle(
+        state,
+        tmp_path / run_id,
+        run_id=run_id,
+        generated_at=at,
+        calibration=calibration,
+    )
 
 
 def _read_json(out: Path, filename: str) -> dict:
@@ -188,7 +207,14 @@ def test_bundle_creates_every_contract_file(tmp_path):
     out = _build(tmp_path, _passing_state())
 
     assert sorted(p.name for p in out.iterdir()) == sorted(BUNDLE_FILENAMES)
-    assert len(BUNDLE_FILENAMES) == 9
+    # 종수를 숫자로 박지 않는다. 파일이 늘 때마다 테스트를 고치게 되면 이 검사가
+    # "상수를 따라 적었다"는 확인으로 퇴화한다. manifest·bundle_hash 2개만
+    # 해시 대상 밖이라는 구조를 대신 고정한다.
+    assert len(BUNDLE_FILENAMES) == len(HASHED_FILENAMES) + 2
+    assert set(BUNDLE_FILENAMES) - set(HASHED_FILENAMES) == {
+        MANIFEST_FILENAME,
+        BUNDLE_HASH_FILENAME,
+    }
 
 
 def test_manifest_hashes_match_actual_files(tmp_path):
@@ -508,3 +534,166 @@ def test_evalset_hash_ignores_judge_run_metadata():
 
     assert v1["evalset_hash"] == v2["evalset_hash"]
     assert v1["prompt_version"] != v2["prompt_version"]
+
+
+# ---------------------------------------------------------------------------
+# calibration 파일 편입 (R4 — 개선 전후 비교표)
+# ---------------------------------------------------------------------------
+def _calibration_report(*, with_v2: bool = False) -> dict:
+    """`scripts/calibration_report.py --out` 산출물의 최소 형태.
+
+    번들이 소비하는 부분만 만든다 — v1/v2의 `records`와 `comparison`.
+
+    v1·v2는 **같은 사례집·같은 사람 정답**을 다른 프롬프트로 잰 것이어야 한다
+    (`compare_versions`가 사람 라벨 동일성을 강제한다). 그래서 사람 라벨은 그대로
+    두고 v1에서 judge만 1건 놓치게 만들어 개선 전후를 만든다.
+    """
+    from dataclasses import asdict
+
+    from app.evaluation.judge_calibration import compare_versions
+
+    base = _calibration_records()
+    v1 = [
+        replace(
+            record,
+            prompt_version="v1",
+            prompt_hash=f"v1-{record.case_id}",
+            # case_001은 사람이 fail로 매긴 사례다. v1 judge는 이를 놓친다(미탐).
+            judge_passed=True if record.case_id == "case_001" else record.judge_passed,
+            judge_fail_axes=() if record.case_id == "case_001" else record.judge_fail_axes,
+        )
+        for record in base
+    ]
+    report: dict = {"v1": {"records": [asdict(record) for record in v1]}}
+    if with_v2:
+        v2 = [
+            replace(record, prompt_version="v2", prompt_hash=f"v2-{record.case_id}")
+            for record in base
+        ]
+        report["v2"] = {"records": [asdict(record) for record in v2]}
+        report["comparison"] = asdict(compare_versions(v1, v2))
+    return report
+
+
+def test_calibration_file_is_always_created_regardless_of_r2_progress(tmp_path):
+    """R2 결과가 있든 없든 파일은 만들어진다.
+
+    `hard_stop_record`가 성공 실행에서도 `blocked=false`로 생성되는 것과 같은
+    원칙이다 — 파일이 아예 없으면 감사자는 "안 만든 것"과 "아직 못 잰 것"을
+    구분할 수 없다.
+    """
+    without = _build(tmp_path, _passing_state(), run_id="run-no-r2")
+    with_r2 = _build(
+        tmp_path,
+        _passing_state(),
+        run_id="run-with-r2",
+        calibration=_calibration_report(),
+    )
+
+    for out in (without, with_r2):
+        assert (out / CALIBRATION_FILENAME).is_file()
+        payload = _read_json(out, CALIBRATION_FILENAME)
+        assert set(CALIBRATION_FILE_REQUIRED_KEYS) <= set(payload)
+
+
+def test_calibration_records_absence_with_reason_not_silent_emptiness(tmp_path):
+    """R2 결과가 없으면 빈 칸이 아니라 사유와 원본 경로가 실린다."""
+    payload = _read_json(_build(tmp_path, _passing_state()), CALIBRATION_FILENAME)
+
+    for key in ("v1", "v2", "comparison"):
+        assert payload[key]["available"] is False
+        assert CALIBRATION_SOURCE_PATH in payload[key]["reason"]
+        assert payload[key]["reason"].endswith("없음")
+        assert payload[key]["note"]
+
+
+def test_calibration_v1_carries_match_fields_not_agreement(tmp_path):
+    """파생 지표 이름은 `match`·`match_rate`다 — `agreement`가 아니다.
+
+    #137 최초 제안이 쓴 `agreement`는 병합된 `app/evaluation/` 코드에 없다.
+    번들이 이름을 새로 만들면 원본과 대조가 불가능해진다.
+    """
+    payload = _read_json(
+        _build(tmp_path, _passing_state(), calibration=_calibration_report()),
+        CALIBRATION_FILENAME,
+    )
+    v1 = payload["v1"]
+
+    assert set(CALIBRATION_SUMMARY_REQUIRED_KEYS) <= set(v1)
+    assert set(v1["derived"]) == set(CALIBRATION_DERIVED_KEYS)
+    assert "agreement" not in json.dumps(payload, ensure_ascii=False)
+    # 파생값은 confusion_matrix에서만 나온다.
+    matrix = v1["confusion_matrix"]
+    assert v1["derived"]["match"] == matrix["true_positive"] + matrix["true_negative"]
+
+
+def test_calibration_comparison_slot_is_filled_only_when_v2_exists(tmp_path):
+    """v1·v2 비교 자리는 계약으로 존재하되, 값은 재측정 전까지 비어 있다."""
+    v1_only = _read_json(
+        _build(
+            tmp_path,
+            _passing_state(),
+            run_id="run-v1-only",
+            calibration=_calibration_report(),
+        ),
+        CALIBRATION_FILENAME,
+    )
+    # 값이 실린 자리에는 available 키 자체가 없다 — §5 표기는 없을 때만 붙는다.
+    assert "available" not in v1_only["v1"]
+    assert v1_only["comparison"]["available"] is False
+
+    both = _read_json(
+        _build(
+            tmp_path,
+            _passing_state(),
+            run_id="run-v1-v2",
+            calibration=_calibration_report(with_v2=True),
+        ),
+        CALIBRATION_FILENAME,
+    )
+    assert set(both["comparison"]) == set(CALIBRATION_COMPARISON_REQUIRED_KEYS)
+    assert both["v1"]["prompt_version"] != both["v2"]["prompt_version"]
+
+
+def test_calibration_never_carries_human_rationale(tmp_path):
+    """사람 라벨 원문은 번들에 실리지 않는다 — 답안지가 증거물로 새면 안 된다."""
+    payload = _read_json(
+        _build(tmp_path, _passing_state(), calibration=_calibration_report(with_v2=True)),
+        CALIBRATION_FILENAME,
+    )
+    # 데이터가 실리는 자리만 본다. mismatch_detail_excluded는 "왜 안 싣는가"를
+    # 설명하는 문장이라 필드 이름이 등장하는 것이 정상이다.
+    data = json.dumps(
+        {key: payload[key] for key in ("v1", "v2", "comparison")}, ensure_ascii=False
+    )
+
+    assert "합성 근거" not in data
+    assert "human_rationale" not in data
+    assert "records" not in data
+
+
+def test_summary_carries_all_three_reproducibility_fingerprints(tmp_path):
+    """`summary.md` 한 장으로 재현 지문 3종이 다 보여야 한다.
+
+    `docs/reproducibility_scope.md` §2가 선언한 지문은 config_hash·
+    computation_hash·approval_hash 셋이다. 하나라도 빠지면 5분 감사 대응에서
+    `replay_diff.json`을 따로 열어야 한다.
+    """
+    out = _build(tmp_path, _passing_state())
+    summary = (out / SUMMARY_FILENAME).read_text(encoding="utf-8")
+    hashes = _read_json(out, REPLAY_DIFF_FILENAME)["hashes"]
+
+    for name in ("config_hash", "computation_hash", "approval_hash"):
+        assert f"- {name}: {hashes[name]}" in summary
+    # report_hash는 재현 지문이 아니라 번들 파생값이라는 표시가 붙어 있어야 한다.
+    assert "report_hash:" in summary
+    assert "재현 지문 아님" in summary
+
+
+def test_summary_marks_missing_fingerprint_instead_of_blank(tmp_path):
+    """지문이 없으면 빈칸이 아니라 §5 누락 표기로 나간다."""
+    summary = (
+        _build(tmp_path, {"trace_id": "run-empty"}, run_id="run-empty") / SUMMARY_FILENAME
+    ).read_text(encoding="utf-8")
+
+    assert "- approval_hash: 없음 (report.reproducibility.approval_hash 없음)" in summary

@@ -24,6 +24,11 @@ from app.evidence.schema import (  # noqa: E402
     BLOCKED_DERIVED_FROM,
     BUNDLE_HASH_FILENAME,
     BUNDLE_SCHEMA_VERSION,
+    CALIBRATION_COMPARISON_REQUIRED_KEYS,
+    CALIBRATION_FILENAME,
+    CALIBRATION_MISMATCH_EXCLUSION_REASON,
+    CALIBRATION_SOURCE_PATH,
+    CALIBRATION_UNAVAILABLE_NOTE,
     CITATION_VERIFICATION_FILENAME,
     HARD_STOP_RECORD_FILENAME,
     HARD_STOP_SOURCE_PATHS,
@@ -39,6 +44,7 @@ from app.evidence.schema import (  # noqa: E402
     REPLAY_DIFF_PLACEHOLDER_STATUS,
     SUMMARY_FILENAME,
     TRACE_FILENAME,
+    calibration_summary_from_report,
     unavailable,
 )
 from app.judge.axes import AXIS_EN_TO_KO  # noqa: E402
@@ -378,6 +384,54 @@ def build_llm_audit(state: dict, git_sha: object) -> dict:
     }
 
 
+def _calibration_side(report: dict | None, key: str) -> object:
+    """`v1`/`v2` 한쪽. 채울 값이 없으면 사유와 원본 경로를 남긴다."""
+    summary = calibration_summary_from_report((report or {}).get(key))
+    if summary is None:
+        return unavailable(
+            f"{CALIBRATION_SOURCE_PATH}.{key}",
+            note=CALIBRATION_UNAVAILABLE_NOTE,
+        )
+    return summary
+
+
+def _calibration_comparison(report: dict | None) -> object:
+    """v1·v2 비교. 계약 키가 하나라도 없으면 부분 결과를 만들지 않는다."""
+    comparison = (report or {}).get("comparison")
+    if not isinstance(comparison, dict):
+        return unavailable(
+            f"{CALIBRATION_SOURCE_PATH}.comparison",
+            note=CALIBRATION_UNAVAILABLE_NOTE,
+        )
+    missing = [key for key in CALIBRATION_COMPARISON_REQUIRED_KEYS if key not in comparison]
+    if missing:
+        # 일부만 실으면 감사자가 "비교했는데 값이 빈 칸"으로 읽는다. 통째로 없음 처리한다.
+        return unavailable(
+            f"{CALIBRATION_SOURCE_PATH}.comparison",
+            note=f"비교 계약 키 누락: {', '.join(missing)}",
+        )
+    return {key: comparison[key] for key in CALIBRATION_COMPARISON_REQUIRED_KEYS}
+
+
+def build_calibration(report: object) -> dict:
+    """R2 calibration 요약. **R2 진행 상태와 무관하게 항상 생성된다.**
+
+    `hard_stop_record`가 성공 실행에서도 `blocked=false`로 만들어지는 것과 같은
+    원칙이다 — 파일이 아예 없으면 감사자는 "안 만든 것"과 "아직 못 잰 것"을
+    구분할 수 없다. 못 잰 것은 못 쟀다고 사유와 함께 적는다.
+
+    `report`는 `scripts/calibration_report.py --out` 산출물이다. 실행 1회분 state가
+    아니라 사례집 전체를 judge에 돌린 결과라 state에서는 나올 수 없다.
+    """
+    payload = report if isinstance(report, dict) else None
+    return {
+        "v1": _calibration_side(payload, "v1"),
+        "v2": _calibration_side(payload, "v2"),
+        "comparison": _calibration_comparison(payload),
+        "mismatch_detail_excluded": CALIBRATION_MISMATCH_EXCLUSION_REASON,
+    }
+
+
 # ---------------------------------------------------------------------------
 # summary.md
 # ---------------------------------------------------------------------------
@@ -442,9 +496,13 @@ def build_summary_md(
             "",
             "## 주요 해시",
             "",
+            # 앞의 3개가 docs/reproducibility_scope.md §2가 선언한 재현 지문이다.
+            # 하나라도 빠지면 감사자가 summary.md 한 장으로 재현 범위를 확인할 수
+            # 없어 replay_diff.json을 따로 열어야 한다.
             f"- config_hash: {_value_or_dash(hashes.get('config_hash'))}",
             f"- computation_hash: {_value_or_dash(hashes.get('computation_hash'))}",
-            f"- report_hash: {report_hash} (번들이 report 전문에서 계산)",
+            f"- approval_hash: {_value_or_dash(hashes.get('approval_hash'))}",
+            f"- report_hash: {report_hash} (번들이 report 전문에서 계산, 재현 지문 아님)",
             "",
             "## 추적",
             "",
@@ -459,7 +517,19 @@ def build_summary_md(
 # ---------------------------------------------------------------------------
 # 번들 생성
 # ---------------------------------------------------------------------------
-def make_bundle(state: dict, out_dir: Path, *, run_id: str, generated_at: str) -> Path:
+def make_bundle(
+    state: dict,
+    out_dir: Path,
+    *,
+    run_id: str,
+    generated_at: str,
+    calibration: object = None,
+) -> Path:
+    """번들 한 벌을 만든다.
+
+    `calibration`은 `scripts/calibration_report.py --out` 산출물이다. 넘기지 않아도
+    calibration 파일은 만들어지며, 그 경우 `available:false`로 사유가 실린다.
+    """
     out_dir.mkdir(parents=True, exist_ok=True)
     git_sha = _git_sha()
 
@@ -469,6 +539,7 @@ def make_bundle(state: dict, out_dir: Path, *, run_id: str, generated_at: str) -
     hard_stop = build_hard_stop_record(state)
     replay = build_replay_diff(state)
     llm_audit = build_llm_audit(state, git_sha)
+    calibration_summary_payload = build_calibration(calibration)
 
     report = _get(state, "report") or {}
     report_hash = sha256_of_dict(report) if report else "-"
@@ -480,6 +551,7 @@ def make_bundle(state: dict, out_dir: Path, *, run_id: str, generated_at: str) -
         HARD_STOP_RECORD_FILENAME: hard_stop,
         REPLAY_DIFF_FILENAME: replay,
         LLM_AUDIT_FILENAME: llm_audit,
+        CALIBRATION_FILENAME: calibration_summary_payload,
     }
     for filename, payload in payloads.items():
         (out_dir / filename).write_text(_dumps(payload), encoding="utf-8")
@@ -516,6 +588,16 @@ def make_bundle(state: dict, out_dir: Path, *, run_id: str, generated_at: str) -
     return out_dir
 
 
+def _load_calibration(path: Path | None) -> object:
+    """calibration 리포트를 읽는다. 경로를 준 이상 못 읽으면 조용히 넘기지 않는다."""
+    if path is None:
+        return None
+    report = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(report, dict):
+        raise SystemExit("--calibration JSON은 최상위가 객체여야 합니다.")
+    return report
+
+
 def _resolve_run_id(state: dict, explicit: str | None) -> str:
     if explicit:
         return explicit
@@ -530,15 +612,29 @@ def main() -> None:
     parser.add_argument("--state", required=True, type=Path, help="실행 상태 JSON 경로")
     parser.add_argument("--out", required=True, type=Path, help="번들 출력 디렉터리")
     parser.add_argument("--run-id", default=None, help="번들 run_id (기본: state.trace_id)")
+    parser.add_argument(
+        "--calibration",
+        type=Path,
+        default=None,
+        metavar="PATH",
+        help="R2 calibration 리포트 JSON (scripts/calibration_report.py --out 산출물)",
+    )
     args = parser.parse_args()
 
     state = json.loads(args.state.read_text(encoding="utf-8"))
     if not isinstance(state, dict):
         raise SystemExit("--state JSON은 최상위가 객체여야 합니다.")
 
+    calibration = _load_calibration(args.calibration)
     run_id = _resolve_run_id(state, args.run_id)
     generated_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    out_dir = make_bundle(state, args.out, run_id=run_id, generated_at=generated_at)
+    out_dir = make_bundle(
+        state,
+        args.out,
+        run_id=run_id,
+        generated_at=generated_at,
+        calibration=calibration,
+    )
 
     print(f"증거 번들 생성 완료: {out_dir}")
     for filename in sorted(p.name for p in out_dir.iterdir()):

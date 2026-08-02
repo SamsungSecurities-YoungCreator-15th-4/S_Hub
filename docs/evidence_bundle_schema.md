@@ -36,12 +36,15 @@ python scripts/run_graph.py --auto-approve --evidence-bundle
 | --- | --- |
 | `--evidence-bundle [DIR]` | 실행 종료 후 번들 자동 생성. 기본 루트 `evidence/` |
 | `--dump-state PATH` | 최종 state를 결정론적 JSON으로 저장 (번들 입력과 같은 내용) |
+| `--calibration PATH` | R2 calibration 리포트를 번들에 실음. 생략하면 §4.8 자리가 `available:false`로 나간다 |
 
-`scripts/make_evidence_bundle.py`를 직접 부르는 경로도 남아 있다(`--state`/`--out`/`--run-id`). 이 경로에서 `--run-id`를 생략하면 `state.trace_id`를, 그마저 없으면 `unknown-run`을 쓴다.
+`scripts/make_evidence_bundle.py`를 직접 부르는 경로도 남아 있다(`--state`/`--out`/`--run-id`/`--calibration`). 이 경로에서 `--run-id`를 생략하면 `state.trace_id`를, 그마저 없으면 `unknown-run`을 쓴다.
+
+`evidence/`는 실행 산출물이라 git이 추적하지 않는다(`.gitignore`). 실행마다 `run-YYYYMMDD-NNN`이 쌓이고 `trace_id`·LangSmith URL 같은 실행 식별자가 들어가므로, 감사 제출본은 레포가 아니라 제출 경로로 따로 전달한다.
 
 ---
 
-## 3. 디렉터리 구조 — 파일 9종
+## 3. 디렉터리 구조 — 파일 10종
 
 `BUNDLE_FILENAMES` 기준. 번들 디렉터리에 **반드시** 생성된다.
 
@@ -55,10 +58,13 @@ python scripts/run_graph.py --auto-approve --evidence-bundle
 ├── hard_stop_record.json         # 차단 기록
 ├── replay_diff.json              # 재실행 해시 대조
 ├── llm_audit.json                # LLM 감사
+├── calibration_summary.json      # R2 캘리브레이션 요약·개선 전후 비교 (§4.8)
 └── bundle_hash.txt               # manifest의 sha256
 ```
 
-`HASHED_FILENAMES`는 위에서 `manifest.json`과 `bundle_hash.txt`를 뺀 7종이다. manifest는 해시를 담는 그릇이고 bundle_hash는 manifest의 해시라서, 자기 자신을 넣으면 순환한다.
+`HASHED_FILENAMES`는 위에서 `manifest.json`과 `bundle_hash.txt`를 뺀 8종이다. manifest는 해시를 담는 그릇이고 bundle_hash는 manifest의 해시라서, 자기 자신을 넣으면 순환한다.
+
+**종수를 문서에 숫자로 적어 두면 상수와 갈라진다.** 그래서 `tests/test_evidence_bundle.py`의 `test_bundle_creates_every_contract_file`은 숫자를 박지 않고 `BUNDLE_FILENAMES == HASHED_FILENAMES + {manifest, bundle_hash}`라는 구조를 검사한다. 위 목록이 어긋나면 그 테스트가 아니라 이 문서를 고친다 — SSOT는 `app/evidence/schema.py:50` (BUNDLE_FILENAMES)다.
 
 ---
 
@@ -180,18 +186,49 @@ python scripts/run_graph.py --auto-approve --evidence-bundle
 | `ips_extraction_meta` | dict | `state.ips_extraction_meta` |
 | `raw_prompt_and_response` | — | **미저장** — §8 참조 |
 
-### 4.8 calibration 관련
+### 4.8 `calibration_summary.json` — `CALIBRATION_FILE_REQUIRED_KEYS`
 
 > **[※]** calibration 필드도 **다른 담당자의 산출물**이다. 번들은 이름을 정하지 않고 `app/evaluation/`의 구현을 그대로 참조한다. 특히 파생 지표의 필드명은 `match`·`match_rate`이며 **`agreement`가 아니다** — 병합된 코드가 SSOT이기 때문이다.
 
+| 키 | 타입 | 출처 |
+| --- | --- | --- |
+| `v1` | dict | 개선 전 측정. `calibration_summary()` 결과 또는 §5의 "없음" 표기 |
+| `v2` | dict | 개선 후 재측정. 같은 형태 |
+| `comparison` | dict | v1·v2 비교. `CALIBRATION_COMPARISON_REQUIRED_KEYS` 또는 §5의 "없음" 표기 |
+| `mismatch_detail_excluded` | str | 오판 사례 상세를 싣지 않는 이유 (`CALIBRATION_MISMATCH_EXCLUSION_REASON`) |
+
+**세 자리는 R2 진행 상태와 무관하게 항상 존재한다.** 채울 값이 없으면 자리를 비우는 게 아니라 `{"available": false, "reason": ...}`이 들어간다 — `hard_stop_record`가 성공 실행에서도 `blocked=false`로 반드시 생성되는 것과 같은 원칙이다(§8.5). 파일이 없는 것과 "아직 측정하지 않았다"는 감사에서 전혀 다른 의미다.
+
+**입력은 state가 아니다.** calibration은 실행 1회분 state가 아니라 사례집 전체를 judge에 돌린 결과의 집계라, 그래프 한 번의 최종 state에는 존재할 수 없다. `scripts/calibration_report.py --out` 산출물을 아래 플래그로 넘긴다.
+
+```bash
+python scripts/run_graph.py --auto-approve --evidence-bundle --calibration out/calibration_report.json
+python scripts/make_evidence_bundle.py --state run_state.json --out evidence/run-001 --calibration out/calibration_report.json
+```
+
+#### `v1`·`v2` 한쪽의 계약 — `CALIBRATION_SUMMARY_REQUIRED_KEYS`
+
 계약은 `app/evidence/schema.py`의 `calibration_summary()`와 `CALIBRATION_SUMMARY_REQUIRED_KEYS`에 정의돼 있다. 필수 키는 `prompt_version`·`evalset_hash`·`evalset_case_count`·`total`·`confusion_matrix`·`derived`·`per_axis`다.
+
+리포트에 이미 `overall`·`axis_metrics`가 들어 있지만 번들은 **그것을 옮겨 적지 않는다.** `app/evidence/schema.py:433` (calibration_summary_from_report)가 리포트의 `records`를 `CalibrationRecord`로 되돌려 `calibration_summary()`에 그대로 태운다. 옮겨 적으면 집계 로직이 두 벌이 되어 한쪽만 고쳐지는 순간 번들과 리포트가 갈리는데, 그 상황이 이 문서가 처음부터 막으려던 것이다.
+
+#### `comparison`의 계약 — `CALIBRATION_COMPARISON_REQUIRED_KEYS`
+
+필드명은 `app/evaluation/judge_calibration.py`의 `VersionComparison`을 그대로 옮긴다: `before`·`after`·`match_rate_delta`·`false_negative_delta`·`false_positive_delta`·`axis_before`·`axis_after`·`before_code_sha`·`after_code_sha`.
+
+- **계약 키가 하나라도 없으면 부분 결과를 만들지 않는다.** 일부만 실으면 감사자가 "비교했는데 값이 빈 칸"으로 읽는다. 통째로 "없음" 표기로 나가고 누락 키를 사유에 적는다.
+- `before_code_sha`·`after_code_sha`를 함께 싣는 이유는 v1·v2의 `code_sha` 동일성을 요구하지 않기 때문이다. judge LLM축 프롬프트가 코드에 하드코딩돼 있어 진짜 개선이면 `code_sha`가 바뀌는 것이 정상이지만, 그렇다고 "프롬프트만 바뀌었다"는 보장은 없다. 두 값을 그대로 남겨 증거를 검토하는 사람이 직접 판단하게 한다.
+
+#### 오판 사례 상세는 싣지 않는다
+
+`find_mismatches()`가 만드는 `Mismatch`에는 `human_rationale` — 사람이 라벨에 적은 근거 원문 — 이 들어 있다. 번들에 실으면 답안지가 증거물로 새어 나간다. 그래서 번들은 **집계값만** 싣고, 사유를 `mismatch_detail_excluded`에 명시한다. 오답 원인 분석(평가 포인트 2)은 `scripts/calibration_report.py --out` 산출물이 담당한다.
 
 - `confusion_matrix`가 **유일한 원본**이고(`true_positive`·`true_negative`·`false_positive`·`false_negative`), `CALIBRATION_DERIVED_KEYS`(`match`·`match_rate`·`false_negative`·`false_positive`)는 전부 거기서 계산된 파생값이다. 두 곳에 손으로 적으면 한쪽만 고쳐져 어긋날 수 있어, 감사 증거에서는 사람이 채우는 칸을 남기지 않는다.
 - `per_axis`는 축별로 같은 구조를 갖고, 여기에 `human_fail_support`와 `defect_recall`이 추가된다. 결함이 드문 축은 `match_rate`가 과장되기 때문이다 — 20건 중 결함 1건을 놓치면 `match_rate` 95%인데 `defect_recall`은 0%다.
 - `prompt_version`이 필요한 이유는 일치율이 프롬프트에 종속된 수치라서다. 버전이 없으면 개선 전후 비교와 LangSmith `prompt_hash` 대조가 성립하지 않는다.
 - `evalset_hash`가 필요한 이유는 일치율이 (프롬프트 × 평가셋)의 함수라서다. 평가셋 정체성이 없으면 사례 추가·라벨 변경으로 인한 변동을 judge 성능 변화로 오진한다. 수동 버전 문자열은 drift가 생기므로 내용 해시로 고정한다. 해시 대상에는 사례 본문과 **사람 라벨**이 함께 들어간다 — 본문만 고정하면 같은 본문을 다시 라벨링해 정답을 바꾼 경우를 못 잡는다.
 
-**이 계약은 아직 번들 파일로 나가지 않는다** — §8 참조.
+**이 계약은 `calibration_summary.json`으로 번들에 실린다.** 아직 채워지지 않은 자리의 현재 상태는 §8.4를 참조한다.
 
 ---
 
@@ -260,7 +297,7 @@ JSON이 표현하지 못하는 타입(datetime·Decimal·set·Path·bytes·numpy
 
 ## 7. 5분 감사 대응 — `summary.md`
 
-`summary.md`는 **1페이지**다. 감사자가 처음 5분에 물을 것만 담고, 그 이상은 나머지 8개 파일로 넘긴다. 서류철을 다 읽어야 판단이 서면 그건 5분 대응이 아니다.
+`summary.md`는 **1페이지**다. 감사자가 처음 5분에 물을 것만 담고, 그 이상은 나머지 파일로 넘긴다. 서류철을 다 읽어야 판단이 서면 그건 5분 대응이 아니다.
 
 실리는 항목은 다음과 같다.
 
@@ -271,13 +308,14 @@ JSON이 표현하지 못하는 타입(datetime·Decimal·set·Path·bytes·numpy
 | 차단 | 차단 여부(예/아니오) · `export_allowed` |
 | 실패 축 | 필수 검사 중 미통과 축을 한글(영문)로 병기. 없으면 "없음 (필수 검사 전부 통과)" |
 | 차단 사유 | `confirmation_blocked_reason` |
-| 주요 해시 | `config_hash` · `computation_hash` · `report_hash` |
+| 주요 해시 | `config_hash` · `computation_hash` · `approval_hash` · `report_hash` |
 | 추적 | `trace_id` · LangSmith trace URL |
 
-두 가지를 눈여겨볼 만하다.
+세 가지를 눈여겨볼 만하다.
 
 - **실패 축은 두 경로로 찾는다.** `judge.checks`에서 `required=True`인데 통과하지 못한 축을 먼저 모으고, 거기서 안 나오면 `manual_review_gate.failed_axes`로 되짚는다. 차단 실행에서도 실패 축이 비지 않게 하기 위해서다.
-- **`report_hash`는 state에서 읽는 값이 아니라 번들이 `report` 전문에서 계산한 값**이며, summary에 그 사실을 괄호로 적는다.
+- **앞의 세 해시가 재현 지문이다.** [`docs/reproducibility_scope.md`](reproducibility_scope.md) §2가 `config_hash`·`computation_hash`·`approval_hash`를 재현 보장 대상으로 선언한다. 셋이 한 화면에 모여 있어야 감사자가 `summary.md` 한 장으로 재현 범위를 확인할 수 있다 — 하나라도 빠지면 `replay_diff.json`을 따로 열어야 한다.
+- **`report_hash`는 재현 지문이 아니다.** state에서 읽는 값이 아니라 번들이 `report` 전문에서 계산한 값이며, summary에 그 사실과 함께 "재현 지문 아님"을 괄호로 적는다.
 
 값이 §5의 "없음" 형태이면 `없음 (사유)`로 풀어 쓰고, `None`이나 빈 문자열이면 `-`로 적는다.
 
@@ -308,9 +346,13 @@ state에 원문이 없다. 이것은 결함이 아니라 `app/llm/audit.py`의 *
 
 **이 번들은 재현성이 증명되었음을 뜻하지 않는다.** 표시는 R5 재현 검증에서 채워질 때까지 유지한다. 재현 범위 자체의 선언은 [`docs/reproducibility_scope.md`](reproducibility_scope.md)를 따른다.
 
-### 8.4 calibration — 번들 파일 미발행
+### 8.4 `calibration_summary.json` — 측정 전 실행
 
-§4.8의 계약은 `app/evidence/schema.py`에 정의돼 있으나, **`BUNDLE_FILENAMES`에 calibration 파일이 없어 현재 번들로 나가지 않는다.** R2 산출물이 준비된 뒤 파일로 편입해야 R4 최종 DoD가 닫힌다.
+**파일은 편입됐다.** `BUNDLE_FILENAMES`에 들어 있어 모든 실행에서 생성된다(§4.8).
+
+다만 R2가 측정을 끝내기 전까지, 또는 `--calibration`을 넘기지 않은 실행에서는 `v1`·`v2`·`comparison` 세 자리가 `available: false`로 나간다. 이것은 감추는 것이 아니라 §5 규약대로 **못 잰 것을 못 쟀다고 적는 것**이다. 사유에는 원본 경로(`R2 calibration 리포트 입력`)와 복원 방법(`scripts/calibration_report.py --out` 산출물을 `--calibration`으로 전달)이 함께 실린다.
+
+R4 최종 DoD는 v1·v2가 실제로 채워진 번들이 제출될 때 닫힌다. 배선은 이제 R2 산출물을 기다릴 뿐이다.
 
 ### 8.5 `hard_stop_record.manual_review_gate` — 차단되지 않은 실행
 

@@ -63,11 +63,14 @@ def allocate_run_id(root: Path, today: str) -> str:
     return f"{prefix}{sequence:03d}"
 
 
-def generate_evidence_bundle(final: dict, root: Path) -> Path:
+def generate_evidence_bundle(final: dict, root: Path, calibration: object = None) -> Path:
     """그래프 종료 직후 증거 번들을 in-process로 생성한다.
 
     subprocess로 다시 부르지 않는 이유: 명령과 번들 사이에 사람이 파일을 옮기거나
     경로를 지정하는 단계가 생기면 "명령 한 번이면 자동 생성"이 성립하지 않는다.
+
+    `calibration`은 R2 리포트다. 없으면 번들의 calibration 파일이 available:false로
+    나가고, 파일 자체는 그대로 만들어진다.
     """
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from make_evidence_bundle import make_bundle
@@ -77,7 +80,13 @@ def generate_evidence_bundle(final: dict, root: Path) -> Path:
     now = datetime.now(timezone.utc)
     generated_at = now.isoformat(timespec="seconds")
     run_id = allocate_run_id(root, now.strftime("%Y%m%d"))
-    out_dir = make_bundle(final, root / run_id, run_id=run_id, generated_at=generated_at)
+    out_dir = make_bundle(
+        final,
+        root / run_id,
+        run_id=run_id,
+        generated_at=generated_at,
+        calibration=calibration,
+    )
 
     from app.evidence.schema import BUNDLE_FILENAMES
 
@@ -121,6 +130,16 @@ def main() -> None:
         help=(
             "실행 종료 후 감사 증거 번들을 자동 생성 "
             f"(기본 출력 루트: {DEFAULT_EVIDENCE_ROOT})"
+        ),
+    )
+    parser.add_argument(
+        "--calibration",
+        type=Path,
+        default=None,
+        metavar="PATH",
+        help=(
+            "번들에 실을 R2 calibration 리포트 JSON "
+            "(scripts/calibration_report.py --out 산출물). 없으면 available:false로 나간다"
         ),
     )
     args = parser.parse_args()
@@ -245,7 +264,14 @@ def main() -> None:
     if args.evidence_bundle:
         # 정상 확정·수동검토 차단 양쪽 모두에서 생성한다. 차단 사례도 제출물이다.
         _print_header("7) 증거 번들 생성")
-        bundle_dir = generate_evidence_bundle(final, args.evidence_bundle)
+        sys.path.insert(0, str(ROOT / "scripts"))
+        from make_evidence_bundle import _load_calibration
+
+        bundle_dir = generate_evidence_bundle(
+            final,
+            args.evidence_bundle,
+            _load_calibration(args.calibration),
+        )
         print(f"  생성: {bundle_dir}")
         for name in sorted(child.name for child in bundle_dir.iterdir()):
             print(f"    - {name}")

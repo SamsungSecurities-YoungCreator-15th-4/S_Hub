@@ -41,3 +41,9 @@ judge_v*_results.json
 # 내용이 전부 cases_blind/ · corpus/chunks.json · labels/ 답안지의 사본이라
 # 정답 사본이 여러 곳에 흩어지지 않도록 추적하지 않는다. 필요하면 재생성한다.
 /goldenset/dist/
+
+# evidence/ 는 scripts/run_graph.py --evidence-bundle 이 만드는 실행 산출물이다
+# (DEFAULT_EVIDENCE_ROOT). 실행마다 run-YYYYMMDD-NNN 이 쌓이고 LangSmith URL·
+# trace_id 같은 실행 식별자가 들어가므로 추적하지 않는다. 감사 제출본은
+# 레포가 아니라 제출 경로로 따로 전달한다.
+/evidence/
