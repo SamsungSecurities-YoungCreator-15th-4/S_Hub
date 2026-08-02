@@ -323,9 +323,8 @@ def hallucination(
         llm,
         axis="hallucination",
         instruction=(
-            "설명문의 실질적 주장 중 검증된 인용문 또는 해당 청크 원문으로 "
-            "뒷받침되지 않는 주장이 하나라도 있거나, 설명문의 실질적 주장 중 "
-            "인용 원문에 존재하지 않는 주장이 하나라도 있으면 fail한다. 단, "
+            "설명문의 실질적 주장 중 인용 원문이 존재하지 않는 주장 또는 해당 "
+            "청크 원문으로 뒷받침되지 않는 주장이 하나라도 있으면 fail한다. 단, "
             "deterministic_context의 expected_dates에 있는 기준일은 state에서 "
             "검증된 값이며, 투자 권유·수익 보장이 아니라는 의무 면책문은 외부 "
             "사실 주장이 아니므로 인용 부재만으로 fail하지 않는다. 또한, 입력에 "
@@ -348,9 +347,9 @@ def false_precision(explanations: list, llm) -> tuple[bool, str]:
         axis="false_precision",
         instruction=(
             "확률·손실을 근거 없이 정밀하게 단정하면 fail한다. 신뢰수준과 보유기간을 "
-            "명시한 VaR, 또는 약·추정·범위·신뢰구간 표현은 허용한다. 반면 신뢰구간(CI)를 "
-            "제시했는데 '신뢰 수준'('confidence', 99%)와 '신뢰 구간'('ci_level', 90%)을 "
-            "혼동해 표기한 경우가 하나라도 있으면 모두 fail한다."
+            "명시한 VaR, 또는 약·추정·범위·신뢰구간 표현은 허용한다. 신뢰수준(confidence)과 "
+            "신뢰구간 수준(ci_level)은 서로 다른 값이며, 한쪽 값을 다른 쪽 이름으로 "
+            "표기하거나 두 개념을 뒤바꿔 서술한 경우가 하나라도 있으면 fail한다."
         ),
         payload={"explanations": _explanation_text(explanations)},
     )
