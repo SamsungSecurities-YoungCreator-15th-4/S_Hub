@@ -9,8 +9,14 @@ leakage 경계(중요): 이 러너는 judge가 채점 대상으로 보는 사례
 분석 담당의 merge_records()가 별도로 소비한다. 러너 출력(JudgeResult)은 judge가 낸
 판정이지 정답지가 아니므로 실행 담당이 봐도 leakage가 아니다.
 
-이번 단계(Phase 1): R1 정답 사례집이 오기 전, EC 회귀 평가셋(시스템 테스트용이며
-정답지가 아님)으로 배선을 검증한다. R1 사례가 오면 case 로더만 교체하면 된다.
+사례 로더: --ec-demo는 EC 회귀 평가셋(시스템 테스트용, 정답지 아님), --r1은 R1
+무라벨 사례집(goldenset/judge_inputs)을 load_case로 읽는다.
+
+방법론 한계(감사 대비 명시): R1 사례집의 computation_hash는 '<실행 시 자동 기록>'
+자리표시라, 로더가 metrics 내용에서 결정론적으로 합성한 값으로 채운다. 그 결과
+judge의 형태 검사 computation_hash_present는 정적 리포트 재생에선 실질적으로
+'무측정'이며(판정에는 통과로 기록됨), 엔진이 실제로 산출한 재현 해시를 검증하는
+것이 아니다. 리포트에 methodology_limitations 필드가 생기면 여기에도 함께 싣는다.
 """
 from __future__ import annotations
 
@@ -28,7 +34,10 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from app.evaluation.calibration_schema import build_judge_result  # noqa: E402
-from app.goldenset.loader import load_case  # noqa: E402,F401  (테스트 계약: scripts.judge_runner.load_case)
+# §8 계약 훅: tests/test_goldenset_integrity.py의 로더 비누출 테스트가
+# scripts.judge_runner.load_case를 탐색한다(문자열 루프라 grep엔 안 잡힘). 로더가
+# app/evaluation로 이동한 뒤로는 이 재노출이 §8이 로더를 찾는 유일한 경로다.
+from app.evaluation.goldenset_loader import load_case  # noqa: E402,F401
 from app.nodes.judge_eval import judge_eval  # noqa: E402
 from app.utils.hashing import sha256_of_dict  # noqa: E402
 
@@ -64,14 +73,19 @@ def resolve_freeze_commit() -> str:
 
     '고치고 나서 v1을 잰 것 아니냐'를 반박하는 감사 앵커라, 태그가 없으면 조용히
     넘기지 않고 즉시 실패시킨다(동결 기준을 못 박지 못하면 v1의 의미가 없다).
+    태그 부재는 원인이 바로 보이는 메시지로 중단시킨다(raw 트레이스백 대신).
     """
     completed = subprocess.run(
         ["git", "rev-parse", "v1-freeze^{commit}"],
         cwd=ROOT,
         capture_output=True,
         text=True,
-        check=True,
     )
+    if completed.returncode != 0:
+        raise SystemExit(
+            "v1-freeze 태그를 찾을 수 없습니다 — R1 라벨 동결 태그가 있어야 v1을"
+            " 실행할 수 있습니다. `git fetch --tags` 후 다시 시도하세요."
+        )
     return completed.stdout.strip()
 
 
@@ -306,7 +320,7 @@ def _load_r1_cases() -> list[dict]:
     스캐폴딩의 기준값(judge_max_retries·strict_citation_gate 등)은 config.yaml을
     적재하는 load_inputs에서 가져와 사례별 기준일만 덮어쓴다.
     """
-    from app.goldenset.loader import load_all_cases
+    from app.evaluation.goldenset_loader import load_all_cases
     from app.nodes.load_inputs import load_inputs
 
     run_config_defaults = load_inputs({})["run_config"]
@@ -318,7 +332,7 @@ def _load_r1_cases() -> list[dict]:
 
 def _r1_input_set_hash() -> str:
     """R1 무라벨 평가셋 식별 해시(manifest input_set_hash)."""
-    from app.goldenset.loader import input_set_hash
+    from app.evaluation.goldenset_loader import input_set_hash
 
     return input_set_hash()
 

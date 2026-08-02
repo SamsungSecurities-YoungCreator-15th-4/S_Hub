@@ -188,7 +188,15 @@ def _parse_metrics(sections: list[tuple[str, str]], body: str) -> dict:
 
 
 def _synthesize_hash(metrics: dict) -> str:
-    """metrics 수치 내용의 결정론적 sha256. 사례집 자리표시 해시를 대체한다."""
+    """metrics 수치 내용의 결정론적 sha256. 사례집 자리표시 해시를 대체한다.
+
+    주의(방법론 한계): 이 값은 엔진이 산출한 재현 해시가 아니라 로더가 사례 내용에서
+    합성한 값이다. R1 사례집의 computation_hash는 '<실행 시 자동 기록>' 자리표시라
+    본문에 실제 해시가 없어, 형태 검사(computation_hash_present)의 재현성 근거를
+    채우기 위해 합성한다. 따라서 정적 리포트 재생에서 computation_hash_present는
+    실질적으로 무측정이다(엔진 산출 해시를 검증하는 것이 아님). judge_runner.py
+    모듈 docstring 참조.
+    """
     payload = {key: metrics[key] for key in ("horizons", "stress", "confidence") if key in metrics}
     payload["data_period_end"] = metrics.get("meta", {}).get("data_period", {}).get("end", "")
     return sha256_of_dict(payload)
@@ -357,8 +365,9 @@ def _parse_citations(body: str, sections: list[tuple[str, str]], chunks: list[di
                 extra=extra,
             )
         )
-    verified, _rejected = verify_citations(candidates, chunks)
-    # verify_citations는 통과분만 verified=True로 표시하고 원본 리스트도 갱신한다.
+    # verify_citations는 candidates를 in-place로 갱신한다(통과분 verified=True +
+    # provenance 첨부). 반환값은 안 쓰고 갱신된 원본을 그대로 직렬화하는 게 의도다.
+    _verified, _rejected = verify_citations(candidates, chunks)
     return [citation.to_dict() for citation in candidates]
 
 

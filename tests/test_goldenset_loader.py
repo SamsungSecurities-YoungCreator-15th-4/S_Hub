@@ -1,4 +1,4 @@
-"""R1 무라벨 사례집 로더(app.goldenset.loader)의 배선·비누출 검증.
+"""R1 무라벨 사례집 로더(app.evaluation.goldenset_loader)의 배선·비누출 검증.
 
 이 테스트는 사례 '내용'을 출력하지 않는다(방화벽). 구조·개수·키·결정성만 확인한다.
 정답(label/fail_axes/…)은 judge_inputs에 애초에 없고, 로더가 어떤 경로로도 state에
@@ -11,7 +11,7 @@ import json
 
 import pytest
 
-from app.goldenset.loader import (
+from app.evaluation.goldenset_loader import (
     ALLOWED_STATE_KEYS,
     JUDGE_INPUTS_DIR,
     CaseFormatError,
