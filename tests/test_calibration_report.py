@@ -150,6 +150,21 @@ def official_files(tmp_path: Path) -> dict[str, Path]:
     return {"human": human_path, "v1": v1_path, "v2": v2_path}
 
 
+@pytest.fixture()
+def official_files_with_v3(official_files, tmp_path: Path) -> dict[str, Path]:
+    """v2→v3처럼 prompt_hash는 v2와 동일하고 code_sha만 다른 v3.json을 추가한다."""
+    v2_by_id = {
+        r["case_id"]: r
+        for r in json.loads(official_files["v2"].read_text(encoding="utf-8"))
+    }
+    v3 = _official_judge_results(prompt_version="v3", code_sha="fadedbee")
+    for result in v3:
+        result["prompt_hash"] = v2_by_id[result["case_id"]]["prompt_hash"]
+    v3_path = tmp_path / "v3.json"
+    v3_path.write_text(json.dumps(v3, ensure_ascii=False), encoding="utf-8")
+    return {**official_files, "v3": v3_path}
+
+
 class TestCalibrationReportV1Only:
     def test_prints_overall_metrics_and_mismatches(self, files, monkeypatch, capsys):
         _run(
@@ -271,5 +286,73 @@ class TestCalibrationReportOfficialMode:
                     "--human-labels-json", str(official_files["human"]),
                     "--judge-results", str(official_files["v1"]),
                     "--official",
+                ],
+            )
+
+    def test_no_prompt_change_required_without_official_is_rejected(self, files, monkeypatch):
+        with pytest.raises(SystemExit):
+            _run(
+                monkeypatch,
+                [
+                    "--human-labels-json", str(files["human"]),
+                    "--judge-results", str(files["v1"]),
+                    "--no-prompt-change-required",
+                ],
+            )
+
+    def test_v2_v3_with_identical_prompt_hash_is_rejected_without_the_flag(
+        self, official_files_with_v3, monkeypatch
+    ):
+        """--no-prompt-change-required 없이 v2→v3(prompt_hash 동일)를 official로
+        비교하면 여전히 거부돼야 한다 — 이 플래그가 실제로 필요함을 보여준다."""
+        with pytest.raises(Exception, match="prompt_hash"):
+            _run(
+                monkeypatch,
+                [
+                    "--human-labels-json", str(official_files_with_v3["human"]),
+                    "--judge-results", str(official_files_with_v3["v2"]),
+                    "--judge-results-v2", str(official_files_with_v3["v3"]),
+                    "--official", "--no-langsmith",
+                ],
+            )
+
+    def test_no_prompt_change_required_allows_code_only_v2_v3_comparison(
+        self, official_files_with_v3, monkeypatch, capsys, tmp_path: Path
+    ):
+        out_path = tmp_path / "report.json"
+        _run(
+            monkeypatch,
+            [
+                "--human-labels-json", str(official_files_with_v3["human"]),
+                "--judge-results", str(official_files_with_v3["v2"]),
+                "--judge-results-v2", str(official_files_with_v3["v3"]),
+                "--official", "--no-langsmith", "--no-prompt-change-required",
+                "--out", str(out_path),
+            ],
+        )
+        capsys.readouterr()
+        report = json.loads(out_path.read_text(encoding="utf-8"))
+        assert report["mode"] == "official_offline_code_change"
+        assert report["official_validation_passed"] is True
+        assert report["comparison"]["before_code_sha"] == "cafebabe"
+        assert report["comparison"]["after_code_sha"] == "fadedbee"
+
+    def test_no_prompt_change_required_does_not_bypass_langsmith_requirement(
+        self, official_files_with_v3, monkeypatch, tmp_path: Path
+    ):
+        """--no-prompt-change-required와 --no-langsmith는 독립적인 요건이다 —
+        official_files_with_v3의 langsmith_run_id는 전부 None이므로,
+        --no-langsmith 없이 --no-prompt-change-required만 쓰면 여전히
+        LangSmith 요건에서 거부돼야 한다(한쪽 플래그가 다른 쪽을 몰래 완화하면 안 됨)."""
+        out_path = tmp_path / "report.json"
+        with pytest.raises(Exception, match="LangSmith"):
+            _run(
+                monkeypatch,
+                [
+                    "--human-labels-json", str(official_files_with_v3["human"]),
+                    "--judge-results", str(official_files_with_v3["v2"]),
+                    "--judge-results-v2", str(official_files_with_v3["v3"]),
+                    "--official", "--no-prompt-change-required",
+                    "--out", str(out_path),
                 ],
             )

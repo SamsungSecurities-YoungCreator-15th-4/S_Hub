@@ -915,6 +915,49 @@ class TestCompareOfficialVersions:
         with pytest.raises(CalibrationSchemaError, match="20건"):
             compare_official_versions(v1, v2)
 
+    def test_require_prompt_change_false_allows_identical_prompt_hash_with_different_code_sha(self):
+        """v2→v3(프롬프트는 그대로, 결정론 규칙 코드만 수정)처럼 prompt_hash가
+        20건 전부 동일해도, require_prompt_change=False면 code_sha 변경으로
+        "무언가 확실히 바뀌었다"를 증명하고 통과해야 한다."""
+        v2 = _official_20_records(prompt_version="v2")
+        v2_by_id = {record.case_id: record for record in v2}
+        v3_raw = _official_20_records(prompt_version="v3")
+        v3 = [
+            replace(record, prompt_hash=v2_by_id[record.case_id].prompt_hash, code_sha="cafef00d")
+            for record in v3_raw
+        ]
+        comparison = compare_official_versions(v2, v3, require_prompt_change=False)
+        assert comparison.before_code_sha == "deadbeef"
+        assert comparison.after_code_sha == "cafef00d"
+
+    def test_require_prompt_change_false_raises_when_code_sha_also_identical(self):
+        """require_prompt_change=False라도 code_sha까지 동일하면 프롬프트도
+        코드도 안 바뀐 것이므로 통과시키면 안 된다."""
+        v2 = _official_20_records(prompt_version="v2")
+        v2_by_id = {record.case_id: record for record in v2}
+        v3_raw = _official_20_records(prompt_version="v3")
+        v3 = [replace(record, prompt_hash=v2_by_id[record.case_id].prompt_hash) for record in v3_raw]
+        with pytest.raises(ValueError, match="code_sha가 동일합니다"):
+            compare_official_versions(v2, v3, require_prompt_change=False)
+
+    def test_require_prompt_change_false_still_checks_model_version_and_prompt_version(self):
+        """require_prompt_change=False가 다른 필수 검증(model_version 동일·
+        prompt_version 상이)까지 느슨하게 풀면 안 된다."""
+        v2 = _official_20_records(prompt_version="v2")
+        v2_by_id = {record.case_id: record for record in v2}
+        v3_raw = _official_20_records(prompt_version="v3")
+        v3 = [
+            replace(
+                record,
+                prompt_hash=v2_by_id[record.case_id].prompt_hash,
+                code_sha="cafef00d",
+                model_version={"deployment": "other", "model": "other-model", "api_version": "x"},
+            )
+            for record in v3_raw
+        ]
+        with pytest.raises(ValueError, match="동일한 model_version"):
+            compare_official_versions(v2, v3, require_prompt_change=False)
+
 
 class TestBuildJudgeResultCrossChecks:
     def test_as_of_date_matching_run_config_is_accepted(self):

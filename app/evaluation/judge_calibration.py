@@ -339,47 +339,62 @@ def compare_official_versions(
     after_records: list[CalibrationRecord],
     *,
     require_langsmith: bool = True,
+    require_prompt_change: bool = True,
 ) -> VersionComparison:
-    """R2 공식 v1·v2 비교 — compare_versions()에 제출 요건 검증을 더한 wrapper.
+    """R2 공식 버전 비교 — compare_versions()에 제출 요건 검증을 더한 wrapper.
 
     각 실행이 validate_official_case_set()을 통과해야 하고(정확히 20건·1차
-    판정·run 내부 일관성), v1·v2 사이에서는 model_version이 같고 prompt_version은
-    달라야 한다.
+    판정·run 내부 일관성), 비교 대상 사이에서는 model_version이 같고
+    prompt_version은 달라야 한다.
 
-    code_sha는 v1·v2 간 동일성을 요구하지 않는다 — 지금 judge의 LLM축
+    code_sha는 두 버전 간 동일성을 요구하지 않는다 — 지금 judge의 LLM축
     프롬프트(hallucination/false_precision)는 app/judge/rubric.py에 문자열로
     하드코딩돼 있어, 프롬프트를 실제로 고치는 유일한 방법이 코드 수정이다.
     즉 진짜 개선이면 code_sha가 반드시 달라진다 — 여기서 동일성을 요구하면
     R2가 요구하는 "v1 측정 → 개선 → v2 재측정" 자체를 이 함수가 거부하게 된다.
-    대신 prompt_hash가 case_id별로 전부 같은지 확인한다 — prompt_hash는 사례
+
+    require_prompt_change=True(기본값, v1→v2처럼 프롬프트만 고친 비교)에서는
+    prompt_hash가 case_id별로 전부 같은지 확인한다 — prompt_hash는 사례
     payload까지 포함해 렌더링한 프롬프트의 해시라, 템플릿이 조금이라도
-    바뀌면 사실상 항상 달라진다. case_content_sha256(사례 본문)은 이미
-    v1·v2 동일성이 강제되므로, 템플릿이 바뀌었다면 20건 전부의 prompt_hash가
-    달라지는 게 정상이다 — 반대로 템플릿이 그대로면 20건 전부 같다. 그래서
-    "일부만 같음"도 "전부 같음"과 마찬가지로 이상 신호다(한 건이라도
-    prompt_hash가 우연히 같다면, 같은 본문·같은 조건에서 렌더링이 비결정적이라는
-    뜻일 수 있다) — 하나라도 같은 case_id가 있으면 거부한다.
+    바뀌면 사실상 항상 달라진다. case_content_sha256(사례 본문)은 이미 동일성이
+    강제되므로, 템플릿이 바뀌었다면 20건 전부의 prompt_hash가 달라지는 게
+    정상이다 — 반대로 템플릿이 그대로면 20건 전부 같다. 그래서 "일부만 같음"도
+    "전부 같음"과 마찬가지로 이상 신호다(한 건이라도 prompt_hash가 우연히
+    같다면, 같은 본문·같은 조건에서 렌더링이 비결정적이라는 뜻일 수 있다) —
+    하나라도 같은 case_id가 있으면 거부한다.
+
+    require_prompt_change=False(v2→v3처럼 프롬프트는 그대로 두고 결정론 규칙
+    코드만 고친 비교)에서는 "무언가 확실히 바뀌었다"는 증명 대상을
+    prompt_hash에서 code_sha로 옮긴다 — 검증을 느슨하게 푸는 게 아니라 어느
+    축으로 그 사실을 증명할지 바꾸는 것이다. code_sha가 그대로면 이 경우에도
+    거부한다(프롬프트도 코드도 안 바뀐 비교를 통과시키지 않는다).
     """
     validate_official_case_set(before_records, require_langsmith=require_langsmith)
     validate_official_case_set(after_records, require_langsmith=require_langsmith)
     before_first, after_first = before_records[0], after_records[0]
     if before_first.model_version != after_first.model_version:
         raise ValueError(
-            f"v1·v2는 동일한 model_version으로 실행해야 합니다: "
-            f"v1={before_first.model_version}, v2={after_first.model_version}"
+            f"두 버전은 동일한 model_version으로 실행해야 합니다: "
+            f"before={before_first.model_version}, after={after_first.model_version}"
         )
     if before_first.prompt_version == after_first.prompt_version:
-        raise ValueError(f"v1·v2의 prompt_version이 같습니다({before_first.prompt_version}) — 비교할 변화가 없습니다.")
-    before_by_id = {record.case_id: record for record in before_records}
-    after_by_id = {record.case_id: record for record in after_records}
-    unchanged_prompt_hash_cases = sorted(
-        case_id
-        for case_id in before_by_id
-        if before_by_id[case_id].prompt_hash == after_by_id[case_id].prompt_hash
-    )
-    if unchanged_prompt_hash_cases:
+        raise ValueError(f"두 버전의 prompt_version이 같습니다({before_first.prompt_version}) — 비교할 변화가 없습니다.")
+    if require_prompt_change:
+        before_by_id = {record.case_id: record for record in before_records}
+        after_by_id = {record.case_id: record for record in after_records}
+        unchanged_prompt_hash_cases = sorted(
+            case_id
+            for case_id in before_by_id
+            if before_by_id[case_id].prompt_hash == after_by_id[case_id].prompt_hash
+        )
+        if unchanged_prompt_hash_cases:
+            raise ValueError(
+                "prompt_version은 다르지만 다음 사례는 두 버전의 prompt_hash가 같습니다 — "
+                f"실제 judge 프롬프트가 안 바뀌었거나 렌더링이 비결정적일 수 있습니다: {unchanged_prompt_hash_cases}"
+            )
+    elif before_first.code_sha == after_first.code_sha:
         raise ValueError(
-            "prompt_version은 다르지만 다음 사례는 v1·v2의 prompt_hash가 같습니다 — "
-            f"실제 judge 프롬프트가 안 바뀌었거나 렌더링이 비결정적일 수 있습니다: {unchanged_prompt_hash_cases}"
+            "require_prompt_change=False(코드 개선 비교)인데 code_sha가 "
+            f"동일합니다({before_first.code_sha}) — 프롬프트도 코드도 안 바뀐 비교입니다."
         )
     return compare_versions(before_records, after_records)
