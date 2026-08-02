@@ -13,11 +13,19 @@
 
 **번들 3건의 구성** ([`docs/symphony_proof_plan.md`](symphony_proof_plan.md) §2 R5 「모의 감사 대응」 기준):
 
-| 번들 | 내용 | 생성 명령 |
-| --- | --- | --- |
-| 성공① | 정상 실행 (judge 첫 시도 통과) | `python scripts/run_graph.py --auto-approve --evidence-bundle` |
-| 성공② | judge 실패 → 재작성 → 통과 (루프 시연) | 위 명령 + `--force-judge-fail N` (N은 `judge_max_retries`**보다 작은** 값) |
-| 차단 | 재시도 소진 → `manual_review_gate` 정지 | 위 명령 + `--force-judge-fail N` (N은 `judge_max_retries` **이상**) |
+| 번들 | 내용 | 덧붙이는 플래그 | state 덤프 경로 |
+| --- | --- | --- | --- |
+| 성공① | 정상 실행 (judge 첫 시도 통과) | 없음 | `evidence/state_dumps/success_1.json` |
+| 성공② | judge 실패 → 재작성 → 통과 (루프 시연) | `--force-judge-fail N` (N은 `judge_max_retries`**보다 작은** 값) | `evidence/state_dumps/success_2.json` |
+| 차단 | 재시도 소진 → `manual_review_gate` 정지 | `--force-judge-fail N` (N은 `judge_max_retries` **이상**) | `evidence/state_dumps/blocked.json` |
+
+세 번들 모두 아래 형태로 만든다. `--dump-state`가 붙어 있는 것이 §3.4 대조의 전제다 — 이유는 §1.1.
+
+```bash
+python scripts/run_graph.py --auto-approve --offline \
+  --evidence-bundle --dump-state evidence/state_dumps/<위 표의 이름>.json \
+  [--force-judge-fail N]
+```
 
 - 출력 루트는 `--evidence-bundle`에 인자를 주지 않으면 `evidence/`다 — `scripts/run_graph.py:127` (DEFAULT_EVIDENCE_ROOT).
 - 재시도 상한 숫자는 이 문서에 적지 않는다. 유일한 원천은 `config/config.yaml`의 `judge_max_retries`이고
@@ -27,6 +35,37 @@
 **감사자가 보는 것**: 번들 디렉터리 안의 파일 전체. 목록의 원천은 `app/evidence/schema.py:50` (BUNDLE_FILENAMES)이며,
 이 문서는 종수를 숫자로 적지 않는다 — 파일이 늘면 문서가 상수와 갈라진다.
 성공 번들이든 차단 번들이든 **`BUNDLE_FILENAMES`가 전부 생성된다** — 차단 사례도 제출물이다.
+
+### 1.1 `submitted.json`은 번들 안에 없다 — 만들 때 같이 만들어 둔다
+
+**번들에는 state 덤프가 들어 있지 않다.** `BUNDLE_FILENAMES`(`app/evidence/schema.py:50`)에 없기 때문이다.
+§3.4의 `submitted.json`은 현장에서 번들을 열어 꺼내는 파일이 아니라 **번들을 만들 때 `--dump-state`로
+함께 만들어 보관해 둔 파일**이다 — `scripts/run_graph.py:261` (dump_state).
+이 절차 없이 현장에서 `replay_verify.py submitted.json …`을 치면 파일이 없어 **종료 코드 `2`로 끝난다**(§3.4).
+
+**보관 위치는 번들 디렉터리 밖이다.** 번들 안에 넣으면 "번들 구성의 원천은 `BUNDLE_FILENAMES`뿐"이라는
+위 설명과 갈린다. `evidence/state_dumps/`에 둔다 — `run_id` 채번은 `run-`으로 시작하는 디렉터리만 세므로
+같은 루트에 둬도 번호가 밀리지 않는다 (`scripts/run_graph.py:47` (allocate_run_id)).
+
+**지목된 번들과 덤프의 대응은 파일명이 아니라 `trace_id`로 확인한다.** 이름은 사람이 붙인 것이라 근거가 못 된다.
+
+- 번들 쪽: `summary.md` §추적의 `trace_id` (= `trace.json`의 같은 값, `scripts/make_evidence_bundle.py:136` (trace_id))
+- 덤프 쪽: 최상위 `trace_id`
+- 두 값이 같은 덤프를 `submitted.json`으로 쓴다. 감사자가 번들을 지목하면 이 확인을 먼저 하고 명령을 친다.
+
+**재실행은 원본과 같은 플래그로 돈다.** "같은 입력"이 계약이므로 다음 두 개를 원본에 맞춘다.
+
+- **`--offline`은 제출 번들 생성과 재실행 양쪽에 똑같이 건다.** 한쪽만 걸면 시장 데이터와 IPS 추출 입력이
+  달라져 "같은 입력"이 성립하지 않는다(§4 마지막 줄). 재현 데모를 `--offline`으로 돌리고 이유를 먼저 밝히는 것은
+  `docs/symphony_proof_plan.md` §2 R5의 방침이기도 하다.
+- **`--force-judge-fail N`의 N도 원본과 같은 값을 쓴다.** 기억에 의존하지 않는다 — 원본 값은 덤프 자신에
+  `demo_options.force_judge_fail`로 남아 있다 (`scripts/run_graph.py:155` (force_judge_fail)).
+
+```bash
+python -c "import json;print(json.load(open('submitted.json'))['demo_options'])"
+```
+
+이건 대조가 아니라 **재실행 인자를 읽는 것**이라 §3.4의 "손으로 대조하지 않는다"에 걸리지 않는다.
 
 ---
 
@@ -113,7 +152,12 @@ python scripts/run_graph.py --auto-approve --offline \
 
 번들은 그래프 종료 직후 in-process로 생성된다 — `scripts/run_graph.py:66` (generate_evidence_bundle). 사람이 파일을 옮기는 단계는 없다.
 
-차단 경로를 재실행하려면 위 명령에 `--force-judge-fail N`(N은 `judge_max_retries` 이상)을 붙인다. **다만 이 플래그가 무엇을 시연하는지는 §3.5에서 먼저 읽는다** — judge가 결함을 판별하는 실연이 아니다.
+차단 경로를 재실행하려면 위 명령에 `--force-judge-fail N`을 붙인다. **N은 임의로 고르는 값이 아니라
+지목된 번들이 쓴 값 그대로다** — 확인 방법은 §1.1. 그리고 **이 플래그가 무엇을 시연하는지는 §3.5에서
+먼저 읽는다** — judge가 결함을 판별하는 실연이 아니다.
+
+`submitted.json`은 이 실행이 만드는 것이 아니라 제출 번들을 만들 때 함께 만들어 둔 덤프다(§1.1).
+`replay.json`만 이 명령이 새로 만든다.
 
 ### 3.2 구간 배분
 
@@ -171,11 +215,13 @@ python scripts/run_graph.py --auto-approve --offline \
 **들어간다. 다만 여유가 얇다.** 예비 8.6초로는 질문 1건도 받을 수 없다. 그래서:
 
 - **차단 경로를 라이브로 돌리는 것은 감사자가 차단 번들을 지목했을 때의 선택지**이지 기본값이 아니다.
-- 실행이 시작되고 **140초가 지나도 안 끝나면 §6.1의 판단 기준을 적용한다.** 실측 최대치를 넘긴 것이므로 정상 범위 밖이다.
+- 실행이 시작되고 **140초가 지나도 안 끝나면 중단한다.** 실측 최대치를 넘긴 것이므로 정상 범위 밖이다.
+  **이때 성공 경로로 갈아타지 않는다** — 그 시점에 이미 160초를 썼고, 남은 20초에는 성공 경로 실측 상한
+  39.8초가 들어가지 않는다. 전환 대상은 §6.2의 오프라인 무결성 검증이다(§6.3).
 - 위 계산에 들어간 값 중 실측이 아닌 것(①·③의 사람이 말하는 시간)과 표본이 작은 것(모드 C는 N=5)은 §7에 남겼다. **리허설에서 타이머로 재기 전까지 이 판단은 계산일 뿐이다.**
 
-**성공 경로는 대안으로 유지한다.** 현장에서 시간이 부족하다고 판단되면 §3.2 성공 경로 배분으로
-전환하고, 차단 재현은 `decision_hash` 동일성으로 갈음한다(§6.3).
+**성공 경로는 대안으로 유지하되, 선택은 타이머가 돌기 전에 끝낸다.** 여유가 없다고 판단되면 §3.2 성공 경로
+배분으로 시작하고, 차단 재현은 `decision_hash` 동일성으로 갈음한다(§6.3). 시작한 뒤에는 경로를 바꾸지 않는다.
 
 ### 3.4 대조에서 무엇을 보여주는가
 
@@ -295,6 +341,7 @@ RAG 검색·rag_cite·judge_eval은 실제 Azure를 호출한다 (`reproducibili
 ### 6.1 재실행이 3분을 넘길 때
 
 - **판단 시점**: 실행 시작 후 60초. 성공 경로 실측 상한이 39.8초(§4.1 모드 A)이므로 이 시점에 안 끝나면 정상 범위 밖이다.
+  **차단 경로로 시작한 경우의 판단 시점은 140초다**(§6.3) — 실측 상한 자체가 131.4초라 60초는 기준이 되지 않는다.
 - **대응**: 실행을 끊지 않고 두되, 대조 구간을 **지문 3종 1개 구간(40초)으로 줄인다.** §2 항목 대조와 제외 대상 공개는 버린다.
 - **그래도 안 끝나면**: 재실행을 중단하고 §6.2의 오프라인 무결성 검증으로 전환한다. 중단했다는 사실을 먼저 말한다.
 
@@ -329,9 +376,14 @@ manifest가 바뀌고, bundle_hash가 바뀐다 (`docs/evidence_bundle_schema.md
 
 - **5분 구간은 그대로 간다.** ⑤ 구간만 `hard_stop_record.json`으로 바꾼다(§2.4). 차단 번들도 `BUNDLE_FILENAMES`가 전부 있다.
 - **3분 재실행은 차단 경로로 돌릴 수 있다.** `replay_verify.py`가 대조 구간을 없애면서 계산상 들어간다(§3.3). §3.2의 차단 경로 배분을 쓰고, §3.5의 시연 구분을 **먼저 밝히고** 시작한다.
+- **경로 선택은 타이머 시작 전에 끝낸다.** 차단 경로로 갈지 성공 경로로 갈지는 명령을 치기 전에 정한다. 한 번 시작하면 3분 안에서는 다른 경로로 갈아탈 수 없다 — 아래 전환 기준 참조.
 - **예비가 9초뿐이라는 것을 알고 들어간다.** 질문을 받을 여유가 없으므로, 감사자가 실행 중에 물으면 "끝나고 답하겠다"고 미룬다.
-- **전환 기준**: 실행 시작 후 140초가 지나도 안 끝나면 중단하고 성공 경로로 바꾼다(§6.1). 실측 최대치(131.4초)를 넘긴 것이라 정상 범위 밖이다.
-- **성공 경로로 갈아탔을 때** 차단의 재현은 `decision_hash`로 갈음한다 — `reproducibility_scope.md` §4.2가 추적 off/on 4회 실행 전부 동일함을 기록하고 있고, `trace_id`가 갈린 실행 쌍에서도 같았다.
+- **전환 기준**: 실행 시작 후 140초가 지나도 안 끝나면 중단한다. 실측 최대치(131.4초)를 넘긴 것이라 정상 범위 밖이다.
+  **성공 경로 재실행으로 바꾸지 않는다** — 그 시점에 사전 설명 20초 + 실행 140초로 160초를 썼고, 남는 20초에
+  성공 경로 실측 상한 39.8초(§4.1 모드 A)와 대조 시간이 들어가지 않는다. 산술적으로 3분 안에 끝나지 않는다.
+- **140초 시점의 대응**: 중단했다는 사실을 **먼저 말하고**, §6.2의 오프라인 무결성 검증 2종과 제출 번들에
+  이미 들어 있는 `decision_hash`로 전환한다. 라이브 재실행 대신 제출물로 답하는 것이며, §6.1의 마지막 항목과 같은 경로다.
+- **차단의 재현을 `decision_hash`로 갈음할 때** — `reproducibility_scope.md` §4.2가 추적 off/on 4회 실행 전부 동일함을 기록하고 있고, `trace_id`가 갈린 실행 쌍에서도 같았다. 성공 경로로 시작하기로 정한 경우에도 이 근거를 쓴다.
 - UI까지 묻거든 `ui/report_export.py:18` (pdf_export_state)를 연다. `report_is_exportable`이 `false`면 PDF 저장 버튼이 비활성이고, 안내문이 "Judge 미통과 또는 수동검토 대기"로 분기한다.
 
 ---
@@ -352,7 +404,9 @@ manifest가 바뀌고, bundle_hash가 바뀐다 (`docs/evidence_bundle_schema.md
   실제 실행 state 덤프는 `citations` 20여 건과 감사 기록이 붙어 더 크다. 번들 3건을 만든 뒤
   실물 덤프로 다시 재고, 유의미하게 느리면 §3.2 차단 경로 배분을 고쳐야 한다.
 - **번들 3건의 실물이 아직 없다.** 현재 레포에 `evidence/` 디렉터리가 없다. 8/6 제출 전에 3건을 만들고,
-  만든 뒤 이 런북의 파일명·키 이름을 실물로 한 번 더 대조한다.
+  만든 뒤 이 런북의 파일명·키 이름을 실물로 한 번 더 대조한다. **§1.1의 state 덤프 3건도 이때 같이 만든다** —
+  번들만 만들고 덤프를 빠뜨리면 3분 재실행이 종료 코드 `2`로 끝난다. 만든 뒤 번들 `trace_id`와 덤프 `trace_id`가
+  실제로 맞물리는지 3쌍 모두 확인한다.
 - **§6.2의 검증 명령 2종은 합성 state로 만든 번들에서만 확인했다.** 그래프를 돌리지 않고
   `make_bundle`(직렬화기)만 호출해 만든 번들이라 파일 구조·해시 체계는 같지만, 실행 산출물이 들어간
   실물 번들에서 다시 한 번 돌려 봐야 한다.
