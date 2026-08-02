@@ -49,7 +49,7 @@ python scripts/run_graph.py --auto-approve --offline \
 
 **지목된 번들과 덤프의 대응은 파일명이 아니라 `trace_id`로 확인한다.** 이름은 사람이 붙인 것이라 근거가 못 된다.
 
-- 번들 쪽: `summary.md` §추적의 `trace_id` (= `trace.json`의 같은 값, `scripts/make_evidence_bundle.py:136` (trace_id))
+- 번들 쪽: `summary.md` §추적의 `trace_id` (= `trace.json`의 같은 값, `scripts/make_evidence_bundle.py:141` (trace_id))
 - 덤프 쪽: 최상위 `trace_id`
 - 두 값이 같은 덤프를 `submitted.json`으로 쓴다. 감사자가 번들을 지목하면 이 확인을 먼저 하고 명령을 친다.
 
@@ -87,7 +87,7 @@ python -c "import json;print(json.load(open('submitted.json'))['demo_options'])"
 
 ### 2.1 ② 구간 — `summary.md` 머리말 7줄
 
-`scripts/make_evidence_bundle.py:491` (build_summary_md)가 찍는 순서 그대로다. 순서를 바꾸지 않는다.
+`scripts/make_evidence_bundle.py:510` (build_summary_md)가 찍는 순서 그대로다. 순서를 바꾸지 않는다.
 
 ```
 - 스키마 버전:
@@ -107,12 +107,12 @@ python -c "import json;print(json.load(open('submitted.json'))['demo_options'])"
 
 | 지문 | 위치 | 근거 |
 | --- | --- | --- |
-| `config_hash` | `summary.md` §주요 해시 | `scripts/make_evidence_bundle.py:491` (build_summary_md) |
+| `config_hash` | `summary.md` §주요 해시 | `scripts/make_evidence_bundle.py:510` (build_summary_md) |
 | `computation_hash` | 〃 | 〃 |
 | `approval_hash` | 〃 | 〃 |
 
 - `summary.md`의 `report_hash`는 재현 지문이 **아니다.** 번들이 `report` 전문에서 계산한 값이며, 화면에 "재현 지문 아님"이라고 적혀 있다.
-- 같은 값이 `replay_diff.json`의 `hashes`에도 있다 — `scripts/make_evidence_bundle.py:324` (build_replay_diff). 감사자가 "summary가 옮겨 적은 것 아니냐"고 물으면 그쪽을 열어 대조한다.
+- 같은 값이 `replay_diff.json`의 `hashes`에도 있다 — `scripts/make_evidence_bundle.py:329` (build_replay_diff). 감사자가 "summary가 옮겨 적은 것 아니냐"고 물으면 그쪽을 열어 대조한다.
 - 왜 3종뿐인지 묻거든 `docs/reproducibility_scope.md` §3 「제외 대상에 대한 원칙」을 연다.
 - `replay_diff.json`을 열면 `status: single_run_only`가 같이 보인다. **먼저 말한다** — 이 번들은 1회 실행분 해시만 싣고 있고 2회 대조는 3분 재실행에서 지금 한다고 예고한다.
 
@@ -130,7 +130,7 @@ python -c "import json;print(json.load(open('submitted.json'))['demo_options'])"
 
 핵심 문장은 하나다 — **"없는 것"과 "안 채운 것"을 구분해 사유와 원본 키 경로를 함께 적었다** (`docs/evidence_bundle_schema.md` §5).
 
-**calibration이 채워진 번들이라면 `source.mode`를 먼저 짚는다.** 수치가 있어도 등급이 `dev_mock`·`offline_rehearsal`이면 R2 공식 제출 요건을 만족하지 않는다. 감사자가 일치율을 먼저 읽기 전에 등급을 말한다. 등급을 알 수 없는 입력에서는 수치도 함께 비워지므로(fail-closed), "수치는 있는데 출처를 모르는" 상태는 나오지 않는다 — `docs/evidence_bundle_schema.md` §4.8.
+**calibration이 채워진 번들이라면 `source.mode`를 먼저 짚는다.** 허용 모드는 `dev_mock`·`offline_rehearsal`·`official`·`official_code_change`·`official_offline_code_change`이며, 공식 제출 가능 모드는 LangSmith까지 검증한 `official`·`official_code_change`뿐이다. 감사자가 일치율을 먼저 읽기 전에 등급을 말한다. 알 수 없는 mode나 모순된 검증 플래그에서는 수치도 함께 비워지므로(fail-closed), "수치는 있는데 등급을 모르는" 상태는 나오지 않는다 — `docs/evidence_bundle_schema.md` §4.8.
 
 ### 2.4 ⑤ 구간 — 지목 번들별 심화 파일
 

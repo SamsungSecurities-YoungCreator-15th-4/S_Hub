@@ -39,6 +39,13 @@ from app.evidence.schema import (
     calibration_summary,
     evalset_hash,
 )
+from app.evaluation.calibration_modes import (
+    CALIBRATION_MODES,
+    MODE_OFFICIAL,
+    MODE_OFFICIAL_CODE_CHANGE,
+    MODE_OFFLINE_REHEARSAL,
+    OFFICIAL_CALIBRATION_MODES,
+)
 from app.judge.axes import AXIS_EN_TO_KO, KOREAN_AXIS_NAMES, to_en
 from app.utils.hashing import sha256_of_file
 from scripts.make_evidence_bundle import make_bundle
@@ -570,7 +577,7 @@ def _calibration_report(*, with_v2: bool = False) -> dict:
     ]
     report: dict = {
         "schema_version": CALIBRATION_REPORT_SCHEMA_VERSION,
-        "mode": "official",
+        "mode": MODE_OFFICIAL,
         "official_validation_passed": True,
         "langsmith_required": True,
         "v1": {"records": [asdict(record) for record in v1]},
@@ -721,7 +728,7 @@ def test_calibration_carries_run_grade_not_just_numbers(tmp_path):
     )
 
     assert set(payload["source"]) == set(CALIBRATION_GRADE_KEYS)
-    assert payload["source"]["mode"] == "official"
+    assert payload["source"]["mode"] == MODE_OFFICIAL
     assert payload["source"]["langsmith_required"] is True
 
 
@@ -760,17 +767,63 @@ def test_calibration_rehearsal_grade_is_visible_in_bundle(tmp_path):
     아니며, 번들이 그 사실을 감추면 안 된다.
     """
     report = _calibration_report()
-    report["mode"] = "offline_rehearsal"
+    report["mode"] = MODE_OFFLINE_REHEARSAL
     report["langsmith_required"] = False
 
     payload = _read_json(
         _build(tmp_path, _passing_state(), calibration=report), CALIBRATION_FILENAME
     )
 
-    assert payload["source"]["mode"] == "offline_rehearsal"
+    assert payload["source"]["mode"] == MODE_OFFLINE_REHEARSAL
     assert payload["source"]["langsmith_required"] is False
     # 등급이 낮아도 수치 자체는 그대로 싣는다 — 감추는 것이 아니라 등급을 밝힌다.
     assert "available" not in payload["v1"]
+
+
+def test_calibration_official_code_change_grade_is_accepted(tmp_path):
+    """LangSmith까지 검증한 코드 개선 비교는 공식 R4 증거로 전달된다."""
+    report = _calibration_report(with_v2=True)
+    report["mode"] = MODE_OFFICIAL_CODE_CHANGE
+
+    payload = _read_json(
+        _build(tmp_path, _passing_state(), calibration=report), CALIBRATION_FILENAME
+    )
+
+    assert payload["source"]["mode"] in OFFICIAL_CALIBRATION_MODES
+    assert payload["source"]["official_validation_passed"] is True
+    assert payload["source"]["langsmith_required"] is True
+    assert "available" not in payload["v1"]
+    assert "available" not in payload["comparison"]
+
+
+@pytest.mark.parametrize(
+    "grade_update, expected_note",
+    [
+        ({"mode": "offical_typo"}, "알 수 없는 calibration mode"),
+        (
+            {"mode": MODE_OFFICIAL, "langsmith_required": False},
+            "검증 메타데이터 불일치",
+        ),
+        ({"official_validation_passed": "true"}, "bool이어야 한다"),
+    ],
+)
+def test_calibration_unknown_or_inconsistent_grade_drops_numbers(
+    tmp_path, grade_update, expected_note
+):
+    """알 수 없거나 모순된 등급은 수치까지 제거하는 fail-closed 계약이다."""
+    report = _calibration_report(with_v2=True)
+    report.update(grade_update)
+
+    payload = _read_json(
+        _build(tmp_path, _passing_state(), calibration=report), CALIBRATION_FILENAME
+    )
+
+    assert payload["source"]["available"] is False
+    assert expected_note in payload["source"]["note"]
+    assert str(list(CALIBRATION_MODES)) in payload["source"]["note"]
+    for key in ("v1", "v2", "comparison"):
+        assert payload[key]["available"] is False
+        assert "실행 등급" in payload[key]["note"]
 
 
 def test_calibration_numbers_are_dropped_on_unknown_report_schema(tmp_path):

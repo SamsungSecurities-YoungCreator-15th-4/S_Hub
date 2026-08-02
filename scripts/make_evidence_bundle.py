@@ -49,6 +49,11 @@ from app.evidence.schema import (  # noqa: E402
     calibration_summary_from_report,
     unavailable,
 )
+from app.evaluation.calibration_modes import (  # noqa: E402
+    CALIBRATION_MODES,
+    OFFICIAL_CALIBRATION_MODES,
+    calibration_mode_issue,
+)
 from app.judge.axes import AXIS_EN_TO_KO  # noqa: E402
 from app.utils.hashing import sha256_of_dict, sha256_of_file  # noqa: E402
 
@@ -419,6 +424,20 @@ def _calibration_source(report: dict | None) -> object:
         return unavailable(
             CALIBRATION_SOURCE_PATH,
             note=f"실행 등급 표시 누락: {', '.join(missing)}",
+        )
+    issue = calibration_mode_issue(
+        report.get("mode"),
+        official_validation_passed=report.get("official_validation_passed"),
+        langsmith_required=report.get("langsmith_required"),
+    )
+    if issue:
+        return unavailable(
+            CALIBRATION_SOURCE_PATH,
+            note=(
+                f"실행 등급 검증 실패: {issue}. "
+                f"허용 mode={list(CALIBRATION_MODES)}, "
+                f"공식 mode={sorted(OFFICIAL_CALIBRATION_MODES)}"
+            ),
         )
     return {key: report[key] for key in CALIBRATION_GRADE_KEYS}
 

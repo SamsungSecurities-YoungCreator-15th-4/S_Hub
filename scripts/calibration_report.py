@@ -18,8 +18,8 @@ app.evaluation.judge_calibration의 집계 함수를 실행해 콘솔 표 + (선
 
 출력 JSON의 `mode`는 이 실행이 어떤 신뢰 수준인지 표시한다 — R4가 파일
 내용만으로 공식 증거 여부를 판별해야 하므로, `--out` 산출물을 그대로 증거로
-쓰기 전에 반드시 `mode == "official"`과 `official_validation_passed`를
-확인해야 한다.
+쓰기 전에 반드시 `mode`가 `OFFICIAL_CALIBRATION_MODES`에 속하고
+`official_validation_passed`·`langsmith_required`가 모두 true인지 확인해야 한다.
 
     - "official": --official (LangSmith 포함) 통과 — R2 공식 제출 요건 충족
     - "offline_rehearsal": --official --no-langsmith — 구조는 검증됐으나
@@ -48,6 +48,13 @@ from app.evaluation.calibration_schema import (  # noqa: E402
     CalibrationRecord,
     merge_records,
     validate_official_case_set,
+)
+from app.evaluation.calibration_modes import (  # noqa: E402
+    MODE_DEV_MOCK,
+    MODE_OFFICIAL,
+    MODE_OFFICIAL_CODE_CHANGE,
+    MODE_OFFICIAL_OFFLINE_CODE_CHANGE,
+    MODE_OFFLINE_REHEARSAL,
 )
 from app.evaluation.human_labels import load_human_labels_from_dir  # noqa: E402
 from app.evaluation.judge_calibration import (  # noqa: E402
@@ -141,12 +148,16 @@ def _to_jsonable(records: list[CalibrationRecord]) -> list[dict]:
 
 def _resolve_mode(args: argparse.Namespace) -> str:
     if not args.official:
-        return "dev_mock"
+        return MODE_DEV_MOCK
     if args.no_prompt_change_required:
-        return "official_offline_code_change" if args.no_langsmith else "official_code_change"
+        return (
+            MODE_OFFICIAL_OFFLINE_CODE_CHANGE
+            if args.no_langsmith
+            else MODE_OFFICIAL_CODE_CHANGE
+        )
     if args.no_langsmith:
-        return "offline_rehearsal"
-    return "official"
+        return MODE_OFFLINE_REHEARSAL
+    return MODE_OFFICIAL
 
 
 def main() -> None:
