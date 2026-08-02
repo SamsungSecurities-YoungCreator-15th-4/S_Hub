@@ -30,6 +30,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
 
+from dotenv import load_dotenv
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
@@ -359,6 +361,10 @@ def _offline_llm():
 
 
 def main() -> None:
+    # 실제 Azure/LangSmith 실행에 필요한 키를 .env에서 불러온다(다른 진입점
+    # run_graph.py·register_judge_dataset.py 등과 동일 패턴). 없으면 조용히 넘어가
+    # 오프라인 리허설(--offline)엔 영향이 없다.
+    load_dotenv(ROOT / ".env")
     parser = argparse.ArgumentParser(
         description="사례를 judge에 돌려 JudgeResult JSON으로 기록한다."
     )
