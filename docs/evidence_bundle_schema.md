@@ -192,10 +192,27 @@ python scripts/run_graph.py --auto-approve --evidence-bundle
 
 | 키 | 타입 | 출처 |
 | --- | --- | --- |
+| `source` | dict | **실행 등급** (`CALIBRATION_GRADE_KEYS`) 또는 §5의 "없음" 표기 |
 | `v1` | dict | 개선 전 측정. `calibration_summary()` 결과 또는 §5의 "없음" 표기 |
 | `v2` | dict | 개선 후 재측정. 같은 형태 |
 | `comparison` | dict | v1·v2 비교. `CALIBRATION_COMPARISON_REQUIRED_KEYS` 또는 §5의 "없음" 표기 |
 | `mismatch_detail_excluded` | str | 오판 사례 상세를 싣지 않는 이유 (`CALIBRATION_MISMATCH_EXCLUSION_REASON`) |
+
+#### `source` — 수치보다 먼저 봐야 하는 값
+
+같은 일치율이라도 **개발용 mock에서 나온 수치와 공식 실행 수치는 증거로서 값이 다르다.** 등급이 안 보이면 감사자가 리허설 숫자를 공식 실측으로 읽는다. 그래서 일치율보다 앞에 둔다.
+
+| 키 | 의미 |
+| --- | --- |
+| `schema_version` | 리포트 스키마 버전 |
+| `mode` | `dev_mock` · `offline_rehearsal` · `official` 중 하나 |
+| `official_validation_passed` | `--official` 검증을 통과했는가 |
+| `langsmith_required` | LangSmith run ID 요건을 적용했는가 |
+
+- **`langsmith_required=false`는 공식 등급이 아니다.** R2는 LangSmith 실행 기록 제출이 과제 요구사항이라 `validate_official_case_set`의 `require_langsmith` 기본값이 True다. `--no-langsmith`로 이를 낮춰 돌린 실행은 `mode=offline_rehearsal`이 되며, 번들은 그 사실을 감추지 않는다.
+- **등급이 낮아도 수치 자체는 그대로 싣는다.** 감추는 것이 아니라 등급을 밝히는 것이 이 블록의 목적이다.
+- **등급 표시가 하나라도 없으면 통째로 "없음"으로 나간다.** 일부만 적어 공식인 척하게 두지 않는다.
+- **모르는 `schema_version`이면 `v1`·`v2`·`comparison` 수치를 옮기지 않는다.** 필드 이름이 같아도 뜻이 달라졌을 수 있어, 조용히 옮기면 감사 증거에 다른 의미의 숫자가 실린다. 이때도 `source`는 남겨 무엇을 받았는지는 기록한다. 어댑터가 아는 버전은 `CALIBRATION_REPORT_SCHEMA_VERSION`이고, `tests/test_evidence_bundle.py`가 생산자(`scripts/calibration_report.py`의 `SCHEMA_VERSION`)와 대조한다.
 
 **세 자리는 R2 진행 상태와 무관하게 항상 존재한다.** 채울 값이 없으면 자리를 비우는 게 아니라 `{"available": false, "reason": ...}`이 들어간다 — `hard_stop_record`가 성공 실행에서도 `blocked=false`로 반드시 생성되는 것과 같은 원칙이다(§8.5). 파일이 없는 것과 "아직 측정하지 않았다"는 감사에서 전혀 다른 의미다.
 
@@ -210,7 +227,7 @@ python scripts/make_evidence_bundle.py --state run_state.json --out evidence/run
 
 계약은 `app/evidence/schema.py`의 `calibration_summary()`와 `CALIBRATION_SUMMARY_REQUIRED_KEYS`에 정의돼 있다. 필수 키는 `prompt_version`·`evalset_hash`·`evalset_case_count`·`total`·`confusion_matrix`·`derived`·`per_axis`다.
 
-리포트에 이미 `overall`·`axis_metrics`가 들어 있지만 번들은 **그것을 옮겨 적지 않는다.** `app/evidence/schema.py:433` (calibration_summary_from_report)가 리포트의 `records`를 `CalibrationRecord`로 되돌려 `calibration_summary()`에 그대로 태운다. 옮겨 적으면 집계 로직이 두 벌이 되어 한쪽만 고쳐지는 순간 번들과 리포트가 갈리는데, 그 상황이 이 문서가 처음부터 막으려던 것이다.
+리포트에 이미 `overall`·`axis_metrics`가 들어 있지만 번들은 **그것을 옮겨 적지 않는다.** `app/evidence/schema.py:455` (calibration_summary_from_report)가 리포트의 `records`를 `CalibrationRecord`로 되돌려 `calibration_summary()`에 그대로 태운다. 옮겨 적으면 집계 로직이 두 벌이 되어 한쪽만 고쳐지는 순간 번들과 리포트가 갈리는데, 그 상황이 이 문서가 처음부터 막으려던 것이다.
 
 #### `comparison`의 계약 — `CALIBRATION_COMPARISON_REQUIRED_KEYS`
 
@@ -350,9 +367,9 @@ state에 원문이 없다. 이것은 결함이 아니라 `app/llm/audit.py`의 *
 
 **파일은 편입됐다.** `BUNDLE_FILENAMES`에 들어 있어 모든 실행에서 생성된다(§4.8).
 
-다만 R2가 측정을 끝내기 전까지, 또는 `--calibration`을 넘기지 않은 실행에서는 `v1`·`v2`·`comparison` 세 자리가 `available: false`로 나간다. 이것은 감추는 것이 아니라 §5 규약대로 **못 잰 것을 못 쟀다고 적는 것**이다. 사유에는 원본 경로(`R2 calibration 리포트 입력`)와 복원 방법(`scripts/calibration_report.py --out` 산출물을 `--calibration`으로 전달)이 함께 실린다.
+다만 R2가 측정을 끝내기 전까지, 또는 `--calibration`을 넘기지 않은 실행에서는 `source`·`v1`·`v2`·`comparison` 네 자리가 `available: false`로 나간다. 이것은 감추는 것이 아니라 §5 규약대로 **못 잰 것을 못 쟀다고 적는 것**이다. 사유에는 원본 경로(`R2 calibration 리포트 입력`)와 복원 방법(`scripts/calibration_report.py --out` 산출물을 `--calibration`으로 전달)이 함께 실린다.
 
-R4 최종 DoD는 v1·v2가 실제로 채워진 번들이 제출될 때 닫힌다. 배선은 이제 R2 산출물을 기다릴 뿐이다.
+R4 최종 DoD는 **`source.mode=official`인 v1·v2가 채워진 번들**이 제출될 때 닫힌다. `offline_rehearsal` 등급으로 채워진 번들은 파일은 완성돼 보여도 R2 제출 요건을 만족하지 않는다 — `source` 블록이 그 구분을 드러내라고 있는 것이다. 배선은 이제 R2 산출물을 기다릴 뿐이다.
 
 ### 8.5 `hard_stop_record.manual_review_gate` — 차단되지 않은 실행
 

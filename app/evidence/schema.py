@@ -272,11 +272,33 @@ CALIBRATION_DERIVED_KEYS = ("match", "match_rate", "false_negative", "false_posi
 #: `hard_stop_record`가 성공 실행에서도 `blocked=false`로 반드시 생성되는 것과 같은
 #: 원칙이다. 파일이 없는 것과 "아직 측정하지 않았다"는 감사에서 다른 의미다.
 CALIBRATION_FILE_REQUIRED_KEYS = (
+    "source",
     "v1",
     "v2",
     "comparison",
     "mismatch_detail_excluded",
 )
+
+#: 수치가 **어떤 등급의 실행에서 나왔는가**. 일치율만 싣고 등급을 빼면, 개발용
+#: mock으로 뽑은 수치와 공식 실행 수치가 번들에서 똑같이 보인다 — 감사에서
+#: 치명적이다. `scripts/calibration_report.py`가 리포트 최상위에 남기는 값을
+#: 이름 그대로 옮긴다.
+#:
+#: `mode`는 `dev_mock` · `offline_rehearsal` · `official` 셋 중 하나다.
+#: `langsmith_required=false`면 `--no-langsmith`로 LangSmith 요건을 낮춘 실행이라
+#: R2 공식 제출 등급이 아니다(`validate_official_case_set`의 기본값은 요구함).
+CALIBRATION_GRADE_KEYS = (
+    "schema_version",
+    "mode",
+    "official_validation_passed",
+    "langsmith_required",
+)
+
+#: 이 어댑터가 해석할 수 있는 calibration 리포트 스키마 버전.
+#: `scripts/calibration_report.py`의 `SCHEMA_VERSION`과 같아야 하며,
+#: `tests/test_evidence_bundle.py`가 두 값을 대조한다. 모르는 버전의 리포트는
+#: 필드 뜻이 달라졌을 수 있으므로 수치를 옮기지 않고 "없음"으로 처리한다.
+CALIBRATION_REPORT_SCHEMA_VERSION = "1"
 
 #: v1·v2 비교가 들어갈 자리. 필드명은 `app/evaluation/judge_calibration.py`의
 #: `VersionComparison`을 그대로 옮긴다 — 번들이 이름을 새로 만들면 원본과 어긋난다.

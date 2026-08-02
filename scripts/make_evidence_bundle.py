@@ -26,7 +26,9 @@ from app.evidence.schema import (  # noqa: E402
     BUNDLE_SCHEMA_VERSION,
     CALIBRATION_COMPARISON_REQUIRED_KEYS,
     CALIBRATION_FILENAME,
+    CALIBRATION_GRADE_KEYS,
     CALIBRATION_MISMATCH_EXCLUSION_REASON,
+    CALIBRATION_REPORT_SCHEMA_VERSION,
     CALIBRATION_SOURCE_PATH,
     CALIBRATION_UNAVAILABLE_NOTE,
     CITATION_VERIFICATION_FILENAME,
@@ -384,25 +386,19 @@ def build_llm_audit(state: dict, git_sha: object) -> dict:
     }
 
 
-def _calibration_side(report: dict | None, key: str) -> object:
+def _calibration_side(report: dict | None, key: str, *, note: str) -> object:
     """`v1`/`v2` 한쪽. 채울 값이 없으면 사유와 원본 경로를 남긴다."""
     summary = calibration_summary_from_report((report or {}).get(key))
     if summary is None:
-        return unavailable(
-            f"{CALIBRATION_SOURCE_PATH}.{key}",
-            note=CALIBRATION_UNAVAILABLE_NOTE,
-        )
+        return unavailable(f"{CALIBRATION_SOURCE_PATH}.{key}", note=note)
     return summary
 
 
-def _calibration_comparison(report: dict | None) -> object:
+def _calibration_comparison(report: dict | None, *, note: str) -> object:
     """v1·v2 비교. 계약 키가 하나라도 없으면 부분 결과를 만들지 않는다."""
     comparison = (report or {}).get("comparison")
     if not isinstance(comparison, dict):
-        return unavailable(
-            f"{CALIBRATION_SOURCE_PATH}.comparison",
-            note=CALIBRATION_UNAVAILABLE_NOTE,
-        )
+        return unavailable(f"{CALIBRATION_SOURCE_PATH}.comparison", note=note)
     missing = [key for key in CALIBRATION_COMPARISON_REQUIRED_KEYS if key not in comparison]
     if missing:
         # 일부만 실으면 감사자가 "비교했는데 값이 빈 칸"으로 읽는다. 통째로 없음 처리한다.
@@ -411,6 +407,31 @@ def _calibration_comparison(report: dict | None) -> object:
             note=f"비교 계약 키 누락: {', '.join(missing)}",
         )
     return {key: comparison[key] for key in CALIBRATION_COMPARISON_REQUIRED_KEYS}
+
+
+def _calibration_source(report: dict | None) -> object:
+    """수치가 어떤 등급의 실행에서 나왔는지. 일치율보다 먼저 봐야 하는 값이다."""
+    if not isinstance(report, dict):
+        return unavailable(CALIBRATION_SOURCE_PATH, note=CALIBRATION_UNAVAILABLE_NOTE)
+    missing = [key for key in CALIBRATION_GRADE_KEYS if key not in report]
+    if missing:
+        # 등급을 모르면 수치도 못 믿는다. 일부만 적어 "공식인 척"하게 두지 않는다.
+        return unavailable(
+            CALIBRATION_SOURCE_PATH,
+            note=f"실행 등급 표시 누락: {', '.join(missing)}",
+        )
+    return {key: report[key] for key in CALIBRATION_GRADE_KEYS}
+
+
+def _calibration_schema_is_supported(report: dict | None) -> bool:
+    """모르는 스키마 버전의 리포트에서는 수치를 옮기지 않는다.
+
+    필드 이름이 같아도 뜻이 달라졌을 수 있다. 조용히 옮기면 감사 증거에 다른
+    의미의 숫자가 실린다 — 버전이 안 맞으면 값을 비우고 사유를 남긴다.
+    """
+    if not isinstance(report, dict):
+        return False
+    return report.get("schema_version") == CALIBRATION_REPORT_SCHEMA_VERSION
 
 
 def build_calibration(report: object) -> dict:
@@ -422,12 +443,27 @@ def build_calibration(report: object) -> dict:
 
     `report`는 `scripts/calibration_report.py --out` 산출물이다. 실행 1회분 state가
     아니라 사례집 전체를 judge에 돌린 결과라 state에서는 나올 수 없다.
+
+    `source`를 `v1`보다 앞에 두는 이유 — 같은 일치율이라도 `dev_mock`에서 나온
+    수치와 `official`에서 나온 수치는 증거로서 값이 다르다. 등급이 안 보이면
+    감사자가 개발용 리허설 숫자를 공식 실측으로 읽는다.
     """
     payload = report if isinstance(report, dict) else None
+    source = _calibration_source(payload)
+    note = CALIBRATION_UNAVAILABLE_NOTE
+    if payload is not None and not _calibration_schema_is_supported(payload):
+        # "리포트를 안 줬다"와 "줬는데 못 읽는다"는 다른 사실이다. 섞지 않는다.
+        note = (
+            f"calibration 리포트 schema_version={payload.get('schema_version')!r}는 "
+            f"이 번들이 해석하는 {CALIBRATION_REPORT_SCHEMA_VERSION!r}가 아니다. "
+            "필드 뜻이 달라졌을 수 있어 수치를 옮기지 않는다."
+        )
+        payload = None
     return {
-        "v1": _calibration_side(payload, "v1"),
-        "v2": _calibration_side(payload, "v2"),
-        "comparison": _calibration_comparison(payload),
+        "source": source,
+        "v1": _calibration_side(payload, "v1", note=note),
+        "v2": _calibration_side(payload, "v2", note=note),
+        "comparison": _calibration_comparison(payload, note=note),
         "mismatch_detail_excluded": CALIBRATION_MISMATCH_EXCLUSION_REASON,
     }
 

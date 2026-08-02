@@ -20,6 +20,8 @@ from app.evidence.schema import (
     CALIBRATION_DERIVED_KEYS,
     CALIBRATION_FILE_REQUIRED_KEYS,
     CALIBRATION_FILENAME,
+    CALIBRATION_GRADE_KEYS,
+    CALIBRATION_REPORT_SCHEMA_VERSION,
     CALIBRATION_SOURCE_PATH,
     CALIBRATION_SUMMARY_REQUIRED_KEYS,
     CITATION_VERIFICATION_FILENAME,
@@ -564,7 +566,13 @@ def _calibration_report(*, with_v2: bool = False) -> dict:
         )
         for record in base
     ]
-    report: dict = {"v1": {"records": [asdict(record) for record in v1]}}
+    report: dict = {
+        "schema_version": CALIBRATION_REPORT_SCHEMA_VERSION,
+        "mode": "official",
+        "official_validation_passed": True,
+        "langsmith_required": True,
+        "v1": {"records": [asdict(record) for record in v1]},
+    }
     if with_v2:
         v2 = [
             replace(record, prompt_version="v2", prompt_hash=f"v2-{record.case_id}")
@@ -697,3 +705,85 @@ def test_summary_marks_missing_fingerprint_instead_of_blank(tmp_path):
     ).read_text(encoding="utf-8")
 
     assert "- approval_hash: 없음 (report.reproducibility.approval_hash 없음)" in summary
+
+
+def test_calibration_carries_run_grade_not_just_numbers(tmp_path):
+    """수치보다 먼저 "어떤 등급의 실행에서 나왔는가"가 보여야 한다.
+
+    같은 일치율이라도 `dev_mock`에서 나온 값과 `official`에서 나온 값은 증거로서
+    값이 다르다. 등급이 빠지면 감사자가 개발용 리허설 숫자를 공식 실측으로 읽는다.
+    """
+    payload = _read_json(
+        _build(tmp_path, _passing_state(), calibration=_calibration_report()),
+        CALIBRATION_FILENAME,
+    )
+
+    assert set(payload["source"]) == set(CALIBRATION_GRADE_KEYS)
+    assert payload["source"]["mode"] == "official"
+    assert payload["source"]["langsmith_required"] is True
+
+
+def test_calibration_grade_absence_is_recorded_not_assumed_official(tmp_path):
+    """등급 표시가 없으면 공식인 척하지 않는다 — 통째로 없음 처리한다."""
+    report = _calibration_report()
+    del report["langsmith_required"]
+
+    payload = _read_json(
+        _build(tmp_path, _passing_state(), calibration=report), CALIBRATION_FILENAME
+    )
+
+    assert payload["source"]["available"] is False
+    assert "langsmith_required" in payload["source"]["note"]
+
+
+def test_calibration_rehearsal_grade_is_visible_in_bundle(tmp_path):
+    """`--no-langsmith`로 낮춘 실행은 번들에서 그대로 드러나야 한다.
+
+    R2는 LangSmith 실행 기록 제출이 요구사항이라 `validate_official_case_set`의
+    `require_langsmith` 기본값이 True다. 이를 낮춰 돌린 실행은 공식 등급이
+    아니며, 번들이 그 사실을 감추면 안 된다.
+    """
+    report = _calibration_report()
+    report["mode"] = "offline_rehearsal"
+    report["langsmith_required"] = False
+
+    payload = _read_json(
+        _build(tmp_path, _passing_state(), calibration=report), CALIBRATION_FILENAME
+    )
+
+    assert payload["source"]["mode"] == "offline_rehearsal"
+    assert payload["source"]["langsmith_required"] is False
+    # 등급이 낮아도 수치 자체는 그대로 싣는다 — 감추는 것이 아니라 등급을 밝힌다.
+    assert "available" not in payload["v1"]
+
+
+def test_calibration_numbers_are_dropped_on_unknown_report_schema(tmp_path):
+    """모르는 스키마 버전에서는 수치를 옮기지 않는다.
+
+    필드 이름이 같아도 뜻이 달라졌을 수 있다. 조용히 옮기면 감사 증거에 다른
+    의미의 숫자가 실린다.
+    """
+    report = _calibration_report(with_v2=True)
+    report["schema_version"] = "99"
+
+    payload = _read_json(
+        _build(tmp_path, _passing_state(), calibration=report), CALIBRATION_FILENAME
+    )
+
+    for key in ("v1", "v2", "comparison"):
+        assert payload[key]["available"] is False
+        assert "schema_version" in payload[key]["note"]
+    # 등급 표시 자체는 남는다 — 무엇을 받았는지는 기록한다.
+    assert payload["source"]["schema_version"] == "99"
+
+
+def test_bundle_adapter_tracks_calibration_report_schema_version():
+    """어댑터가 아는 버전과 리포트 생산자의 버전이 갈리면 잡는다.
+
+    `scripts/calibration_report.py`의 주석이 "이 값으로 호환성을 확인할 수 있도록
+    처음부터 박아둔다"고 적은 그 대조다. 생산자가 버전을 올리면 이 테스트가
+    어댑터도 함께 손보게 만든다.
+    """
+    from scripts.calibration_report import SCHEMA_VERSION
+
+    assert CALIBRATION_REPORT_SCHEMA_VERSION == SCHEMA_VERSION
