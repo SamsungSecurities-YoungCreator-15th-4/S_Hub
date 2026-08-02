@@ -44,9 +44,9 @@ python scripts/run_graph.py --auto-approve --evidence-bundle
 
 ---
 
-## 3. 디렉터리 구조 — 파일 10종
+## 3. 디렉터리 구조
 
-`BUNDLE_FILENAMES` 기준. 번들 디렉터리에 **반드시** 생성된다.
+`BUNDLE_FILENAMES` 기준. 여기 있는 파일은 번들 디렉터리에 **반드시** 생성된다.
 
 ```
 <출력 루트>/run-YYYYMMDD-NNN/
@@ -62,9 +62,9 @@ python scripts/run_graph.py --auto-approve --evidence-bundle
 └── bundle_hash.txt               # manifest의 sha256
 ```
 
-`HASHED_FILENAMES`는 위에서 `manifest.json`과 `bundle_hash.txt`를 뺀 8종이다. manifest는 해시를 담는 그릇이고 bundle_hash는 manifest의 해시라서, 자기 자신을 넣으면 순환한다.
+`HASHED_FILENAMES`는 위에서 `manifest.json`과 `bundle_hash.txt`를 뺀 나머지다. manifest는 해시를 담는 그릇이고 bundle_hash는 manifest의 해시라서, 자기 자신을 넣으면 순환한다.
 
-**종수를 문서에 숫자로 적어 두면 상수와 갈라진다.** 그래서 `tests/test_evidence_bundle.py`의 `test_bundle_creates_every_contract_file`은 숫자를 박지 않고 `BUNDLE_FILENAMES == HASHED_FILENAMES + {manifest, bundle_hash}`라는 구조를 검사한다. 위 목록이 어긋나면 그 테스트가 아니라 이 문서를 고친다 — SSOT는 `app/evidence/schema.py:50` (BUNDLE_FILENAMES)다.
+**이 문서는 파일 종수를 숫자로 적지 않는다.** 숫자를 적으면 파일이 늘 때마다 상수와 갈라지고, 그 drift를 잡아 줄 장치가 없다. `tests/test_evidence_bundle.py`의 `test_bundle_creates_every_contract_file`도 같은 이유로 숫자를 박지 않고 `BUNDLE_FILENAMES == HASHED_FILENAMES + {manifest, bundle_hash}`라는 구조를 검사한다. 위 목록이 어긋나면 그 테스트가 아니라 이 문서를 고친다 — SSOT는 `app/evidence/schema.py:50` (BUNDLE_FILENAMES)다.
 
 ---
 
@@ -210,11 +210,21 @@ python scripts/run_graph.py --auto-approve --evidence-bundle
 | `langsmith_required` | LangSmith run ID 요건을 적용했는가 |
 
 - **`langsmith_required=false`는 공식 등급이 아니다.** R2는 LangSmith 실행 기록 제출이 과제 요구사항이라 `validate_official_case_set`의 `require_langsmith` 기본값이 True다. `--no-langsmith`로 이를 낮춰 돌린 실행은 `mode=offline_rehearsal`이 되며, 번들은 그 사실을 감추지 않는다.
-- **등급이 낮아도 수치 자체는 그대로 싣는다.** 감추는 것이 아니라 등급을 밝히는 것이 이 블록의 목적이다.
-- **등급 표시가 하나라도 없으면 통째로 "없음"으로 나간다.** 일부만 적어 공식인 척하게 두지 않는다.
-- **모르는 `schema_version`이면 `v1`·`v2`·`comparison` 수치를 옮기지 않는다.** 필드 이름이 같아도 뜻이 달라졌을 수 있어, 조용히 옮기면 감사 증거에 다른 의미의 숫자가 실린다. 이때도 `source`는 남겨 무엇을 받았는지는 기록한다. 어댑터가 아는 버전은 `CALIBRATION_REPORT_SCHEMA_VERSION`이고, `tests/test_evidence_bundle.py`가 생산자(`scripts/calibration_report.py`의 `SCHEMA_VERSION`)와 대조한다.
+- **등급을 아는 한, 등급이 낮아도 수치는 그대로 싣는다.** `dev_mock`이든 `offline_rehearsal`이든 수치는 나가고 등급이 그 옆에 붙는다. 감추는 것이 아니라 밝히는 것이 이 블록의 목적이다.
 
-**세 자리는 R2 진행 상태와 무관하게 항상 존재한다.** 채울 값이 없으면 자리를 비우는 게 아니라 `{"available": false, "reason": ...}`이 들어간다 — `hard_stop_record`가 성공 실행에서도 `blocked=false`로 반드시 생성되는 것과 같은 원칙이다(§8.5). 파일이 없는 것과 "아직 측정하지 않았다"는 감사에서 전혀 다른 의미다.
+**등급을 모르면 수치도 싣지 않는다 — fail-closed.** 아래 세 경우 `v1`·`v2`·`comparison`이 **전부** "없음" 표기로 나간다. 등급만 "없음"으로 적고 일치율은 그대로 내보내면, 감사자가 등급 줄을 지나쳤을 때 출처를 알 수 없는 수치를 공식 결과로 읽는다.
+
+| 경우 | `source` | `v1`·`v2`·`comparison` |
+| --- | --- | --- |
+| 리포트를 안 넘김 | 없음 | 없음 |
+| 등급 키(`CALIBRATION_GRADE_KEYS`) 중 하나라도 누락 | 없음 (누락 키를 사유에 명시) | 없음 (등급 미확인이 사유) |
+| `schema_version`이 `CALIBRATION_REPORT_SCHEMA_VERSION`과 다름 | **남김** (무엇을 받았는지는 기록) | 없음 (버전 불일치가 사유) |
+
+세 경우의 사유 문구는 섞지 않는다 — "안 줬다" · "등급을 모른다" · "줬는데 못 읽는다"는 감사에서 각각 다른 사실이다.
+
+모르는 `schema_version`에서 수치를 버리는 이유는 필드 이름이 같아도 뜻이 달라졌을 수 있어서다. 조용히 옮기면 감사 증거에 다른 의미의 숫자가 실린다. 어댑터가 아는 버전은 `CALIBRATION_REPORT_SCHEMA_VERSION`이고, `tests/test_evidence_bundle.py`가 생산자(`scripts/calibration_report.py`의 `SCHEMA_VERSION`)와 대조한다.
+
+**네 자리는 R2 진행 상태와 무관하게 항상 존재한다.** 채울 값이 없으면 자리를 비우는 게 아니라 `{"available": false, "reason": ...}`이 들어간다 — `hard_stop_record`가 성공 실행에서도 `blocked=false`로 반드시 생성되는 것과 같은 원칙이다(§8.5). 파일이 없는 것과 "아직 측정하지 않았다"는 감사에서 전혀 다른 의미다.
 
 **입력은 state가 아니다.** calibration은 실행 1회분 state가 아니라 사례집 전체를 judge에 돌린 결과의 집계라, 그래프 한 번의 최종 state에는 존재할 수 없다. `scripts/calibration_report.py --out` 산출물을 아래 플래그로 넘긴다.
 
@@ -275,7 +285,7 @@ python scripts/make_evidence_bundle.py --state run_state.json --out evidence/run
 ① 파일별 sha256  →  ② manifest.json  →  ③ bundle_hash.txt
 ```
 
-1. **파일별 sha256** — `HASHED_FILENAMES` 7종 각각의 파일 내용 해시(`sha256_of_file`). manifest의 `files`에 파일명→해시로 들어간다.
+1. **파일별 sha256** — `HASHED_FILENAMES` 각각의 파일 내용 해시(`sha256_of_file`). manifest의 `files`에 파일명→해시로 들어간다.
 2. **manifest.json** — 위 해시표에 `schema_version`·`run_id`·`generated_at`·`generated_by`를 더한 문서.
 3. **bundle_hash.txt** — manifest 파일 자체의 sha256. 한 줄로 저장된다.
 

@@ -10,6 +10,8 @@ import uuid
 from dataclasses import replace
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.evidence.schema import (
@@ -723,17 +725,31 @@ def test_calibration_carries_run_grade_not_just_numbers(tmp_path):
     assert payload["source"]["langsmith_required"] is True
 
 
-def test_calibration_grade_absence_is_recorded_not_assumed_official(tmp_path):
-    """등급 표시가 없으면 공식인 척하지 않는다 — 통째로 없음 처리한다."""
-    report = _calibration_report()
-    del report["langsmith_required"]
+@pytest.mark.parametrize("missing", CALIBRATION_GRADE_KEYS)
+def test_calibration_grade_absence_drops_numbers_too(tmp_path, missing):
+    """등급 키가 하나라도 빠지면 **수치도 싣지 않는다** — fail-closed.
+
+    등급만 "없음"으로 적고 일치율은 그대로 내보내면, 감사자가 등급 줄을
+    지나쳤을 때 출처를 알 수 없는 수치를 공식 결과로 읽는다. 등급 4개 각각에
+    대해 검사한다 — 하나만 검사하면 나머지 경로가 열려 있어도 통과한다.
+    """
+    report = _calibration_report(with_v2=True)
+    del report[missing]
 
     payload = _read_json(
-        _build(tmp_path, _passing_state(), calibration=report), CALIBRATION_FILENAME
+        _build(tmp_path, _passing_state(), calibration=report, run_id=f"run-{missing}"),
+        CALIBRATION_FILENAME,
     )
 
     assert payload["source"]["available"] is False
-    assert "langsmith_required" in payload["source"]["note"]
+    assert missing in payload["source"]["note"]
+    for key in ("v1", "v2", "comparison"):
+        assert payload[key]["available"] is False, f"{missing} 누락인데 {key} 수치가 남았습니다"
+        assert "실행 등급" in payload[key]["note"]
+    # 수치가 한 조각도 새지 않았는지 본문으로 확인한다.
+    data = json.dumps({k: payload[k] for k in ("v1", "v2", "comparison")}, ensure_ascii=False)
+    assert "match_rate" not in data
+    assert "confusion_matrix" not in data
 
 
 def test_calibration_rehearsal_grade_is_visible_in_bundle(tmp_path):

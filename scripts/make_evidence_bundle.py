@@ -423,15 +423,32 @@ def _calibration_source(report: dict | None) -> object:
     return {key: report[key] for key in CALIBRATION_GRADE_KEYS}
 
 
-def _calibration_schema_is_supported(report: dict | None) -> bool:
-    """모르는 스키마 버전의 리포트에서는 수치를 옮기지 않는다.
+def _usable_calibration_payload(
+    report: dict | None, source: object
+) -> tuple[dict | None, str]:
+    """수치를 옮겨도 되는 입력인지 판정하고, 안 되면 그 사유를 함께 돌려준다.
 
-    필드 이름이 같아도 뜻이 달라졌을 수 있다. 조용히 옮기면 감사 증거에 다른
-    의미의 숫자가 실린다 — 버전이 안 맞으면 값을 비우고 사유를 남긴다.
+    **fail-closed다.** 수치를 실을 수 없는 사유가 하나라도 있으면 payload를 통째로
+    버린다. 등급만 "없음"으로 적고 수치는 그대로 내보내면, 감사자가 등급 줄을
+    지나쳤을 때 출처를 알 수 없는 일치율을 공식 수치로 읽는다.
+
+    사유는 셋 다 다른 사실이라 문구를 섞지 않는다 — 안 줬다 / 등급을 모른다 /
+    줬는데 못 읽는다.
     """
     if not isinstance(report, dict):
-        return False
-    return report.get("schema_version") == CALIBRATION_REPORT_SCHEMA_VERSION
+        return None, CALIBRATION_UNAVAILABLE_NOTE
+    if isinstance(source, dict) and source.get("available") is False:
+        # 등급을 모르면 수치도 못 믿는다. 어떤 등급 키가 빠졌는지는 source에 있다.
+        return None, f"실행 등급을 확인할 수 없어 수치를 싣지 않는다 — {source.get('reason')}"
+    if report.get("schema_version") != CALIBRATION_REPORT_SCHEMA_VERSION:
+        # 필드 이름이 같아도 뜻이 달라졌을 수 있다. 조용히 옮기면 감사 증거에
+        # 다른 의미의 숫자가 실린다.
+        return None, (
+            f"calibration 리포트 schema_version={report.get('schema_version')!r}는 "
+            f"이 번들이 해석하는 {CALIBRATION_REPORT_SCHEMA_VERSION!r}가 아니다. "
+            "필드 뜻이 달라졌을 수 있어 수치를 옮기지 않는다."
+        )
+    return report, CALIBRATION_UNAVAILABLE_NOTE
 
 
 def build_calibration(report: object) -> dict:
@@ -450,15 +467,7 @@ def build_calibration(report: object) -> dict:
     """
     payload = report if isinstance(report, dict) else None
     source = _calibration_source(payload)
-    note = CALIBRATION_UNAVAILABLE_NOTE
-    if payload is not None and not _calibration_schema_is_supported(payload):
-        # "리포트를 안 줬다"와 "줬는데 못 읽는다"는 다른 사실이다. 섞지 않는다.
-        note = (
-            f"calibration 리포트 schema_version={payload.get('schema_version')!r}는 "
-            f"이 번들이 해석하는 {CALIBRATION_REPORT_SCHEMA_VERSION!r}가 아니다. "
-            "필드 뜻이 달라졌을 수 있어 수치를 옮기지 않는다."
-        )
-        payload = None
+    payload, note = _usable_calibration_payload(payload, source)
     return {
         "source": source,
         "v1": _calibration_side(payload, "v1", note=note),
