@@ -39,7 +39,7 @@ from __future__ import annotations
 
 import re
 from functools import lru_cache
-from pathlib import Path
+from pathlib import Path, PurePath, PurePosixPath, PureWindowsPath
 
 import pytest
 
@@ -133,25 +133,37 @@ def parse_citations(text: str, doc: str) -> list[Citation]:
     return found
 
 
+def path_matches_citation(relative: PurePath, cited: str) -> bool:
+    """레포 기준 상대경로가 인용 경로 조각과 맞는지 판정한다.
+
+    비교는 반드시 `as_posix()`로 한다. `str(relative)`를 쓰면 Windows에서
+    `app\\judge\\rubric.py`가 나와 `/rubric.py`와 절대 안 맞고, **파일명만 적은
+    인용이 전부 "파일을 찾지 못했습니다"로 실패**한다. 문서는 슬래시로만 적히므로
+    구분자를 posix로 고정하는 쪽이 맞다.
+
+    디렉터리 경계를 지키려고 `/`를 앞에 붙인다 — `load_inputs.py`가
+    `tests/test_load_inputs.py`에 걸리면 안 된다.
+    """
+    return relative.as_posix().endswith("/" + cited)
+
+
 @lru_cache(maxsize=None)
 def resolve_cited_path(cited: str) -> tuple[Path, ...]:
     """인용 경로를 실제 파일로 해석한다.
 
     문서는 `rag_cite.py:879`처럼 파일명만 적기도 하고 `app/graph.py:30`처럼
     레포 기준 경로를 적기도 한다. 둘 다 받아들이되, 경로 조각으로 맞출 때는
-    디렉터리 경계를 지킨다 — `load_inputs.py`가 `tests/test_load_inputs.py`에
-    걸리면 안 된다.
+    디렉터리 경계를 지킨다.
     """
     direct = ROOT / cited
     if direct.is_file():
         return (direct,)
-    suffix = "/" + cited
     matches = []
     for path in ROOT.rglob("*" + Path(cited).name):
         relative = path.relative_to(ROOT)
         if any(part in SKIP_DIRS for part in relative.parts):
             continue
-        if path.is_file() and str(relative).endswith(suffix):
+        if path.is_file() and path_matches_citation(relative, cited):
             matches.append(path)
     return tuple(sorted(matches))
 
@@ -311,3 +323,44 @@ def test_known_stale_entries_are_still_stale():
         "KNOWN_STALE에 더 이상 필요 없는 등록이 남아 있습니다. 해당 항목을 지워 주세요:\n"
         + "\n".join(f"  {row}" for row in stale_but_fine)
     )
+
+
+@pytest.mark.parametrize(
+    ("relative", "cited", "expected"),
+    [
+        # 파일명만 적은 인용 — 이 술어가 실제로 해석하는 경우다.
+        (PureWindowsPath("app/judge/rubric.py"), "rubric.py", True),
+        (PurePosixPath("app/judge/rubric.py"), "rubric.py", True),
+        # 디렉터리 경계 — `load_inputs.py`가 `test_load_inputs.py`에 걸리면 안 된다.
+        (PureWindowsPath("tests/test_load_inputs.py"), "load_inputs.py", False),
+        (PurePosixPath("tests/test_load_inputs.py"), "load_inputs.py", False),
+        # 전체 경로 인용은 이 술어가 아니라 `resolve_cited_path`의 direct 분기가
+        # 처리한다(`ROOT / cited`가 곧 파일). 그래서 여기서는 False가 맞다 —
+        # 앞에 `/`를 붙여 비교하므로 레포 루트 기준 전체 경로와는 안 맞는다.
+        (PureWindowsPath("app/judge/rubric.py"), "app/judge/rubric.py", False),
+        (PurePosixPath("app/judge/rubric.py"), "app/judge/rubric.py", False),
+    ],
+)
+def test_citation_matching_is_platform_independent(relative, cited, expected):
+    """경로 대조가 OS 구분자에 좌우되면 안 된다.
+
+    Windows에서 `str(relative)`는 `app\\judge\\rubric.py`를 주는데 인용은 항상
+    슬래시(`/rubric.py`)라, 구분자를 정규화하지 않으면 **파일명만 적은 인용이
+    전부 "파일을 찾지 못했습니다"로 실패**한다. CI가 Linux라 안 잡히고 Windows에서
+    개발하는 팀원만 계속 빨간 테스트를 보게 되는 종류의 버그다.
+
+    `PureWindowsPath`로 검사해 Linux CI에서도 이 회귀를 잡는다.
+    """
+    assert path_matches_citation(relative, cited) is expected
+
+
+def test_bare_filename_citations_actually_resolve():
+    """파일명만 적은 인용이 실제로 해석되는지 — 위 단위 검사의 통합 확인.
+
+    문서에 파일명만 적은 인용이 여러 건 있고, 경로 대조가 깨지면 그 전부가
+    한꺼번에 실패한다. 한 건이라도 있는지부터 확인해 검사가 공허해지지 않게 한다.
+    """
+    bare = [c for c in CITATIONS if "/" not in c.cited_path]
+    assert bare, "파일명만 적은 인용이 없어 이 검사가 무의미합니다."
+    unresolved = [str(c) for c in bare if not resolve_cited_path(c.cited_path)]
+    assert not unresolved, "파일명만 적은 인용이 해석되지 않습니다:\n" + "\n".join(unresolved)
