@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -189,7 +190,10 @@ BLIND_FORBIDDEN = (
 )
 
 
-@pytest.mark.parametrize("folder", ["cases_blind", "dist", "dist_relabel"])
+# blind 배포본에만 적용한다.
+#   judge_inputs — R2 실행용이라 사례 ID를 그대로 쓰는 것이 설계다 (§9에서 별도 검사)
+#   starter-kit  — 템플릿·견본이라 `label:` 등이 예시로 들어간다
+@pytest.mark.parametrize("folder", ["cases_blind", "dist_relabel"])
 def test_blind_packages_have_no_answers(folder):
     d = GS / folder
     if not d.exists():
@@ -230,18 +234,44 @@ def test_labeler_guide_generator_is_rerun_safe():
         assert not re.search(pattern, guide), f"배포용 가이드에 {what} 유출"
 
 
-def test_committed_labeler_guide_matches_generator():
-    """커밋된 배포본이 생성기 출력과 같은지 — 손으로 복사하다 §4가 섞여 든 적이 있다."""
-    src, dist = GS / "labeling-guide.md", GS / "dist" / "labeling-guide.md"
-    tools = GS / "tools"
-    if not (src.exists() and dist.exists() and (tools / "make_blind.py").exists()):
-        pytest.skip("대상 파일 없음")
-    sys.path.insert(0, str(tools))
-    from make_blind import build_labeler_guide  # noqa: PLC0415
+# ── 9. R2 무라벨 입력본(judge_inputs) ────────────────────────────────────
 
-    assert dist.read_text(encoding="utf-8") == build_labeler_guide(
-        src.read_text(encoding="utf-8")
-    ), "dist/labeling-guide.md 가 생성기 출력과 다르다 — 재생성할 것"
+def test_judge_inputs_hashes_match_frozen_cases():
+    """judge_inputs 본문 해시가 R1 동결 해시와 같아야 한다.
+
+    이게 깨지면 judge가 동결된 것과 **다른 사례**를 채점하고 있다는 뜻이다.
+    v1/v2 비교의 전제가 무너지므로 가장 먼저 막아야 할 실패다.
+    """
+    mf = JUDGE_INPUTS / "manifest.json"
+    if not mf.exists():
+        pytest.skip("judge_inputs/manifest.json 없음")
+    manifest = json.loads(mf.read_text(encoding="utf-8"))
+    frozen = (json.loads((GS / "case_hashes.json").read_text(encoding="utf-8"))
+              .get("hashes") or {})
+    got = {c["id"]: c["case_content_sha256"] for c in manifest["cases"]}
+    assert got == frozen, "judge_inputs 본문이 동결된 사례와 다르다"
+
+
+def test_judge_inputs_frontmatter_allowlist():
+    """무라벨 입력본에 허용된 frontmatter 필드만 남아야 한다."""
+    if not JUDGE_INPUTS.exists():
+        pytest.skip("judge_inputs 없음")
+    allowed = {"id", "variant", "llm_draft"}
+    problems = []
+    for p in sorted(JUDGE_INPUTS.glob("case_*.md")):
+        fm = _frontmatter(p)
+        extra = set(fm) - allowed
+        if extra:
+            problems.append(f"{p.name}: 허용 밖 필드 {sorted(extra)}")
+    assert not problems, problems
+
+
+def test_judge_inputs_cover_all_cases():
+    """20건이 빠짐없이 내보내졌는가 — 일부만 채점하면 일치율이 왜곡된다."""
+    if not JUDGE_INPUTS.exists():
+        pytest.skip("judge_inputs 없음")
+    exported = {p.stem for p in JUDGE_INPUTS.glob("case_*.md")}
+    assert exported == {p.stem for p in CASES.glob("case_*.md")}
 
 
 # ── 7. 사례 본문 해시 (v1/v2 동일성 앵커) ──────────────────────────────────
@@ -292,17 +322,25 @@ ANSWER_FIELDS = ("label", "fail_axes", "trap_type", "rationale",
 ALLOWED_STATE_KEYS = {"metrics", "explanations", "citations"}
 
 
+# R2 실행 로더 후보 — 모듈이 옮겨져도 검사가 조용히 꺼지지 않도록 넓게 찾는다.
+LOADER_CANDIDATES = (
+    ("app.evaluation.goldenset_loader", ("load_case", "load_judge_state", "build_state")),
+    ("app.goldenset.loader", ("load_case",)),
+    ("scripts.judge_runner", ("load_case",)),
+)
+
+
 def _loader():
     """R2 실행 로더. 아직 없으면 skip — 생기는 순간 자동으로 검사 대상이 된다."""
     sys.path.insert(0, str(ROOT))
-    for mod, fn in (("scripts.judge_runner", "load_case"),
-                    ("app.goldenset.loader", "load_case")):
+    for mod, names in LOADER_CANDIDATES:
         try:
-            m = __import__(mod, fromlist=[fn])
+            m = __import__(mod, fromlist=list(names))
         except Exception:
             continue
-        if hasattr(m, fn):
-            return getattr(m, fn)
+        for fn in names:
+            if hasattr(m, fn):
+                return getattr(m, fn)
     pytest.skip("judge 실행 로더가 아직 없습니다 (생성되면 자동으로 검사 대상이 됩니다)")
 
 
@@ -328,3 +366,28 @@ def test_loader_uses_allowlist_only():
     state = load_case(JUDGE_INPUTS / "case_001.md")
     extra = set(state) - ALLOWED_STATE_KEYS
     assert not extra, f"allowlist({sorted(ALLOWED_STATE_KEYS)}) 밖의 키: {sorted(extra)}"
+
+
+def test_make_blind_refuses_after_freeze():
+    """라벨 확정 후에는 --force 없이 cases_blind/ 를 덮을 수 없다.
+
+    cases_blind/ 는 라벨러가 실제로 본 본문의 유일한 사본이다. 재라벨한 2건
+    (case_008·case_010)은 cases/ 와 의도적으로 다르며, 재생성하면
+    labeling-guide.md §4의 재라벨 경위가 근거를 잃는다.
+
+    가드가 리팩터링으로 사라져도 CI가 초록이면 안 되므로 여기서 고정한다.
+    """
+    tool = GS / "tools" / "make_blind.py"
+    blind = GS / "cases_blind"
+    if not (GS / "case_hashes.json").exists() or not tool.exists():
+        pytest.skip("동결 전이거나 생성기 없음")
+
+    before = {p.name: p.read_bytes() for p in blind.glob("*.md")}
+    assert before, "cases_blind/ 가 비어 있어 검사 의미가 없다"
+
+    result = subprocess.run(
+        [sys.executable, str(tool)], capture_output=True, text=True, cwd=str(ROOT)
+    )
+    assert result.returncode != 0, "동결 후인데 재생성이 통과했다"
+    after = {p.name: p.read_bytes() for p in blind.glob("*.md")}
+    assert after == before, "가드가 걸렸는데도 cases_blind/ 가 바뀌었다"
