@@ -164,7 +164,7 @@ seed = 42     3회 동일 = False   고유 응답 2종
 
 **`seed`를 지정해도 해결되지 않는다.** 짧은 프롬프트에서는 3회 동일했으므로, 프롬프트가 길고 후보가 많을수록 갈리는 것으로 보인다. `temperature=0`은 벤더 측 비결정성을 제거하지 못한다.
 
-> **부수 확인 — `seed` 전달이 비일관적이다.** `get_llm(temperature, *, seed)` 호출부 3곳 중 `extract_ips_chain.py:78`만 seed를 넘기고 `rag_cite.py:879`·`judge_eval.py:379`는 넘기지 않는다. 위 측정상 이를 고쳐도 재현되지 않지만, 일관성 차원에서 정리할 가치는 있다. 단 `judge_eval`의 seed 전달 변경은 judge 출력 분포를 바꾸므로 R2 v1/v2 캘리브레이션 측정이 끝나기 전에는 수정하지 않는다.
+> **부수 확인 — `seed` 전달이 비일관적이다.** `get_llm(temperature, *, seed)` 호출부 3곳 중 `extract_ips_chain.py:78`만 seed를 넘기고 `rag_cite.py:879`·`judge_eval.py:380`는 넘기지 않는다. 위 측정상 이를 고쳐도 재현되지 않지만, 일관성 차원에서 정리할 가치는 있다. 단 `judge_eval`의 seed 전달 변경은 judge 출력 분포를 바꾸므로 R2 v1/v2 캘리브레이션 측정이 끝나기 전에는 수정하지 않는다.
 >
 > **두 번째 실사례 — seed를 넘겨도 갈렸다.** `extract_ips_chain.py:78` (EXTRACTION_SEED)는 세 호출부 중 **유일하게 `seed=EXTRACTION_SEED`를 넘기는데도** §4.1 모드 B에서 `ips.Unique`가 실행마다 갈렸다. 위 ③의 rag_cite 프롬프트 실험과 별개로, 실제 파이프라인에서 seed 지정이 재현을 보장하지 못한다는 것을 다시 보여준다.
 

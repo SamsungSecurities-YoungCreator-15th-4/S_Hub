@@ -123,6 +123,51 @@ def test_numeric_consistency_ignores_unitless_ordinals_and_counts():
     assert numeric_consistency(explanations, {})[0] is True
 
 
+def test_numeric_consistency_accepts_portfolio_weight_without_citation():
+    portfolio = [
+        {"asset_class": "domestic_equity", "value_krw": 500, "weight": 0.5},
+        {"asset_class": "cash", "value_krw": 500, "weight": 0.5},
+    ]
+    explanations = _explanations(
+        f"기준일 {AS_OF_DATE} 기준 국내주식 비중은 50%입니다."
+    )
+
+    passed, reason = numeric_consistency(
+        explanations, METRICS, {AS_OF_DATE}, None, portfolio
+    )
+
+    assert passed is True
+    assert "engine_metric=2" in reason
+
+
+def test_numeric_consistency_fails_when_weights_do_not_sum_to_100():
+    portfolio = [
+        {"asset_class": "domestic_equity", "value_krw": 500, "weight": 0.5},
+        {"asset_class": "cash", "value_krw": 300, "weight": 0.3},
+    ]
+    explanations = _explanations(DISCLAIMER_TEXT)
+
+    passed, reason = numeric_consistency(
+        explanations, METRICS, {AS_OF_DATE}, None, portfolio
+    )
+
+    assert passed is False
+    assert "자산군 비중 합계가 100%가 아님 (80.0%)" in reason
+
+
+def test_numeric_consistency_allows_rounding_tolerance_on_weight_sum():
+    portfolio = [
+        {"asset_class": "domestic_equity", "value_krw": 500, "weight": 0.334},
+        {"asset_class": "cash", "value_krw": 500, "weight": 0.333},
+        {"asset_class": "bond", "value_krw": 333, "weight": 0.333},
+    ]
+    explanations = _explanations(DISCLAIMER_TEXT)
+
+    assert numeric_consistency(
+        explanations, METRICS, {AS_OF_DATE}, None, portfolio
+    )[0] is True
+
+
 def test_numeric_consistency_accepts_cited_evidence_fact_outside_metrics():
     topic = "거시환경·스트레스 개연성"
     text = "한국은행은 2026-05-29 기준금리를 2.50%로 유지했습니다."

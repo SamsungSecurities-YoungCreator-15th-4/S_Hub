@@ -51,7 +51,8 @@ _NUMBER_RE = re.compile(
 )
 _ENGINE_METRIC_CONTEXT_RE = re.compile(
     r"(?<![A-Za-z])(?:CVaR|VaR|ES)(?![A-Za-z])|Expected\s+Shortfall|"
-    r"손실액|손실률|신뢰수준|보유기간|관측기간|관측치|포트폴리오\s*총액",
+    r"손실액|손실률|신뢰수준|보유기간|관측기간|관측치|포트폴리오\s*총액|"
+    r"자산군?\s*비중|비중",
     flags=re.IGNORECASE,
 )
 _ENGINE_DATE_CONTEXT_RE = re.compile(r"기준일|산출일|데이터.{0,8}종료|관측.{0,8}종료")
@@ -212,13 +213,25 @@ def numeric_consistency(
     metrics: dict,
     expected_dates: set[str] | None = None,
     citations: list | None = None,
+    portfolio: list | None = None,
 ) -> tuple[bool, str]:
-    candidates = _metric_numbers(metrics)
+    candidates = _metric_numbers(metrics) | _metric_numbers(portfolio or [])
     dates = _metric_dates(metrics) | (expected_dates or set())
     quotes_by_topic = _verified_quotes_by_topic(citations)
     mismatches: list[str] = []
     engine_metric_count = 0
     evidence_fact_count = 0
+
+    if portfolio:
+        weight_sum = sum(
+            float(item["weight"])
+            for item in portfolio
+            if isinstance(item, dict) and isinstance(item.get("weight"), (int, float))
+        )
+        # 가이드 §2②-B1: 99.9%~100.1%는 비중 표기 자릿수 반올림으로 설명되는
+        # 범위라 pass, 그 밖은 재량 없이 fail(F1)한다.
+        if not math.isclose(weight_sum, 1.0, abs_tol=0.001):
+            mismatches.append(f"자산군 비중 합계가 100%가 아님 ({weight_sum * 100:.1f}%)")
 
     for explanation in explanations:
         if not isinstance(explanation, dict) or explanation.get("topic") == "재작성 반영":
@@ -477,6 +490,7 @@ def evaluate_rubric(
     strict_citation_gate: bool,
     expected_dates: set[str],
     llm,
+    portfolio: list | None = None,
 ) -> tuple[dict[str, tuple[bool, str]], list[str]]:
     results = {
         "source_validity": source_validity(citations, strict_citation_gate),
@@ -485,6 +499,7 @@ def evaluate_rubric(
             metrics,
             expected_dates,
             citations,
+            portfolio,
         ),
         "hallucination": hallucination(
             explanations,
