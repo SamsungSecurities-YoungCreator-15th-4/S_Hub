@@ -26,10 +26,16 @@ data/rag-index-cache/
 !/corpus/**/.gitkeep
 
 # judge 실행·기록 러너 산출물 — 실행마다 생기는 로컬 리허설/결과 파일이라
-# 커밋하지 않는다. 공식 v1/v2 결과 파일 공유 방식은 팀 합의 후 별도로 정한다.
+# 커밋하지 않는다(`/out/`은 로컬 작업 공간).
 /out/
 judge_v*_results.json
 judge_v*_results.manifest.json
+
+# 공식 v1~v6 실행 결과는 감사·재현 근거라 예외로 추적한다. 위치를 goldenset/ 밖에
+# 두는 것은 R2 실행 담당이 정답 사례집·라벨 대조 산출물을 실수로도 열지 않도록
+# 물리적으로 분리하기 위함이다.
+!/docs/r2_calibration_runs/judge_v*_results.json
+!/docs/r2_calibration_runs/judge_v*_results.manifest.json
 
 # 에디터/OS
 .idea/
