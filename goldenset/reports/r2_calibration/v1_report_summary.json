@@ -1,0 +1,147 @@
+{
+  "comparison": {
+    "available": false,
+    "note": "calibration은 실행 1회분 state가 아니라 사례집 전체 judge 결과의 집계다. scripts/calibration_report.py --out 산출물을 --calibration으로 넘기면 실린다.",
+    "reason": "R2 calibration 리포트 입력.comparison 없음"
+  },
+  "mismatch_detail_excluded": "오판 사례 상세는 사람 라벨 원문(human_rationale)을 포함하므로 번들에 싣지 않는다. scripts/calibration_report.py --out 산출물을 참조한다.",
+  "source": {
+    "langsmith_required": true,
+    "mode": "official",
+    "official_validation_passed": true,
+    "schema_version": "1"
+  },
+  "v1": {
+    "confusion_matrix": {
+      "false_negative": 1,
+      "false_positive": 4,
+      "true_negative": 6,
+      "true_positive": 9
+    },
+    "derived": {
+      "false_negative": 1,
+      "false_positive": 4,
+      "match": 15,
+      "match_rate": 0.75
+    },
+    "evalset_case_count": 20,
+    "evalset_hash": "70a75abcd2d5ea9d2a752695ecc9e296c014b7866afb18e18275469cdcaeaf75",
+    "per_axis": {
+      "disclaimer": {
+        "axis_ko": "면책",
+        "confusion_matrix": {
+          "false_negative": 1,
+          "false_positive": 0,
+          "true_negative": 17,
+          "true_positive": 2
+        },
+        "defect_recall": 0.6667,
+        "derived": {
+          "false_negative": 1,
+          "false_positive": 0,
+          "match": 19,
+          "match_rate": 0.95
+        },
+        "human_fail_support": 3,
+        "total": 20
+      },
+      "false_precision": {
+        "axis_ko": "위조정밀도",
+        "confusion_matrix": {
+          "false_negative": 1,
+          "false_positive": 0,
+          "true_negative": 18,
+          "true_positive": 1
+        },
+        "defect_recall": 0.5,
+        "derived": {
+          "false_negative": 1,
+          "false_positive": 0,
+          "match": 19,
+          "match_rate": 0.95
+        },
+        "human_fail_support": 2,
+        "total": 20
+      },
+      "hallucination": {
+        "axis_ko": "환각",
+        "confusion_matrix": {
+          "false_negative": 3,
+          "false_positive": 4,
+          "true_negative": 13,
+          "true_positive": 0
+        },
+        "defect_recall": 0.0,
+        "derived": {
+          "false_negative": 3,
+          "false_positive": 4,
+          "match": 13,
+          "match_rate": 0.65
+        },
+        "human_fail_support": 3,
+        "total": 20
+      },
+      "numeric_consistency": {
+        "axis_ko": "수치 정합",
+        "confusion_matrix": {
+          "false_negative": 1,
+          "false_positive": 6,
+          "true_negative": 11,
+          "true_positive": 2
+        },
+        "defect_recall": 0.6667,
+        "derived": {
+          "false_negative": 1,
+          "false_positive": 6,
+          "match": 13,
+          "match_rate": 0.65
+        },
+        "human_fail_support": 3,
+        "total": 20
+      },
+      "prohibited_expression": {
+        "axis_ko": "금지표현",
+        "confusion_matrix": {
+          "false_negative": 1,
+          "false_positive": 0,
+          "true_negative": 18,
+          "true_positive": 1
+        },
+        "defect_recall": 0.5,
+        "derived": {
+          "false_negative": 1,
+          "false_positive": 0,
+          "match": 19,
+          "match_rate": 0.95
+        },
+        "human_fail_support": 2,
+        "total": 20
+      },
+      "source_validity": {
+        "axis_ko": "출처",
+        "confusion_matrix": {
+          "false_negative": 3,
+          "false_positive": 0,
+          "true_negative": 17,
+          "true_positive": 0
+        },
+        "defect_recall": 0.0,
+        "derived": {
+          "false_negative": 3,
+          "false_positive": 0,
+          "match": 17,
+          "match_rate": 0.85
+        },
+        "human_fail_support": 3,
+        "total": 20
+      }
+    },
+    "prompt_version": "v1",
+    "total": 20
+  },
+  "v2": {
+    "available": false,
+    "note": "calibration은 실행 1회분 state가 아니라 사례집 전체 judge 결과의 집계다. scripts/calibration_report.py --out 산출물을 --calibration으로 넘기면 실린다.",
+    "reason": "R2 calibration 리포트 입력.v2 없음"
+  }
+}
