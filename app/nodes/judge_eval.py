@@ -321,6 +321,7 @@ def _rubric_checks(state: RiskState, llm) -> tuple[list[dict], dict, list[str]]:
         strict_citation_gate=run_config.get("strict_citation_gate") is True,
         expected_dates=_expected_dates(state),
         llm=llm,
+        portfolio=state.get("portfolio") or [],
     )
     rubric = {
         name: {"passed": results[name][0], "reason": results[name][1]}

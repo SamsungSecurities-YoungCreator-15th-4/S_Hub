@@ -279,7 +279,7 @@ python scripts/replay_verify.py submitted.json replay.json
 **이 구분을 놓치면 발표에서 사실과 다른 주장을 하게 된다.**
 
 `--force-judge-fail N`은 judge의 실제 판정 결과를 **덮어쓴다**. 6축이 전부 통과했더라도
-`failed_axes=["forced_failure"]`로 강제 실패시킨다 — `app/nodes/judge_eval.py:403` (force_fail_n).
+`failed_axes=["forced_failure"]`로 강제 실패시킨다 — `app/nodes/judge_eval.py:404` (force_fail_n).
 `reproducibility_scope.md` §4.2의 측정 조건에도 `failed_axes=["forced_failure"]`가 그대로 적혀 있다.
 
 따라서 차단 번들 라이브 재실행이 보이는 것은:
@@ -331,7 +331,7 @@ RAG 검색·rag_cite·judge_eval은 실제 Azure를 호출한다 (`reproducibili
 | 12 | 차단 지문 | 차단 지문이 실행마다 같나 | `docs/reproducibility_scope.md` §4.2 · `docs/evidence_bundle_schema.md` §4.5 |
 | 13 | 누락 표기 | "없음"으로 나온 칸은 안 채운 것 아닌가 | `docs/evidence_bundle_schema.md` §5 · §8 |
 | 14 | 탈락 인용 | 떨어진 인용은 어디에 남나 | `docs/hard_stop_contract.md` §5 「탈락 인용 기록」 · `scripts/make_evidence_bundle.py:249` (_rejected_citations) |
-| 15 | 시연 범위 | 방금 차단된 건 judge가 결함을 잡은 건가 | 이 문서 §3.5 · `app/nodes/judge_eval.py:403` (force_fail_n) · R2 판별 증거는 `scripts/judge_runner.py` + `docs/evidence_bundle_schema.md` §4.8 |
+| 15 | 시연 범위 | 방금 차단된 건 judge가 결함을 잡은 건가 | 이 문서 §3.5 · `app/nodes/judge_eval.py:404` (force_fail_n) · R2 판별 증거는 `scripts/judge_runner.py` + `docs/evidence_bundle_schema.md` §4.8 |
 | 16 | 재현 해시 검증 | R2 사례집 채점에서 `computation_hash_present`가 전부 통과한 건 무슨 뜻인가 | `app/evaluation/goldenset_loader.py:190` (_synthesize_hash) · `docs/reproducibility_scope.md` §2 |
 
 ---
@@ -349,7 +349,7 @@ RAG 검색·rag_cite·judge_eval은 실제 Azure를 호출한다 (`reproducibili
 
 `--offline`이어도 RAG·judge는 Azure를 호출하므로(§4의 마지막 줄) **재실행 자체가 성립하지 않는다.**
 네트워크가 없으면 인용이 0건이 되고, `config/config.yaml`의 `strict_citation_gate`가 켜져 있으면 출처 축이 실패해
-정상적으로 차단된다 — `app/judge/rubric.py:84` (source_validity). 결함이 아니라 설계된 fail-closed 동작이지만,
+정상적으로 차단된다 — `app/judge/rubric.py:89` (source_validity). 결함이 아니라 설계된 fail-closed 동작이지만,
 **재현 데모로는 쓸 수 없다.**
 
 대응 — 제출된 번들 파일만으로 되는 **오프라인 무결성 검증 2종**으로 전환한다. 둘 다 네트워크가 필요 없다.

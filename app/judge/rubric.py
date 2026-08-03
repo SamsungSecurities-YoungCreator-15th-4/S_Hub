@@ -54,6 +54,11 @@ _ENGINE_METRIC_CONTEXT_RE = re.compile(
     r"손실액|손실률|신뢰수준|보유기간|관측기간|관측치|포트폴리오\s*총액",
     flags=re.IGNORECASE,
 )
+# portfolio가 있을 때만(=candidates에 실제 비중 후보가 있을 때만) "비중" 문맥을
+# 엔진 수치로 재분류한다. R2 calibration 로더는 portfolio를 넘기지 않으므로
+# (goldenset_loader.py ALLOWED_STATE_KEYS), 그 경로에서는 이 재분류가 꺼져
+# 기존 citation 경로 그대로 동작한다 — PR #181 리뷰(다경) 지적 사항.
+_PORTFOLIO_WEIGHT_CONTEXT_RE = re.compile(r"자산군?\s*비중|비중")
 _ENGINE_DATE_CONTEXT_RE = re.compile(r"기준일|산출일|데이터.{0,8}종료|관측.{0,8}종료")
 _ENGINE_METRIC_TOPICS = {"VaR 해석", "스트레스 시나리오", "기준일 및 유의사항"}
 _CLAUSE_BOUNDARY_RE = re.compile(r"[,.!?;\n]")
@@ -212,13 +217,34 @@ def numeric_consistency(
     metrics: dict,
     expected_dates: set[str] | None = None,
     citations: list | None = None,
+    portfolio: list | None = None,
 ) -> tuple[bool, str]:
-    candidates = _metric_numbers(metrics)
+    candidates = _metric_numbers(metrics) | _metric_numbers(portfolio or [])
     dates = _metric_dates(metrics) | (expected_dates or set())
     quotes_by_topic = _verified_quotes_by_topic(citations)
     mismatches: list[str] = []
     engine_metric_count = 0
     evidence_fact_count = 0
+
+    if portfolio:
+        weight_items = [
+            item
+            for item in portfolio
+            if isinstance(item, dict)
+            and isinstance(item.get("weight"), (int, float))
+            and not isinstance(item.get("weight"), bool)
+        ]
+        weight_sum = sum(float(item["weight"]) for item in weight_items)
+        # 가이드 §2②-B1: 99.9%~100.1%는 비중 표기 자릿수 반올림으로 설명되는
+        # 범위라 pass, 그 밖은 재량 없이 fail(F1)한다.
+        if not math.isclose(weight_sum, 1.0, abs_tol=0.001):
+            detail = f"자산군 비중 합계가 100%가 아님 ({weight_sum * 100:.1f}%)"
+            if len(weight_items) != len(portfolio):
+                detail += (
+                    f" — portfolio {len(portfolio)}건 중 유효한 weight를 가진 "
+                    f"{len(weight_items)}건만 합산함(데이터 결함 가능성)"
+                )
+            mismatches.append(detail)
 
     for explanation in explanations:
         if not isinstance(explanation, dict) or explanation.get("topic") == "재작성 반영":
@@ -260,6 +286,7 @@ def numeric_consistency(
             is_engine_metric = (
                 topic in _ENGINE_METRIC_TOPICS
                 or _ENGINE_METRIC_CONTEXT_RE.search(context)
+                or (bool(portfolio) and _PORTFOLIO_WEIGHT_CONTEXT_RE.search(context))
             )
             if is_engine_metric:
                 metric_match = any(
@@ -480,6 +507,7 @@ def evaluate_rubric(
     strict_citation_gate: bool,
     expected_dates: set[str],
     llm,
+    portfolio: list | None = None,
 ) -> tuple[dict[str, tuple[bool, str]], list[str]]:
     results = {
         "source_validity": source_validity(citations, strict_citation_gate),
@@ -488,6 +516,7 @@ def evaluate_rubric(
             metrics,
             expected_dates,
             citations,
+            portfolio,
         ),
         "hallucination": hallucination(
             explanations,
