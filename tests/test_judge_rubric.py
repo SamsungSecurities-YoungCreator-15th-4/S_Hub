@@ -24,7 +24,8 @@ AS_OF_DATE = "2026-06-30"
 JUDGE_MAX_RETRIES = load_inputs({})["run_config"]["judge_max_retries"]
 DISCLAIMER_TEXT = (
     f"기준일 {AS_OF_DATE}의 과거 데이터 기반 추정치이며 투자 권유가 아니고, "
-    "원금 또는 수익을 보장하지 않습니다. 실제 결과와 다를 수 있습니다."
+    "원금 또는 수익을 보장하지 않습니다. 실제 결과와 다를 수 있습니다. "
+    "최종 의사결정 책임은 고객과 담당 PB에게 있습니다."
 )
 METRICS = {
     "confidence": 0.99,
@@ -120,6 +121,65 @@ def test_numeric_consistency_ignores_unitless_ordinals_and_counts():
     explanations = _explanations("2가지 요인 중 1순위 위험을 설명합니다.")
 
     assert numeric_consistency(explanations, {})[0] is True
+
+
+def test_numeric_consistency_accepts_portfolio_weight_without_citation():
+    portfolio = [
+        {"asset_class": "domestic_equity", "value_krw": 500, "weight": 0.5},
+        {"asset_class": "cash", "value_krw": 500, "weight": 0.5},
+    ]
+    explanations = _explanations(
+        f"기준일 {AS_OF_DATE} 기준 국내주식 비중은 50%입니다."
+    )
+
+    passed, reason = numeric_consistency(
+        explanations, METRICS, {AS_OF_DATE}, None, portfolio
+    )
+
+    assert passed is True
+    assert "engine_metric=2" in reason
+
+
+def test_numeric_consistency_weight_context_inert_without_portfolio():
+    """PR #181 리뷰(다경) — R2 calibration 로더는 portfolio를 안 넘긴다.
+    portfolio가 없으면 "비중" 문맥이 엔진 수치로 재분류되지 않고 기존
+    citation 경로 그대로 동작해야 한다(새 오탐 회귀 방지)."""
+    topic = "거시환경·스트레스 개연성"
+    text = f"기준일 {AS_OF_DATE} 기준 국내주식 비중은 50%입니다."
+    explanations = [{"topic": topic, "text": text, "revision": 0}]
+
+    passed, reason = numeric_consistency(explanations, METRICS, {AS_OF_DATE}, None, None)
+
+    assert passed is False
+    assert "같은 topic의 검증 인용에 없음" in reason
+
+
+def test_numeric_consistency_fails_when_weights_do_not_sum_to_100():
+    portfolio = [
+        {"asset_class": "domestic_equity", "value_krw": 500, "weight": 0.5},
+        {"asset_class": "cash", "value_krw": 300, "weight": 0.3},
+    ]
+    explanations = _explanations(DISCLAIMER_TEXT)
+
+    passed, reason = numeric_consistency(
+        explanations, METRICS, {AS_OF_DATE}, None, portfolio
+    )
+
+    assert passed is False
+    assert "자산군 비중 합계가 100%가 아님 (80.0%)" in reason
+
+
+def test_numeric_consistency_allows_rounding_tolerance_on_weight_sum():
+    portfolio = [
+        {"asset_class": "domestic_equity", "value_krw": 500, "weight": 0.334},
+        {"asset_class": "cash", "value_krw": 500, "weight": 0.333},
+        {"asset_class": "bond", "value_krw": 333, "weight": 0.333},
+    ]
+    explanations = _explanations(DISCLAIMER_TEXT)
+
+    assert numeric_consistency(
+        explanations, METRICS, {AS_OF_DATE}, None, portfolio
+    )[0] is True
 
 
 def test_numeric_consistency_accepts_cited_evidence_fact_outside_metrics():
@@ -396,7 +456,60 @@ def test_disclaimer_pass_and_fail():
     passed, reason = disclaimer(_explanations("VaR 설명입니다."), {AS_OF_DATE})
     assert passed is False
     assert "기준일" in reason
-    assert "면책" in reason
+    assert "E1" in reason
+    assert "E3" in reason
+
+
+def test_disclaimer_requires_both_e1_and_e3():
+    """E1(비권유)만 있거나 E3(책임 소재)만 있으면 fail한다 — 라벨링 가이드
+    §2⑤ B2·B3. 불확실성 고지("실제 결과와 다를 수 있다")만으로는 어느 쪽도
+    충족하지 못한다(B4, 위조정밀도 P2가 담당). 기준일은 세 경우 모두 채워
+    E1·E3 여부만 갈리게 한다."""
+    prefix = f"기준일 {AS_OF_DATE} 기준 "
+
+    e1_only = prefix + "투자 권유가 아니며 원금 또는 수익을 보장하지 않습니다."
+    passed, reason = disclaimer(_explanations(e1_only), {AS_OF_DATE})
+    assert passed is False
+    assert "E3" in reason
+    assert "E1" not in reason
+
+    e3_only = prefix + "최종 의사결정 책임은 고객과 담당 PB에게 있습니다."
+    passed, reason = disclaimer(_explanations(e3_only), {AS_OF_DATE})
+    assert passed is False
+    assert "E1" in reason
+    assert "E3" not in reason
+
+    uncertainty_only = prefix + "실제 결과와 다를 수 있습니다."
+    passed, reason = disclaimer(_explanations(uncertainty_only), {AS_OF_DATE})
+    assert passed is False
+    assert "E1" in reason
+    assert "E3" in reason
+
+    both = prefix + (
+        "투자 권유가 아니며 원금 또는 수익을 보장하지 않습니다. "
+        "최종 의사결정 책임은 고객과 담당 PB에게 있습니다."
+    )
+    assert disclaimer(_explanations(both), {AS_OF_DATE})[0] is True
+
+
+def test_disclaimer_e3_accepts_alternate_wordings_and_order():
+    """PR #178 리뷰(다경) — E3 정규식이 "의사결정|판단 → 책임 → 주체 → 있|귀속"
+    어순만 받아들여 정당한 면책문을 놓치는 문제를 재현·검증한다."""
+    prefix = f"기준일 {AS_OF_DATE} 기준 "
+    e1 = "투자 권유가 아니며 원금 또는 수익을 보장하지 않습니다. "
+
+    subject_after_responsibility = prefix + e1 + "투자의 최종 책임은 고객에게 있습니다."
+    assert disclaimer(_explanations(subject_after_responsibility), {AS_OF_DATE})[0] is True
+
+    responsibility_attribution = (
+        prefix + e1 + "본 자료에 따른 책임은 투자자 본인에게 귀속됩니다."
+    )
+    assert disclaimer(_explanations(responsibility_attribution), {AS_OF_DATE})[0] is True
+
+    subject_first_reversed_order = (
+        prefix + e1 + "고객님의 책임 하에 판단하시기 바랍니다."
+    )
+    assert disclaimer(_explanations(subject_first_reversed_order), {AS_OF_DATE})[0] is True
 
 
 def test_prohibited_expression_negated_pass_and_positive_fail():

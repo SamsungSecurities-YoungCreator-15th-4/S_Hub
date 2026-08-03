@@ -18,12 +18,18 @@ app.evaluation.judge_calibration의 집계 함수를 실행해 콘솔 표 + (선
 
 출력 JSON의 `mode`는 이 실행이 어떤 신뢰 수준인지 표시한다 — R4가 파일
 내용만으로 공식 증거 여부를 판별해야 하므로, `--out` 산출물을 그대로 증거로
-쓰기 전에 반드시 `mode == "official"`과 `official_validation_passed`를
-확인해야 한다.
+쓰기 전에 반드시 `mode`가 `OFFICIAL_CALIBRATION_MODES`에 속하고
+`official_validation_passed`·`langsmith_required`가 모두 true인지 확인해야 한다.
 
     - "official": --official (LangSmith 포함) 통과 — R2 공식 제출 요건 충족
     - "offline_rehearsal": --official --no-langsmith — 구조는 검증됐으나
       LangSmith 증거가 없어 공식 제출로 쓸 수 없음
+    - "official_code_change": --official --no-prompt-change-required — v2→v3처럼
+      프롬프트는 그대로 두고 결정론 규칙 코드만 고친 비교. 20건·1차 판정·run
+      일관성 등은 전부 검증되지만, "프롬프트만 바뀌었다"는 단일 변수 귀속
+      주장은 하지 않는다(대신 code_sha 변경으로 증명한다)
+    - "official_offline_code_change": 위 --no-langsmith와 --no-prompt-change-required가
+      동시에 적용된 경우
     - "dev_mock": --official 없음 — 개수·ID·run 일관성 등 아무 검증도 하지
       않은 개발용 실행. 절대 증거로 쓰지 않는다
 """
@@ -42,6 +48,13 @@ from app.evaluation.calibration_schema import (  # noqa: E402
     CalibrationRecord,
     merge_records,
     validate_official_case_set,
+)
+from app.evaluation.calibration_modes import (  # noqa: E402
+    MODE_DEV_MOCK,
+    MODE_OFFICIAL,
+    MODE_OFFICIAL_CODE_CHANGE,
+    MODE_OFFICIAL_OFFLINE_CODE_CHANGE,
+    MODE_OFFLINE_REHEARSAL,
 )
 from app.evaluation.human_labels import load_human_labels_from_dir  # noqa: E402
 from app.evaluation.judge_calibration import (  # noqa: E402
@@ -76,7 +89,9 @@ def _print_overall(records: list[CalibrationRecord], *, title: str) -> None:
     overall = calculate_overall_metrics(records)
     matrix = build_confusion_matrix(records)
     print(f"\n=== {title}: 전체 일치율 ===")
-    print(f"  총 {overall.total}건 | 일치 {overall.match}건 | 일치율 {overall.match_rate:.1%}")
+    # 일치율은 분수로 쓴다. 20건 표본에서 1건은 5%p를 움직이므로 `85.0%` 같은
+    # 백분율 소수점은 없는 정밀도를 만든다 — labeling-guide.md §3.
+    print(f"  총 {overall.total}건 | 일치 {overall.match}건 | 일치율 {overall.match}/{overall.total}")
     print(f"  결함 놓침(FN, 사람 fail→judge pass): {overall.false_negative}건")
     print(f"  과잉 차단(FP, 사람 pass→judge fail): {overall.false_positive}건")
     print("  혼동행렬 (행=사람, 열=judge):")
@@ -87,10 +102,15 @@ def _print_overall(records: list[CalibrationRecord], *, title: str) -> None:
     print(f"\n=== {title}: 6축별 일치율 ===")
     axis_metrics = calculate_axis_metrics(records)
     for axis, metrics in axis_metrics.items():
-        recall = "N/A" if metrics.defect_recall is None else f"{metrics.defect_recall:.1%}"
+        # recall도 분수로 — 분모(결함사례 수)가 보여야 "0/1"과 "0/10"을 구분한다.
+        recall = (
+            "N/A"
+            if metrics.defect_recall is None
+            else f"{metrics.true_positive}/{metrics.human_fail_support}"
+        )
         print(
-            f"  {metrics.axis_ko:10} 일치율 {metrics.match_rate:6.1%}  "
-            f"결함탐지율(recall) {recall:>6}  (결함사례 {metrics.human_fail_support}건)"
+            f"  {metrics.axis_ko:10} 일치율 {f'{metrics.match}/{metrics.total}':>7}  "
+            f"결함탐지율(recall) {recall:>7}"
         )
 
 
@@ -113,20 +133,24 @@ def _print_mismatches(records: list[CalibrationRecord], *, title: str) -> None:
 
 def _print_version_comparison(comparison) -> None:
     print("\n=== v1 → v2 비교 ===")
-    print(f"  일치율: {comparison.before.match_rate:.1%} → {comparison.after.match_rate:.1%} "
-          f"(Δ {comparison.match_rate_delta:+.1%})")
+    # Δ도 건수로 — "+5.0%"는 20건에서 "+1건"이라는 사실을 가린다.
+    match_delta = comparison.after.match - comparison.before.match
+    print(f"  일치율: {comparison.before.match}/{comparison.before.total} → "
+          f"{comparison.after.match}/{comparison.after.total} (Δ {match_delta:+d}건)")
     print(f"  FN(결함 놓침): {comparison.before.false_negative} → {comparison.after.false_negative} "
           f"(Δ {comparison.false_negative_delta:+d})")
     print(f"  FP(과잉 차단): {comparison.before.false_positive} → {comparison.after.false_positive} "
           f"(Δ {comparison.false_positive_delta:+d})")
     print(f"  code_sha: {comparison.before_code_sha[:12]} → {comparison.after_code_sha[:12]}")
+    # 같은 시험지·같은 정답지로 두 번 쟀다는 앵커. 한 값인 이유는 compare_versions 참조.
+    print(f"  evalset_hash: {comparison.evalset_hash[:12]} (v1·v2 공통)")
     print("  6축별 결함탐지율(recall) 변화:")
     for axis in comparison.axis_before:
-        before_r = comparison.axis_before[axis].defect_recall
-        after_r = comparison.axis_after[axis].defect_recall
-        before_s = "N/A" if before_r is None else f"{before_r:.1%}"
-        after_s = "N/A" if after_r is None else f"{after_r:.1%}"
-        print(f"    {comparison.axis_before[axis].axis_ko:10} {before_s:>6} → {after_s:>6}")
+        b, a = comparison.axis_before[axis], comparison.axis_after[axis]
+        # 여기도 분수 — 결함사례가 1~3건인 축이라 백분율은 0%/100% 사이를 널뛴다.
+        before_s = "N/A" if b.defect_recall is None else f"{b.true_positive}/{b.human_fail_support}"
+        after_s = "N/A" if a.defect_recall is None else f"{a.true_positive}/{a.human_fail_support}"
+        print(f"    {b.axis_ko:10} {before_s:>7} → {after_s:>7}")
 
 
 def _to_jsonable(records: list[CalibrationRecord]) -> list[dict]:
@@ -135,10 +159,16 @@ def _to_jsonable(records: list[CalibrationRecord]) -> list[dict]:
 
 def _resolve_mode(args: argparse.Namespace) -> str:
     if not args.official:
-        return "dev_mock"
+        return MODE_DEV_MOCK
+    if args.no_prompt_change_required:
+        return (
+            MODE_OFFICIAL_OFFLINE_CODE_CHANGE
+            if args.no_langsmith
+            else MODE_OFFICIAL_CODE_CHANGE
+        )
     if args.no_langsmith:
-        return "offline_rehearsal"
-    return "official"
+        return MODE_OFFLINE_REHEARSAL
+    return MODE_OFFICIAL
 
 
 def main() -> None:
@@ -158,10 +188,21 @@ def main() -> None:
         action="store_true",
         help="--official과 함께 쓸 때 LangSmith run ID 필수 요건을 낮춘다(오프라인 리허설용).",
     )
+    parser.add_argument(
+        "--no-prompt-change-required",
+        action="store_true",
+        help=(
+            "--official과 함께 쓸 때 '두 버전의 prompt_hash가 달라야 한다'는 요건을 "
+            "code_sha 변경 요건으로 바꾼다(v2→v3처럼 프롬프트는 그대로 두고 결정론 "
+            "규칙 코드만 고친 비교용 — v1→v2 프롬프트 단독 비교에는 쓰지 않는다)."
+        ),
+    )
     parser.add_argument("--out", type=Path, help="리포트를 JSON으로도 저장할 경로(증거번들·서류철용).")
     args = parser.parse_args()
     if args.no_langsmith and not args.official:
         parser.error("--no-langsmith는 --official과 함께 써야 합니다(비공식 실행은 애초에 LangSmith를 요구하지 않습니다).")
+    if args.no_prompt_change_required and not args.official:
+        parser.error("--no-prompt-change-required는 --official과 함께 써야 합니다(비공식 실행은 이 요건 자체가 없습니다).")
 
     require_langsmith = not args.no_langsmith
     mode = _resolve_mode(args)
@@ -199,7 +240,12 @@ def main() -> None:
         _print_mismatches(records_v2, title="v2")
 
         if args.official:
-            comparison = compare_official_versions(records, records_v2, require_langsmith=require_langsmith)
+            comparison = compare_official_versions(
+                records,
+                records_v2,
+                require_langsmith=require_langsmith,
+                require_prompt_change=not args.no_prompt_change_required,
+            )
         else:
             comparison = compare_versions(records, records_v2)
         _print_version_comparison(comparison)

@@ -117,9 +117,13 @@ S.ymphony는 이 문제를 두 축으로 해결한다.
 
 ## 아키텍처
 
-노드 9개 · 조건부 분기 2개(① 상충 재추출 ② Judge 재작성/Hard Stop) ·
-PB 승인용 HITL 인터럽트 1개. LLM/결정론/HITL 3계층 표식이 포함된 전체 다이어그램은
-[`mermaid.mmd`](mermaid.mmd) 참조.
+노드 9개 · 조건부 분기 2개 · PB 승인용 HITL 인터럽트 1개.
+LLM/결정론/HITL 3계층 표식이 포함된 전체 다이어그램은
+[`docs/mermaid.mmd`](docs/mermaid.mmd) 참조.
+
+**제어 흐름 번호 ①②③은 분기 번호가 아니라 제어 지점 번호다.** `scripts/run_graph.py`가
+실행 요약에 찍는 표기를 그대로 따른다 — ① 충돌 재추출 분기 · ② HITL 인터럽트 ·
+③ judge 재작성 분기. 조건부 분기는 ①·③ 둘이고 ②는 분기가 아니라 인터럽트다.
 
 ```
 START
@@ -171,6 +175,8 @@ Orchestration/
 ├── app/
 │   ├── state.py       # RiskState/IPSProfile — 팀 데이터 계약(SSOT), 임의 수정 금지
 │   ├── graph.py       # StateGraph 조립 (9노드 + 조건부 분기 2개 + HITL)
+│   ├── hard_stop_policy.py     # Hard Stop 정책 버전 로더·검증(SSOT 접근점)
+│   ├── deployment_validation.py # 실제 배포 계약 검증(--validate-deployment)
 │   ├── nodes/         # 그래프 노드 9개 (순수 함수, 바꾼 키만 반환)
 │   ├── engine/        # 결정론 계층 — langchain/llm import 금지
 │   ├── llm/           # AzureChatOpenAI 팩토리, IPS 추출 체인, 감사
@@ -180,15 +186,19 @@ Orchestration/
 │   ├── evidence/      # 실행 1회분 감사 증거 묶음 스키마(SSOT)
 │   ├── observability/ # LangSmith 트레이싱
 │   └── utils/         # 해시 등 공용 유틸
-├── config/            # config.yaml, ips_policy.yaml, rag_sources.json
+├── config/            # config.yaml · ips_policy.yaml · hard_stop_policy.yaml · rag_sources.json
 ├── corpus/            # RAG 문서 21건 (원문 PDF는 로컬 전용, manifest.md 참조)
 ├── data/              # 시장 데이터·Chroma (gitignore 대상 산출물 포함)
 ├── docs/              # 정책·평가·배포 문서
+├── goldenset/         # R1 정답 사례집·라벨링 가이드·무라벨 judge 입력본·평가 도구
 ├── scripts/           # CLI 진입점·평가·배포 스크립트
-├── tests/             # pytest (28개 테스트 모듈)
+├── tests/             # pytest
 ├── ui/                # Streamlit UI (랜딩·PB 승인·RAG 근거 뷰)
-└── .github/           # PR 템플릿·CI·Dependabot
+└── .github/           # PR 템플릿·CI·Dependabot·커뮤니티 문서(CONTRIBUTING·SECURITY·CODE_OF_CONDUCT)
 ```
+
+디렉터리별 상세 규약은 [`AGENTS.md`](AGENTS.md)를 따른다. 파일 개수·모듈 수는
+적지 않는다 — 커밋마다 낡아서 문서와 코드가 갈리는 가장 흔한 자리다.
 
 ## 실행법
 
@@ -272,7 +282,7 @@ fake LLM을 쓴다.
 | 요구사항 | 구현 |
 | --- | --- |
 | R0-1 StateGraph 9노드+조건부 분기 | `app/graph.py` — 상충 분기·승인 게이트·Judge 재작성·`manual_review_gate` Hard Stop |
-| R0-2 Mermaid 3계층 표식 | [`mermaid.mmd`](mermaid.mmd) — LLM/결정론/HITL 색상 분리 |
+| R0-2 Mermaid 3계층 표식 | [`docs/mermaid.mmd`](docs/mermaid.mmd) — LLM/결정론/HITL 색상 분리 |
 | R0-3 LangSmith 풀스택 | trace·judge 역추적·평가셋 20건+정확도·감사 로그(trace_id+프롬프트 해시+모델 버전)·형상관리 |
 | R0-4 LangChain 표준 부품 | RAG retriever(langchain-chroma)·Structured Output, 원시 API 직접 호출 금지 |
 | R0-5 도구 적정 사용 정당화 | 위 "도구 적정 사용 정당화" 절 |

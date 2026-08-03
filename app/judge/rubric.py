@@ -18,7 +18,28 @@ AXIS_NAMES = (
     "prohibited_expression",
 )
 
-PROHIBITED_TERMS = ("보장", "확정", "반드시", "무조건", "절대", "확실히")
+PROHIBITED_TERMS = (
+    # 전역 최적성 단정: 안내서 명시("최적") + 동의어(라벨링 가이드 §2⑥ 금지어 목록)
+    "최적",
+    "최선",
+    "가장 좋은",
+    # 보장성: 기존 PROHIBITED_TERMS(라벨링 가이드 §2⑥ 금지어 목록)
+    "보장",
+    "확정",
+    "손실 없음",
+    # 단정 부사: 기존 PROHIBITED_TERMS(라벨링 가이드 §2⑥ 금지어 목록)
+    "반드시",
+    "무조건",
+    "절대",
+    "확실히",
+)
+# "최적화"(평균-분산 최적화 등 방법론 명칭)는 우월성 주장이 아니므로 금지어
+# 판정에서 제외한다 — 라벨링 가이드 §2⑥ B3. 가이드가 명시하는 방법론 명칭
+# 예외는 "최적화"뿐이므로 "최적해"·"최적점" 등 다른 형태로는 확장하지
+# 않는다 — 미문서 확장은 B4("최적" 단독 우월성 주장 fail)의 취지를 흐릴 수
+# 있다. "우월한"은 안내서 금지 목록에 없어 의도적으로 PROHIBITED_TERMS에서
+# 제외한다(가이드 §2⑥ B5).
+_TERM_SAFE_SUFFIXES: dict[str, tuple[str, ...]] = {"최적": ("화",)}
 NEGATION_MARKERS = ("않", "아니", "못", "없")
 NEGATION_WINDOW = 15
 DOUBLE_NEGATION_WINDOW = 40
@@ -33,6 +54,11 @@ _ENGINE_METRIC_CONTEXT_RE = re.compile(
     r"손실액|손실률|신뢰수준|보유기간|관측기간|관측치|포트폴리오\s*총액",
     flags=re.IGNORECASE,
 )
+# portfolio가 있을 때만(=candidates에 실제 비중 후보가 있을 때만) "비중" 문맥을
+# 엔진 수치로 재분류한다. R2 calibration 로더는 portfolio를 넘기지 않으므로
+# (goldenset_loader.py ALLOWED_STATE_KEYS), 그 경로에서는 이 재분류가 꺼져
+# 기존 citation 경로 그대로 동작한다 — PR #181 리뷰(다경) 지적 사항.
+_PORTFOLIO_WEIGHT_CONTEXT_RE = re.compile(r"자산군?\s*비중|비중")
 _ENGINE_DATE_CONTEXT_RE = re.compile(r"기준일|산출일|데이터.{0,8}종료|관측.{0,8}종료")
 _ENGINE_METRIC_TOPICS = {"VaR 해석", "스트레스 시나리오", "기준일 및 유의사항"}
 _CLAUSE_BOUNDARY_RE = re.compile(r"[,.!?;\n]")
@@ -191,13 +217,34 @@ def numeric_consistency(
     metrics: dict,
     expected_dates: set[str] | None = None,
     citations: list | None = None,
+    portfolio: list | None = None,
 ) -> tuple[bool, str]:
-    candidates = _metric_numbers(metrics)
+    candidates = _metric_numbers(metrics) | _metric_numbers(portfolio or [])
     dates = _metric_dates(metrics) | (expected_dates or set())
     quotes_by_topic = _verified_quotes_by_topic(citations)
     mismatches: list[str] = []
     engine_metric_count = 0
     evidence_fact_count = 0
+
+    if portfolio:
+        weight_items = [
+            item
+            for item in portfolio
+            if isinstance(item, dict)
+            and isinstance(item.get("weight"), (int, float))
+            and not isinstance(item.get("weight"), bool)
+        ]
+        weight_sum = sum(float(item["weight"]) for item in weight_items)
+        # 가이드 §2②-B1: 99.9%~100.1%는 비중 표기 자릿수 반올림으로 설명되는
+        # 범위라 pass, 그 밖은 재량 없이 fail(F1)한다.
+        if not math.isclose(weight_sum, 1.0, abs_tol=0.001):
+            detail = f"자산군 비중 합계가 100%가 아님 ({weight_sum * 100:.1f}%)"
+            if len(weight_items) != len(portfolio):
+                detail += (
+                    f" — portfolio {len(portfolio)}건 중 유효한 weight를 가진 "
+                    f"{len(weight_items)}건만 합산함(데이터 결함 가능성)"
+                )
+            mismatches.append(detail)
 
     for explanation in explanations:
         if not isinstance(explanation, dict) or explanation.get("topic") == "재작성 반영":
@@ -239,6 +286,7 @@ def numeric_consistency(
             is_engine_metric = (
                 topic in _ENGINE_METRIC_TOPICS
                 or _ENGINE_METRIC_CONTEXT_RE.search(context)
+                or (bool(portfolio) and _PORTFOLIO_WEIGHT_CONTEXT_RE.search(context))
             )
             if is_engine_metric:
                 metric_match = any(
@@ -323,10 +371,16 @@ def hallucination(
         llm,
         axis="hallucination",
         instruction=(
-            "설명문의 실질적 주장 중 검증된 인용문 또는 해당 청크 원문으로 "
-            "뒷받침되지 않는 주장이 하나라도 있으면 fail한다. 단, deterministic_context의 "
-            "expected_dates에 있는 기준일은 state에서 검증된 값이며, 투자 권유·수익 보장이 "
-            "아니라는 의무 면책문은 외부 사실 주장이 아니므로 인용 부재만으로 fail하지 않는다."
+            "설명문의 실질적 주장 중 인용 원문이 존재하지 않는 주장 또는 해당 "
+            "청크 원문으로 뒷받침되지 않는 주장이 하나라도 있으면 fail한다. 단, "
+            "deterministic_context의 expected_dates에 있는 기준일, 투자 권유·수익 "
+            "보장이 아니라는 의무 면책문, 검증 가능한 일반 시장 원리 서술(특정 "
+            "기관·상품·이벤트를 지목하지 않는 일반적 시장 메커니즘 설명에 한정), "
+            "입력 수치에 대한 해석 서술은 외부 사실 주장이 아니므로 인용 부재만으로 "
+            "fail하지 않는다. 단, 입력에 없는 종목·상품·기관·뉴스·이벤트를 사실처럼 "
+            "서술한 경우는 통념상 그럴듯하거나 일반적으로 알려진 내용처럼 보이더라도 "
+            "예외 없이 반드시 fail한다. 실존 기관명이 입력에 없는데 단순 언급된 것은 "
+            "괜찮지만, 그 기관의 발표·전망·정책을 사실처럼 서술하면 반드시 fail한다."
         ),
         payload={
             "explanations": _explanation_text(explanations),
@@ -344,7 +398,20 @@ def false_precision(explanations: list, llm) -> tuple[bool, str]:
         axis="false_precision",
         instruction=(
             "확률·손실을 근거 없이 정밀하게 단정하면 fail한다. 신뢰수준과 보유기간을 "
-            "명시한 VaR, 또는 약·추정·범위·신뢰구간 표현은 허용한다."
+            "명시한 VaR, 또는 약·추정·범위·신뢰구간 표현은 허용한다. 신뢰수준(confidence)과 "
+            "신뢰구간 수준(ci_level)은 서로 다른 개념이다. 설명문이 같은 수치를 "
+            "confidence와 ci_level 두 이름으로 번갈아 지칭하거나, 두 개념을 명시적으로 "
+            "동일시하는 서술이 있는 경우에만 fail한다. 두 개념이 각각 별도의 수치로 "
+            "명확히 언급되어 서로 인접해 등장하는 것만으로는 뒤바뀐 것으로 보지 않는다. "
+            "단, 신뢰수준(confidence)을 수치로 명시하는 것은 확률 단정이 아니라 VaR "
+            "파라미터이므로 fail하지 않는다. 설명문의 수치가 metrics의 계산값(VaR·CVaR·"
+            "손실액 등)을 그대로 인용한 것이면, 자릿수가 길거나 소수점이 정밀하다는 "
+            "이유만으로 fail하지 않는다. 단, 리포트 어딘가에 신뢰구간 수치 또는 "
+            "불확실성 문구(예: \"실제 결과와 다를 수 있습니다\") 중 하나 이상이 있어야 "
+            "하는 요건은 이 예외와 별개로 계속 충족해야 한다. 스트레스 손익처럼 "
+            "\"(가상 설정)\" 표기가 있는 가정값, "
+            "불확실성 문구만 있고 CI 수치가 없는 경우, VaR과 CVaR 중 한쪽에만 "
+            "신뢰구간을 제시한 경우는 이 규칙만으로 fail하지 않는다."
         ),
         payload={"explanations": _explanation_text(explanations)},
     )
@@ -358,20 +425,30 @@ def disclaimer(
     dates = set(_DATE_RE.findall(text))
     expected = expected_dates or set()
     date_ok = bool(dates & expected) if expected else bool(dates)
-    disclaimer_patterns = (
+    # E1(비권유): 투자 권유·수익 보장이 아님을 명시적으로 부정한다.
+    e1_patterns = (
         r"투자\s*권유.{0,12}(?:아니|않)",
         r"보장.{0,15}(?:않|아니|못|없)",
-        r"실제\s*결과.{0,12}다를\s*수",
     )
-    disclaimer_ok = any(re.search(pattern, text) for pattern in disclaimer_patterns)
+    # E3(책임 소재): 최종 판단·책임이 고객에게 귀속됨을 명시한다. 불확실성
+    # 고지("실제 결과와 다를 수 있다")는 위조정밀도 P2가 담당하므로 이
+    # 축에서는 E1·E3 어느 쪽으로도 세지 않는다 — 라벨링 가이드 §2⑤ 참조.
+    e3_patterns = (
+        r"책임.{0,20}(?:고객|본인|투자자).{0,15}(?:있|귀속)",
+        r"(?:고객|본인|투자자).{0,15}책임.{0,20}(?:판단|결정|있|귀속)",
+    )
+    e1_ok = any(re.search(pattern, text) for pattern in e1_patterns)
+    e3_ok = any(re.search(pattern, text) for pattern in e3_patterns)
     missing: list[str] = []
     if not date_ok:
         missing.append("state와 일치하는 기준일")
-    if not disclaimer_ok:
-        missing.append("투자 권유·손실 가능성 면책 문구")
+    if not e1_ok:
+        missing.append("투자 권유가 아니라는 비권유 고지(E1)")
+    if not e3_ok:
+        missing.append("최종 판단·책임 소재 고지(E3)")
     if missing:
         return False, "누락: " + ", ".join(missing)
-    return True, "기준일과 면책 문구가 존재합니다."
+    return True, "기준일과 면책 문구(E1·E3)가 존재합니다."
 
 
 def _scan_prohibited(explanations: list) -> tuple[list[str], list[str]]:
@@ -379,7 +456,13 @@ def _scan_prohibited(explanations: list) -> tuple[list[str], list[str]]:
     ambiguous: list[str] = []
     text = _explanation_text(explanations)
     for term in PROHIBITED_TERMS:
+        safe_suffixes = _TERM_SAFE_SUFFIXES.get(term, ())
         for match in re.finditer(re.escape(term), text):
+            if any(
+                text[match.end() : match.end() + len(suffix)] == suffix
+                for suffix in safe_suffixes
+            ):
+                continue
             context = text[match.end() : match.end() + NEGATION_WINDOW]
             extended_context = text[match.end() : match.end() + DOUBLE_NEGATION_WINDOW]
             context = _CLAUSE_BOUNDARY_RE.split(context, maxsplit=1)[0]
@@ -424,6 +507,7 @@ def evaluate_rubric(
     strict_citation_gate: bool,
     expected_dates: set[str],
     llm,
+    portfolio: list | None = None,
 ) -> tuple[dict[str, tuple[bool, str]], list[str]]:
     results = {
         "source_validity": source_validity(citations, strict_citation_gate),
@@ -432,6 +516,7 @@ def evaluate_rubric(
             metrics,
             expected_dates,
             citations,
+            portfolio,
         ),
         "hallucination": hallucination(
             explanations,

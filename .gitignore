@@ -29,6 +29,7 @@ data/rag-index-cache/
 # 커밋하지 않는다. 공식 v1/v2 결과 파일 공유 방식은 팀 합의 후 별도로 정한다.
 /out/
 judge_v*_results.json
+judge_v*_results.manifest.json
 
 # 에디터/OS
 .idea/
@@ -36,3 +37,20 @@ judge_v*_results.json
 .DS_Store
 .claude/*
 !.claude/settings.json
+
+# goldenset/dist 는 goldenset/tools/make_blind.py 가 생성하는 배포 패키지다.
+# 내용이 전부 cases_blind/ · corpus/chunks.json · labels/ 답안지의 사본이라
+# 정답 사본이 여러 곳에 흩어지지 않도록 추적하지 않는다. 필요하면 재생성한다.
+/goldenset/dist/
+
+# MAGI 표본 목록(scripts/magi_vote.py)은 사람 라벨에서 파생된 값이다 — 어느 사례가
+# 어느 축에서 fail인지가 목록 자체로 드러나므로 커밋하지 않는다. 코드·PR에는
+# 소금값을 섞은 sha256 커밋값만 남기고(MAGI_TARGETS_SHA256), 목록 원본은 R1
+# 소유자가 보관해 실행자에게 전달한다.
+/goldenset/.sealed/magi_targets.json
+
+# evidence/ 는 scripts/run_graph.py --evidence-bundle 이 만드는 실행 산출물이다
+# (DEFAULT_EVIDENCE_ROOT). 실행마다 run-YYYYMMDD-NNN 이 쌓이고 LangSmith URL·
+# trace_id 같은 실행 식별자가 들어가므로 추적하지 않는다. 감사 제출본은
+# 레포가 아니라 제출 경로로 따로 전달한다.
+/evidence/

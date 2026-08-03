@@ -1,0 +1,4 @@
+# Judge 재시도 소진 후 확정·다운로드를 차단하는 정책 버전 SSOT.
+# 버전을 변경하면 같은 판단 내용의 decision_hash도 의도적으로 변경된다.
+version: "2026-08-01.v1"
+policy_ref: "docs/hard_stop_contract.md"

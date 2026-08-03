@@ -19,4 +19,4 @@ fail로 판정했는가"를 증명하는 기록입니다. 덮어쓰면 그 근�
 재라벨링에 쓰인 수정본은 `dist_relabel/`에 있습니다 (`R02`=case_010, `R03`=case_008).
 
 - 매핑: `.sealed/blind_map.json` · `.sealed/relabel_map.json`
-- 경위: `labeling-guide.md` §4, `reports/agreement_before.md` §4
+- 경위: `labeling-guide.md` §4, `goldenset/reports/agreement_before.md` §4

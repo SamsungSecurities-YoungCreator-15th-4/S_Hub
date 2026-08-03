@@ -14,10 +14,12 @@ from dotenv import load_dotenv
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.graph import build_graph
+from app.nodes.judge_eval import resolve_max_judge_retries
 from app.nodes.load_inputs import (
     ASSET_DEFINITIONS,
     DUMMY_PORTFOLIO,
     TOTAL_ASSET_KRW,
+    load_inputs,
     portfolio_from_percentages,
 )
 from app.observability.langsmith import (
@@ -35,6 +37,7 @@ from app.state import (
 )
 from ui.branding import logo_markup
 from ui.document_links import document_url
+from ui.evidence_export import EvidenceDownload, build_evidence_download
 from ui.index_supply import prepare_index_or_stop
 from ui.pb_approvers import approver_label, validate_pb_approver
 from ui.rag_evidence import (
@@ -51,6 +54,7 @@ from ui.start_page import render_start_page
 
 ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(ROOT / ".env")
+JUDGE_MAX_RETRIES = resolve_max_judge_retries(load_inputs({}))
 
 st.set_page_config(page_title="S.ymphony", layout="wide")
 
@@ -98,24 +102,24 @@ st.markdown(
     .app-topbar .divider { width: 1px; height: 30px; background: #E4EAF2; }
     .app-topbar .title { font-size: 15.5px; font-weight: 800; letter-spacing: -0.01em; color: #0F172A; }
 
-    /* 결과 화면 상단 PDF 저장 액션 — 확정본만 파란색, 차단본은 명시적 회색. */
-    div[data-testid="stHorizontalBlock"]:has(.pdf-save-marker) {
+    /* 결과 화면 상단 다운로드 액션 — 리포트와 감사 자료의 권한을 분리한다. */
+    div[data-testid="stHorizontalBlock"]:has(.report-action-marker) {
         align-items: stretch; margin-bottom: 16px;
     }
-    div[data-testid="stHorizontalBlock"]:has(.pdf-save-marker) .app-topbar {
+    div[data-testid="stHorizontalBlock"]:has(.report-action-marker) .app-topbar {
         height: 100%; min-height: 58px; margin-bottom: 0;
     }
-    div[data-testid="stColumn"]:has(.pdf-save-marker) > div[data-testid="stVerticalBlock"] {
+    div[data-testid="stColumn"]:has(.report-action-marker) > div[data-testid="stVerticalBlock"] {
         height: 100%; justify-content: center;
     }
-    div[data-testid="stColumn"]:has(.pdf-save-marker) [data-testid="stButton"] button {
+    div[data-testid="stColumn"]:has(.report-action-marker) button {
         min-height: 58px; border-radius: 14px; font-weight: 800;
         background: #2563EB; color: #FFFFFF; border: 1px solid #2563EB;
     }
-    div[data-testid="stColumn"]:has(.pdf-save-marker) [data-testid="stButton"] button:hover:not(:disabled) {
+    div[data-testid="stColumn"]:has(.report-action-marker) button:hover:not(:disabled) {
         background: #1D4ED8; border-color: #1D4ED8; color: #FFFFFF;
     }
-    div[data-testid="stColumn"]:has(.pdf-save-marker) [data-testid="stButton"] button:disabled {
+    div[data-testid="stColumn"]:has(.report-action-marker) button:disabled {
         background: #E2E8F0 !important; border-color: #CBD5E1 !important;
         color: #94A3B8 !important; opacity: 1 !important; cursor: not-allowed;
     }
@@ -923,7 +927,13 @@ if not report:
     )
 
     _current_step = 3 if st.session_state.get("pending_state") else 1
-    _steps = ["고객 정보 입력", "포트폴리오 입력", "IPS 추출", "PB 승인 및 리스크 분석"]
+    _steps = [
+        "고객 정보 입력",
+        "포트폴리오 입력",
+        "IPS 추출·충돌 검사",
+        "PB 승인·리스크 분석",
+        "Judge 검증·확정",
+    ]
     _step_html = "".join(
         f'<div class="step"><div class="num {"num-done" if n <= _current_step else "num-pending"}">{n}</div>'
         f'<div class="label">{html.escape(label)}</div></div>'
@@ -935,7 +945,7 @@ if not report:
         <div class="report-header">
         <div class="titles">
         <h1>고객 정보 및 포트폴리오 입력</h1>
-        <p>고객 정보에서 IPS를 추출하고 PB 승인 후에만 리스크 분석을 진행합니다.</p>
+        <p>IPS 충돌 검사와 PB 승인을 거쳐 리스크를 계산하고, Judge 통과 후에만 리포트를 확정합니다.</p>
         </div>
         <div class="step-indicator">{_step_html}</div>
         </div>
@@ -1020,11 +1030,16 @@ if not report:
             unsafe_allow_html=True,
         )
 
-        with st.expander("추가 옵션"):
-            st.caption("judge 강제 실패 횟수")
+        with st.expander("개발·Hard Stop 시연 옵션"):
+            st.caption(
+                "강제 실패는 Judge의 결함 탐지 성능이 아니라 재시도·수동검토 차단 "
+                "동작만 시연합니다. 일반 분석에서는 0을 유지하세요."
+            )
             force_judge_fail = st.number_input(
-                "judge 강제 실패 횟수",
-                min_value=0, max_value=5, value=0,
+                "Judge 강제 실패 횟수",
+                min_value=0,
+                max_value=JUDGE_MAX_RETRIES,
+                value=0,
                 label_visibility="collapsed",
             )
 
@@ -1280,7 +1295,7 @@ if not report:
                                 },
                             },
                         )
-                        with st.spinner("포트폴리오 리스크 연산 및 리포트 생성 중…"):
+                        with st.spinner("리스크 분석 중..."):
                             with tracing_scope(resume_invocation):
                                 for _ in graph.stream(
                                     None,
@@ -1288,9 +1303,21 @@ if not report:
                                     stream_mode="updates",
                                 ):
                                     pass
-                        st.session_state["report"] = graph.get_state(
-                            resume_invocation.config
-                        ).values.get("report")
+                        final_state = dict(
+                            graph.get_state(resume_invocation.config).values
+                        )
+                        st.session_state["final_state"] = final_state
+                        st.session_state["report"] = final_state.get("report")
+                        try:
+                            st.session_state["evidence_download"] = (
+                                build_evidence_download(final_state)
+                            )
+                            st.session_state.pop("evidence_error", None)
+                        except Exception as evidence_exc:
+                            # 리스크 결과를 유실시키지는 않되 감사 자료의 실패를
+                            # 숨기지 않고 결과 화면에서 명시한다.
+                            st.session_state.pop("evidence_download", None)
+                            st.session_state["evidence_error"] = str(evidence_exc)
                         st.session_state["scroll_report_to_top"] = True
                         for key in ("pending_graph", "pending_config", "pending_state"):
                             st.session_state.pop(key, None)
@@ -1313,8 +1340,14 @@ else:
     # Hard Stop 계약을 모두 만족한 확정본만 고객 제공 가능 상태로 취급한다.
     _pdf_export = pdf_export_state(report)
     _finalized = _pdf_export.enabled
+    _evidence_download = st.session_state.get("evidence_download")
+    if not isinstance(_evidence_download, EvidenceDownload):
+        _evidence_download = None
+    _evidence_error = st.session_state.get("evidence_error")
 
-    _header_col, _pdf_col = st.columns([7, 1.2], vertical_alignment="center")
+    _header_col, _pdf_col, _evidence_col = st.columns(
+        [6.2, 1.15, 1.45], vertical_alignment="center"
+    )
     with _header_col:
         st.markdown(
             f"""
@@ -1327,14 +1360,36 @@ else:
             unsafe_allow_html=True,
         )
     with _pdf_col:
-        st.markdown('<span class="pdf-save-marker"></span>', unsafe_allow_html=True)
+        st.markdown(
+            '<span class="report-action-marker pdf-save-marker"></span>',
+            unsafe_allow_html=True,
+        )
         _pdf_save_clicked = st.button(
             "PDF 저장",
             key="save_report_pdf",
             type="primary",
             icon=":material/download:",
             disabled=not _pdf_export.enabled,
-            help=_pdf_export.help_text,
+            width="stretch",
+        )
+    with _evidence_col:
+        st.markdown(
+            '<span class="report-action-marker evidence-save-marker"></span>',
+            unsafe_allow_html=True,
+        )
+        st.download_button(
+            "감사 번들",
+            data=_evidence_download.data if _evidence_download else b"",
+            file_name=(
+                _evidence_download.filename
+                if _evidence_download
+                else "symphony-evidence-unavailable.zip"
+            ),
+            mime="application/zip",
+            key="download_evidence_bundle",
+            icon=":material/folder_zip:",
+            disabled=_evidence_download is None,
+            help="리스크 분석 과정 검증 기록을 확인할 수 있습니다.",
             width="stretch",
         )
     if _pdf_save_clicked and _pdf_export.enabled:
@@ -1410,6 +1465,29 @@ else:
             "수치·근거는 검토용으로만 사용하고, 사람 검토와 재승인 전에는 "
             "고객 제공·최종 판단 근거로 사용하지 않습니다.",
             icon=":material/gpp_maybe:",
+        )
+        _manual_gate = _governance.get("manual_review_gate")
+        if isinstance(_manual_gate, dict):
+            _failed_axes = _manual_gate.get("failed_axes") or []
+            _failed_axes_text = ", ".join(map(str, _failed_axes)) or "-"
+            with st.expander("수동검토 이관 정보", expanded=True):
+                st.markdown(
+                    "\n".join(
+                        (
+                            f"- 차단 원인: `{_manual_gate.get('trigger') or '-'}`",
+                            f"- Judge 시도: `{_manual_gate.get('judge_retries') or 0}/"
+                            f"{_manual_gate.get('judge_max_retries') or 0}회`",
+                            f"- 실패 평가축: `{_failed_axes_text}`",
+                            f"- 정책 버전: `{_manual_gate.get('policy_version') or '-'}`",
+                            f"- 결정 지문: `{_manual_gate.get('decision_hash') or '-'}`",
+                        )
+                    )
+                )
+
+    if _evidence_error:
+        st.error(
+            "감사 증거 번들을 생성하지 못했습니다. 리포트와 별도로 운영 담당자의 "
+            f"확인이 필요합니다: {_evidence_error}"
         )
 
     if warnings:
@@ -1711,7 +1789,7 @@ else:
             f"{governance.get('judge_retries') or 0}/"
             f"{governance.get('judge_max_retries') or 0}회"
         )
-        t1, t2, t3 = st.columns(3)
+        t1, t2, t3, t4 = st.columns(4)
         t1.markdown(
             status_tile("리포트 신뢰성 검증", judge_label, judge_tone),
             unsafe_allow_html=True,
@@ -1728,8 +1806,17 @@ else:
             status_tile("검증 강도", "엄격" if gate_on else "표준", "blue" if gate_on else "gray"),
             unsafe_allow_html=True,
         )
+        t4.markdown(
+            status_tile(
+                "감사 증거",
+                "번들 생성 완료" if _evidence_download else "번들 확인 필요",
+                "blue" if _evidence_download else "gray",
+            ),
+            unsafe_allow_html=True,
+        )
         st.caption(
-            f"Judge 평가 시도 {retries_label} · 통과하지 못한 리포트는 확정되지 않습니다."
+            f"Judge 평가 시도 {retries_label} · 실패 시 RAG 인용을 재작성하며, "
+            "상한까지 통과하지 못하면 manual_review_gate에서 확정·PDF 저장을 차단합니다."
         )
         st.markdown("<br>", unsafe_allow_html=True)
         checks = judge.get("checks") or []
@@ -1784,6 +1871,10 @@ else:
         ("계산 해시", reproducibility.get("computation_hash")),
         ("설정 해시", reproducibility.get("config_hash")),
         ("승인 해시", reproducibility.get("approval_hash")),
+        (
+            "감사 번들 해시",
+            _evidence_download.bundle_hash if _evidence_download else None,
+        ),
         ("방법론 문서", methodology_ref_text),
         ("IPS 추출 정보", ips_extraction_text),
         ("추적 ID", reproducibility.get("trace_id")),

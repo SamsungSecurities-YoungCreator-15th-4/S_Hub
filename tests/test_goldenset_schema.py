@@ -43,7 +43,7 @@ EXPECTED_CASE_IDS = tuple(f"case_{i:03d}" for i in range(1, EXPECTED_CASE_COUNT 
 EXPECTED_PASS_COUNT = 10
 EXPECTED_FAIL_COUNT = 10
 # 스타터 킷 견본 전용 접두 — 실제 20건에 쓰면 안 된다
-# (starter-kit/labeling-guide-template.md §4).
+# (goldenset/starter-kit/labeling-guide-template.md §4).
 SAMPLE_ID_PREFIX = "GS-EX-"
 FRONTMATTER_FENCE = "---"
 

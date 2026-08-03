@@ -106,7 +106,7 @@ goldenset/
 
 사례집은 리포트 md 전문인데 `judge_eval(state)`는 `RiskState`를 먹는다. 이 사이를 잇는 변환기가 이번 과제 코드의 심장이다.
 
-> **소유권 확정** — 이 변환기는 R2 실행 담당(다경)의 `scripts/judge_runner.py` 안에 **로더**로 들어간다. R1(승민)은 코드를 쓰지 않고 **형식 명세**(`goldenset/case-format.md`)만 제공한다. 계획서 초안의 `app/goldenset/adapter.py`는 이 러너와 중복이므로 만들지 않는다.
+> **소유권 확정** — R3가 `goldenset/tools/export_judge_inputs.py`로 R1 원본에서 정답 메타데이터를 제거하고, R2 실행 담당(다경)은 `goldenset/judge_inputs/`만 읽는 **로더**를 `scripts/judge_runner.py`에 연결한다. R2는 정답이 든 `goldenset/cases/`를 열거나 파싱하지 않는다. 계획서 초안의 `app/goldenset/adapter.py`는 이 러너와 중복이므로 만들지 않는다.
 
 ```python
 # 다경의 러너 안에 들어갈 로더 (아래는 변환 규칙)
@@ -121,10 +121,26 @@ case_00X.md
 
 ★ `numeric_consistency`는 `explanations` 텍스트만 스캔한다. 견본의 핵심 함정(1일 VaR × √10 ≠ 10일 VaR)은 **표 안**에 있으므로, 표 수치를 explanations로 옮겨주지 않으면 이 축이 무력화된다.
 
+계획 단계에서는 `calibrate_judge.py` 하나로 잡았으나, **실제 구현은 judge 실행과
+집계를 두 스크립트로 나눴다** — 실행(Azure 호출)과 분석(순수 집계)을 분리해야
+같은 판정 결과로 집계만 다시 돌릴 수 있기 때문이다.
+
 ```bash
-python scripts/calibrate_judge.py --prompt-version v1 --out reports/calibration_v1.json
-python scripts/calibrate_judge.py --prompt-version v2 --compare-with reports/calibration_v1.json
+# ① judge 실행 — 사례를 judge에 돌려 JudgeResult JSON으로 기록
+python scripts/judge_runner.py --prompt-version v1 --out out/v1.json
+python scripts/judge_runner.py --prompt-version v2 --out out/v2.json
+
+# ② 집계·비교 — 사람 라벨과 합쳐 일치율·혼동행렬·v1↔v2 비교를 뽑는다
+python scripts/calibration_report.py --judge-results out/v1.json \
+    --judge-results-v2 out/v2.json --human-labels-dir goldenset/cases \
+    --official --out out/calibration_report.json
 ```
+
+`--out` 산출물은 R4 증거 번들이 `--calibration`으로 받아 그대로 싣는다. 허용
+mode는 `dev_mock`·`offline_rehearsal`·`official`·`official_code_change`·
+`official_offline_code_change`이며, 공식 증거는 LangSmith 요건까지 적용한
+`official`·`official_code_change`다 — 상세는
+[`docs/evidence_bundle_schema.md`](evidence_bundle_schema.md) §4.8.
 
 **산출 지표** — "20건 중 17건 일치"보다 아래가 훨씬 설득력 있다.
 
@@ -138,7 +154,7 @@ python scripts/calibrate_judge.py --prompt-version v2 --compare-with reports/cal
 
 **judge 개선 — 범위를 먼저 정해야 한다**
 
-judge 프롬프트는 `rubric.py:290`에 문자열로 박혀 있다 → `app/judge/prompts/v1.py`·`v2.py`로 분리하고 `--prompt-version`으로 선택.
+judge 프롬프트는 `rubric.py:306`에 문자열로 박혀 있다 → `app/judge/prompts/v1.py`·`v2.py`로 분리하고 `--prompt-version`으로 선택.
 
 단, 우리 6축 중 **결정론 4축은 프롬프트가 아니라 코드**다(LLM은 환각·위조정밀도 2축뿐). 캘리브레이션에서 나올 미탐 중 상당수는 프롬프트만 고쳐서는 안 잡힌다. 예를 들어 `PROHIBITED_TERMS`에 과제가 지목한 '최적'이 없고, `source_validity`는 `verified=True`가 1건이라도 있으면 통과시킨다.
 
@@ -156,7 +172,7 @@ judge 프롬프트는 `rubric.py:290`에 문자열로 박혀 있다 → `app/jud
 - [ ] 프롬프트/루브릭 v1→v2 후 **같은 20건**으로 재측정, 전/후 비교표
 - [ ] LangSmith에 실행 기록이 남고 실측 수치를 제출
 
-**산출**: `goldenset/case-format.md`(R1 제공) · 로더는 다경의 `scripts/judge_runner.py`, `scripts/calibrate_judge.py`, `app/judge/prompts/`, `docs/judge_calibration_report.md`
+**산출**: `goldenset/case-format.md`(R1 제공) · 무라벨 입력본 `goldenset/judge_inputs/` · 다경의 `scripts/judge_runner.py`(실행) + `scripts/calibration_report.py`(집계)
 
 > LangSmith 데이터셋 등록은 기존 `scripts/register_judge_dataset.py`에 dry-run/upload 구조가 이미 있다. 패턴을 복사한다.
 
@@ -166,75 +182,40 @@ judge 프롬프트는 `rubric.py:290`에 문자열로 박혀 있다 → `app/jud
 
 **무엇을.** "judge는 몇 번까지 재시도하고, 끝내 실패하면 어떻게 되는가"를 규칙 문서 한 장으로 못 박고, 규칙마다 테스트를 1:1로 붙인다.
 
-**어떻게.**
+**어떻게 — 구현 완료 상태.**
 
-> **✅ 상당 부분이 이미 반영돼 있다** — `ab0b64c fix: judge 미통과 리포트를 확정하지 않도록 수정` (7/28, PR #131). 아래는 그 위에서 남은 것만 다룬다.
->
-> | 이미 된 것 | 내용 |
-> |---|---|
-> | 재시도 상한 | `config/config.yaml: judge_max_retries: 3` + `resolve_max_judge_retries()` 순수 함수. 잘못된 값이면 `DEFAULT_MAX_JUDGE_RETRIES=3`으로 폴백 |
-> | 통과 없이 확정 금지 | `report.status = pending_manual_review`, `finalized=False`, 제목에 `[미확정 · 수동검토 대기]` 접두, `confirmation_blocked_reason`에 실패 축 기록 |
-> | 문서 정합 | `AGENTS.md`·`README.md`가 config 키를 참조하도록 갱신됨 (3회 시도 = 재작성 2회 — 코드와 일치) |
-> | 테스트 | 확정/미확정 분기 2건, config 상한 해석 1건(무효값 폴백 포함) |
->
-> **→ 무효 조건 ②("실패했는데 리포트가 그대로 확정됨")는 이것으로 방어된다.**
+| 규칙 | 현재 구현 |
+|---|---|
+| 재시도 상한 SSOT | `config/config.yaml: judge_max_retries`를 `resolve_max_judge_retries()`로만 읽는다. 누락·bool·0 이하·잘못된 타입은 코드 기본값으로 대체하지 않고 `ValueError`로 실행을 거부한다. |
+| 통과 없이 확정 금지 | `route_after_judge`가 상한 소진 실패를 독립 노드 `manual_review_gate`로 보내고, `pending_manual_review`·`finalized=False`·`export_allowed=False`를 기록한 뒤 END로 종료한다. |
+| 결정 지문 | `decision_hash`는 판단 내용과 정책 버전·`computation_hash`를 해시하며, 실행마다 달라지는 `trace_id`·`stopped_at`은 제외한다. |
+| 인용 identity 검증 | 인용문뿐 아니라 `chunk_id`·문서명·조항/locator가 원문 청크와 모두 일치해야 `verified=true`가 된다. 탈락 인용은 `citation_rejections`에 시도별로 누적된다. |
+| UI 차단 | `report_is_exportable()`이 false면 PDF 저장 버튼을 비활성화한다. |
 
-**규칙 ① 숫자는 한 곳에만 — 계층을 문서로 못 박는다.**
+**규칙 ① 숫자는 한 곳에만.** 값의 유일한 원천은 `config/config.yaml`이며 폴백
+기본값은 없다. 문서에 숫자를 복제하지 않고 키를 참조하며,
+`tests/test_docs_config_consistency.py`가 문서와 설정을 대조한다.
 
-값의 SSOT는 `config/config.yaml`의 `judge_max_retries`고, `DEFAULT_MAX_JUDGE_RETRIES`는 그 값이 없거나 무효할 때의 폴백이다. 이 계층이 문서에 없으면 "코드에 3이 두 번 적혀 있는데요?"라는 질문에 답이 궁색해진다. `docs/hard_stop_policy.md`에 명시하고, 문서의 숫자와 config 값을 대조하는 테스트를 붙인다.
+**규칙 ② 끝내 실패하면 확정하지 않고 멈춘다.** 그래프는 별도
+`manual_review_gate` 노드를 사용한다. 노드는 미확정 리포트와 정책 버전·실패 축·
+재시도 횟수·논리적 차단시각·결정 지문을 `report.governance.manual_review_gate`에
+남긴다. R4는 이 원본 계약을 `hard_stop_record.json`에 이름 그대로 싣는다.
 
-> **미갱신 문서 1건 — `발표대비_오케스트레이션_완전해설.md`** (d84ed7e 기준 확인)
->
-> `AGENTS.md`·`README.md`·`ui/app.py`는 `ab0b64c`에서 함께 갱신됐지만 이 문서는 빠졌다.
->
-> | 행 | 현재 표기 | 실제 |
-> |---|---|---|
-> | 179 | `MAX_JUDGE_RETRIES=2` · "시도 2회 후 수동검토" · **"왜 3회가 아니라 2회인지" 변론 전체** | 상한 3, 변론 자체가 무효 |
-> | 419 | "2회 실패 시 ... 리포트로 진행(경고 병기)" | 3회 실패 시 미확정(`pending_manual_review`) 조립 |
->
-> 하필 **감사 답변 준비용 문서**다. 179행은 "3회 미만이라 미달"이라는 지적에 대비한 변론인데, 이제 3회로 맞췄으므로 그대로 두면 오히려 팀이 혼란스러워진다. 규칙 ①이 잡아야 할 바로 그 유형이므로 대조 테스트 범위에 이 문서를 포함시킨다.
-
-**규칙 ② 끝내 실패하면 확정하지 않고 멈춘다 — 남은 간극.**
-
-과제 안내서는 "사람 검토 대기(**`manual_review_gate`**)에서 멈춥니다"라고 정지 지점의 이름까지 지정했다. 현재 구현은 `assemble_report`가 미확정 상태를 붙여 조립하고 정상 종료한다. 결과는 같지만 **그래프상 "멈춘 지점"이 없다.**
-
-> **팀 결정 필요 — 8/1 게이트까지**
-> - **(가) `manual_review_gate` 노드 신설 (권장)**: `route_after_judge`가 재시도 소진 시 이 노드로 보내고, 노드는 미확정 리포트 + `hard_stop` 기록을 남기고 END. 안내서 문구와 1:1로 맞고, 감사에서 "이 노드에서 멈췄습니다"라고 그래프를 짚을 수 있다. 기존 `assemble_report` 로직은 재사용하므로 작업량은 작다
-> - **(나) 현행 유지 + 규칙 문서로 방어**: "우리는 별도 노드 대신 상태 기반 미확정으로 구현했고 근거는 이것"이라고 문서화. 코드 변경 0이지만 "그래서 뭐가 멈춘 겁니까"에 말로만 답해야 한다
-
-**규칙 ③ 인용은 문장뿐 아니라 출처 표기까지 맞아야 통과.** 현재 `_is_verified_citation`은 `verified` 플래그와 필드 존재 여부만 본다. `quote`가 `chunk_id` 원문에 실제로 포함되는지, `source`가 그 문서와 일치하는지 대조하도록 강화한다. **R3에서 아직 손대지 않은 유일한 규칙이다.**
-
-**규칙 ② 끝내 실패하면 확정하지 않고 멈춘다.**
-
-(가)를 택할 경우:
-
-```python
-def route_after_judge(state):
-    if judge.get("passed"):                              return "assemble_report"
-    if retries >= resolve_max_judge_retries(state):      return "manual_review_gate"
-    return "rag_cite"
-```
-
-`app/nodes/manual_review_gate.py`는 기존 `assemble_report`로 미확정 리포트를 만든 뒤 `hard_stop` 기록(정지 시각·실패 축·정책 버전·재시도 횟수)을 덧붙이고 END로 간다. 이 `hard_stop` 블록이 R4 번들의 `hard_stop_record.json`이 된다.
-
-**속성 테스트 3건** (`hypothesis` 신규 의존성) — 기존 테스트는 예시 기반이라 특정 입력만 검증한다. 어떤 입력에서도 성립하는지 자동 시험하는 건 아직 없다.
-
-1. 어떤 실패 축 조합·재시도 횟수에서도 `judge.passed is not True` ⇒ `report["finalized"] is False`
-2. 어떤 config 값(무효값·음수·bool 포함)에서도 `judge_retries <= resolve_max_judge_retries(state)`
-3. 어떤 citation 리스트에서도 quote가 원문에 없거나 source 불일치면 항상 fail
+**규칙 ③ 인용은 문장뿐 아니라 출처 표기까지 맞아야 통과한다.** `rag_cite`는
+quote가 청크 원문에 존재하는지와 source·locator가 청크 provenance와 일치하는지를
+함께 확인한다. 문장만 맞거나 출처만 맞는 인용은 통과하지 않는다.
 
 **완료 기준 (DoD)**
 
-- [ ] 정지 지점 구현 방식 (가)/(나) **팀 결정 완료**
-- [ ] `docs/hard_stop_policy.md` 한 장 작성 — config SSOT ↔ 코드 폴백 계층 명시
-- [ ] `발표대비_오케스트레이션_완전해설.md` 179·419행 정정 (미갱신 잔재 청산)
-- [ ] 문서 숫자 = `config.yaml` 값 대조 테스트 통과 (대상에 발표대비 문서 포함)
-- [ ] judge 미통과 시 `report.finalized is False` (✅ 이미 통과 — `test_report_is_not_finalized_without_judge_pass`)
-- [ ] 인용 출처 표기 대조 강화 + 테스트
-- [ ] 규칙 3개에 테스트 1:1 대응
-- [ ] 속성 테스트 3건 통과
+- [x] 독립 `manual_review_gate` 노드 및 실패 경로 E2E 구현
+- [x] `docs/hard_stop_contract.md`에 상한·인용·차단·R4 상태 계약 문서화
+- [x] 문서의 재시도 상한 = `config.yaml` 대조 테스트
+- [x] Judge 미통과 시 `finalized=False`·`export_allowed=False`
+- [x] 인용문·문서명·조항·청크 일치 검증과 탈락 이력 누적
+- [x] 규칙별 1:1 테스트 및 속성 테스트 3건 이상
 
-**산출**: `docs/hard_stop_policy.md`, `tests/test_hard_stop_properties.py`, (가 선택 시) `app/nodes/manual_review_gate.py` + `app/graph.py` 수정
+**산출**: `docs/hard_stop_contract.md` · `app/nodes/manual_review_gate.py` ·
+`app/graph.py` · `tests/test_hard_stop_contract.py`
 
 ---
 
@@ -256,10 +237,15 @@ evidence/<run_id>/
 ├── judge_rationale.json  judge.checks / rubric 축별 판정 사유 전문
 ├── hard_stop_record.json ★ 멈춘 기록 (없으면 성공 번들임을 명시)
 ├── replay_diff.json      같은 입력 2회 실행 해시 대조
-├── calibration_before_after.md   개선 전후 비교표 (R2 산출물)
+├── citation_verification.json  인용 검증 결과·탈락 인용 이력
+├── calibration_summary.json    R2 실행 등급·일치율·개선 전후 비교
 ├── llm_audit.json        프롬프트·모델버전·응답 감사기록
 └── bundle_hash.txt       번들 루트 해시
 ```
+
+> 위는 계획 시점 스케치이며 **실제 목록의 SSOT는 `app/evidence/schema.py`의
+> `BUNDLE_FILENAMES`**다. 계약 상세는
+> [`docs/evidence_bundle_schema.md`](evidence_bundle_schema.md)를 따른다.
 
 **설계 시 반영할 점**
 
@@ -346,8 +332,8 @@ LLM 2축이 유일한 약점이다. **재현 데모는 `--offline` 또는 캐시
 |---|---|---|
 | **A** 사례집 | `goldenset/cases/` 20건 본문, 라벨링 가이드 최종본, 사례 코퍼스 | 즉시 |
 | **B** 라벨·검증 | 독립 라벨 20건, A와 합의, `initial_agreement`, 스키마 테스트 | A 본문 후 |
-| **C** 캘리브레이션 | 로더 연결(다경과 협업), `calibrate_judge.py`, 프롬프트 v1/v2, 오답 분석, LangSmith | 견본 3건으로 선행 가능 |
-| **D** hard stop | `hard_stop_policy.md`, 인용 출처 대조 강화, 속성 테스트 3건, (가 선택 시) `manual_review_gate` | 즉시 |
+| **C** 캘리브레이션 | 로더 연결(다경과 협업), `judge_runner.py`(실행)+`calibration_report.py`(집계), 프롬프트 v1/v2, 오답 분석, LangSmith | 견본 3건으로 선행 가능 |
+| **D** hard stop | `hard_stop_contract.md`, 인용 identity 검증, 속성 테스트 3건 이상, `manual_review_gate` | 구현 완료 |
 | **E** 증거·재현 | `make_evidence_bundle.py`, `replay_verify.py`, 범위 선언, 번들 3건 | D 후 |
 
 발표는 C(캘리브레이션 숫자)·D(정지 규칙)·E(증거 꺼내기) 3인이 앞에 서고, A·B는 라벨 기준 질문 대기.
@@ -355,7 +341,7 @@ LLM 2축이 유일한 약점이다. **재현 데모는 `--offline` 또는 캐시
 | 날짜 | 마일스톤 |
 |---|---|
 | 7/28 화 | 분담 확정 · **라벨링 가이드 6축 경계 규칙 팀 합의** (이거 없이 라벨링 시작 금지) |
-| 7/29~30 | 사례 본문 20건 / 규칙 문서 + 인용 출처 대조 + (가 선택 시) `manual_review_gate` |
+| 7/29~30 | 사례 본문 20건 / 규칙 문서 + 인용 출처 대조 + `manual_review_gate` 구현 |
 | 7/31 금 | **2인 독립 라벨링 → 일치율 → 합의** / 속성 테스트 3건 |
 | **8/1 토** | **게이트 1 — R1·R3 DoD 충족.** judge 개선 범위 A/B/C 결정 |
 | 8/2~4 | 로더 → v1 측정 → 오답 3건 분석 → v2 재측정 / 번들 배선 |
@@ -391,10 +377,10 @@ LLM 2축이 유일한 약점이다. **재현 데모는 `--offline` 또는 캐시
 | 6축 루브릭 · `AXIS_NAMES` | `app/judge/rubric.py:12` |
 | 금지어 목록 (R2 개선 후보) | `app/judge/rubric.py:21` |
 | `source_validity` (R2 개선 후보) | `app/judge/rubric.py:65` |
-| judge LLM 프롬프트 (v1/v2 분리) | `app/judge/rubric.py:290` |
-| 라우팅 (R3 수정) | `app/graph.py:29` |
+| judge LLM 프롬프트 (v1/v2 분리) | `app/judge/rubric.py:306` |
+| Hard Stop 라우팅 | `app/graph.py:30` (`route_after_judge`) |
 | 재시도 상한 SSOT | `config/config.yaml: judge_max_retries` · `app/nodes/judge_eval.py: resolve_max_judge_retries()` |
-| 미확정 상태 조립 | `app/nodes/assemble_report.py` (`STATUS_PENDING_MANUAL_REVIEW`) |
+| 미확정 상태·차단 기록 | `app/nodes/manual_review_gate.py` |
 | 리포트 조립 · governance | `app/nodes/assemble_report.py:285` |
 | LangSmith 등록 (패턴 복사) | `scripts/register_judge_dataset.py` |
 | 실행 CLI (R4 훅 추가) | `scripts/run_graph.py` |

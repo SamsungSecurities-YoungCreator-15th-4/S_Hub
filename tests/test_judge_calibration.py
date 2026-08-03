@@ -787,6 +787,49 @@ class TestCompareVersions:
         assert comparison.before_code_sha == "deadbeef"
         assert comparison.after_code_sha == "cafef00d"
 
+    def test_evalset_hash_is_carried_and_matches_both_sides(self, records_v1):
+        """비교가 '같은 시험지·같은 정답지'에서 나왔음을 값으로 증명한다.
+
+        code_sha는 무엇으로 쟀는지만 말한다. 이 값이 없으면 일치율 변화를 judge
+        개선으로 귀속할 수 없다.
+        """
+        from app.evidence.schema import evalset_hash
+
+        judge_v2 = [
+            _judge("case_001", True, prompt_version="v2"),
+            _judge("case_002", True, prompt_version="v2"),
+            _judge("case_003", False, ("disclaimer",), prompt_version="v2"),
+            _judge("case_004", False, ("numeric_consistency",), prompt_version="v2"),
+        ]
+        records_v2 = merge_records(HUMAN_LABELS_V1, judge_v2)
+
+        comparison = compare_versions(records_v1, records_v2)
+
+        # 한 값이 v1·v2 양쪽의 해시와 모두 같아야 "같은 평가셋"이 증명된다.
+        assert comparison.evalset_hash == evalset_hash(records_v1)
+        assert comparison.evalset_hash == evalset_hash(records_v2)
+
+    def test_different_evalset_never_reaches_comparison(self, records_v1):
+        """v1·v2의 evalset_hash가 갈리는 입력은 비교 자체가 거부된다.
+
+        evalset_hash는 case_id·사례 본문·사람 라벨에서만 계산되고 그 셋은 전부
+        비교 전에 검사된다. 그래서 '해시가 다른 비교 결과'라는 산출물은 존재할 수
+        없다 — 폴백으로 통과시키지 않고 ValueError로 끊는다.
+        """
+        from app.evidence.schema import evalset_hash
+
+        judge_v2 = [
+            _judge("case_001", True, prompt_version="v2", case_content_seed="case_001-rewritten"),
+            _judge("case_002", True, prompt_version="v2"),
+            _judge("case_003", False, ("disclaimer",), prompt_version="v2"),
+            _judge("case_004", False, ("numeric_consistency",), prompt_version="v2"),
+        ]
+        records_v2 = merge_records(HUMAN_LABELS_V1, judge_v2)
+        assert evalset_hash(records_v1) != evalset_hash(records_v2)
+
+        with pytest.raises(ValueError):
+            compare_versions(records_v1, records_v2)
+
     def test_mismatched_case_ids_raise(self, records_v1):
         with pytest.raises(ValueError, match="동일 case_id"):
             compare_versions(records_v1, records_v1[:-1])
@@ -914,6 +957,61 @@ class TestCompareOfficialVersions:
         v2 = _official_20_records(prompt_version="v2")
         with pytest.raises(CalibrationSchemaError, match="20건"):
             compare_official_versions(v1, v2)
+
+    def test_require_prompt_change_false_allows_identical_prompt_hash_with_different_code_sha(self):
+        """v2→v3(프롬프트는 그대로, 결정론 규칙 코드만 수정)처럼 prompt_hash가
+        20건 전부 동일해도, require_prompt_change=False면 code_sha 변경으로
+        "무언가 확실히 바뀌었다"를 증명하고 통과해야 한다."""
+        v2 = _official_20_records(prompt_version="v2")
+        v2_by_id = {record.case_id: record for record in v2}
+        v3_raw = _official_20_records(prompt_version="v3")
+        v3 = [
+            replace(record, prompt_hash=v2_by_id[record.case_id].prompt_hash, code_sha="cafef00d")
+            for record in v3_raw
+        ]
+        comparison = compare_official_versions(v2, v3, require_prompt_change=False)
+        assert comparison.before_code_sha == "deadbeef"
+        assert comparison.after_code_sha == "cafef00d"
+
+    def test_require_prompt_change_false_raises_when_code_sha_also_identical(self):
+        """require_prompt_change=False라도 code_sha까지 동일하면 프롬프트도
+        코드도 안 바뀐 것이므로 통과시키면 안 된다."""
+        v2 = _official_20_records(prompt_version="v2")
+        v2_by_id = {record.case_id: record for record in v2}
+        v3_raw = _official_20_records(prompt_version="v3")
+        v3 = [replace(record, prompt_hash=v2_by_id[record.case_id].prompt_hash) for record in v3_raw]
+        with pytest.raises(ValueError, match="code_sha가 동일합니다"):
+            compare_official_versions(v2, v3, require_prompt_change=False)
+
+    def test_require_prompt_change_false_still_checks_model_version_and_prompt_version(self):
+        """require_prompt_change=False가 다른 필수 검증(model_version 동일·
+        prompt_version 상이)까지 느슨하게 풀면 안 된다."""
+        v2 = _official_20_records(prompt_version="v2")
+        v2_by_id = {record.case_id: record for record in v2}
+        v3_raw = _official_20_records(prompt_version="v3")
+        v3 = [
+            replace(
+                record,
+                prompt_hash=v2_by_id[record.case_id].prompt_hash,
+                code_sha="cafef00d",
+                model_version={"deployment": "other", "model": "other-model", "api_version": "x"},
+            )
+            for record in v3_raw
+        ]
+        with pytest.raises(ValueError, match="동일한 model_version"):
+            compare_official_versions(v2, v3, require_prompt_change=False)
+
+    def test_require_prompt_change_false_raises_when_prompt_hash_also_changed(self):
+        """require_prompt_change=False의 주장은 "프롬프트는 그대로, 코드만
+        바뀌었다"이므로, code_sha가 다르다는 것만으로는 부족하다 — 프롬프트도
+        같이 바뀌었다면(예: v3의 "루브릭 구체화"가 프롬프트 문구를 건드린 경우)
+        "코드만 바뀌었다"는 주장이 거짓이 되므로 잡아야 한다(다경님 리뷰 반영)."""
+        v2 = _official_20_records(prompt_version="v2")
+        v3_raw = _official_20_records(prompt_version="v3")
+        # prompt_hash를 강제로 맞추지 않는다 — v3의 자체 prompt_hash(다름)를 그대로 둔다.
+        v3 = [replace(record, code_sha="cafef00d") for record in v3_raw]
+        with pytest.raises(ValueError, match="prompt_hash가 다릅니다"):
+            compare_official_versions(v2, v3, require_prompt_change=False)
 
 
 class TestBuildJudgeResultCrossChecks:

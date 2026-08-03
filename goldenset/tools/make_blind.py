@@ -12,7 +12,13 @@
 
 ⚠️ 이 스크립트는 pass/fail을 판정하지 않는다. 라벨은 사람이 매긴다(무효 조건 ①).
 
-사용: python goldenset/tools/make_blind.py [--seed 문구]
+⚠️ **라벨 확정 후에는 실행이 거부된다.** `cases_blind/`는 라벨러가 실제로 본
+   본문의 유일한 사본이고, 재라벨한 사례는 `cases/`와 의도적으로 다르다.
+   `case_hashes.json`이 있으면 `--force` 없이 돌지 않는다.
+   · judge 실행 입력이 필요하면  → `goldenset/tools/export_judge_inputs.py`
+   · 그래도 재생성해야 하면      → `--force` + 사유를 `labeling-guide.md` §4에 기록
+
+사용: python goldenset/tools/make_blind.py [--seed 문구]        # 라벨링 전에만
 """
 from __future__ import annotations
 
@@ -161,6 +167,12 @@ def main() -> int:
         ),
     )
     ap.add_argument(
+        "--force",
+        action="store_true",
+        help="라벨 확정 후에도 재생성한다. cases_blind/의 '라벨러가 본 원본'이 덮이므로 "
+        "사유를 labeling-guide.md §4에 남길 것.",
+    )
+    ap.add_argument(
         "--names",
         default="승민,중현,준호",
         help="라벨러 실명 3개, 쉼표 구분. 첫 번째가 출제자(#1)다. 예: 승민,중현,준호",
@@ -169,6 +181,23 @@ def main() -> int:
     names = [n.strip() for n in args.names.split(",")]
     if len(names) != 3:
         ap.error("--names 는 라벨러 3명이어야 한다")
+
+    # ── 동결 후 재실행 가드 ────────────────────────────────────────────────
+    #
+    # `cases_blind/`는 **라벨러가 실제로 본 본문**의 기록이다. 라벨 확정 후
+    # 사례를 고친 건이 있으면(현재 case_008·case_010) 그 기록과 `cases/`가
+    # 의도적으로 달라진다. 여기서 재생성하면 그 차이가 사라지고,
+    # `labeling-guide.md` §4의 "무엇을 보고 fail을 줬는가"가 근거를 잃는다.
+    #
+    # R2 실행 입력은 이 폴더가 아니라 `judge_inputs/`(export_judge_inputs.py)를
+    # 쓰므로, 여기서 막아도 v1·v2 파이프라인에는 아무 영향이 없다.
+    if (ROOT / "case_hashes.json").exists() and not args.force:
+        ap.error(
+            "라벨이 확정된 상태입니다 (case_hashes.json 존재).\n"
+            "  cases_blind/ 를 재생성하면 라벨러가 본 원본이 사라집니다.\n"
+            "  · judge 실행 입력이 필요하면 → python goldenset/tools/export_judge_inputs.py\n"
+            "  · 그래도 재생성해야 하면 → --force 를 쓰고 사유를 labeling-guide.md §4에 기록"
+        )
 
     files = sorted(CASES.glob("case_*.md"))
     if len(files) != 20:
@@ -255,8 +284,8 @@ def main() -> int:
     )
     if not shared:
         print("   ⚠️ 겹치는 구간이 없다 — 오염 없는 사람-사람 일치율을 잴 수 없다")
-    print(f"✅ 배포 패키지 → dist/ (labeling-guide.md · chunks.json · cases_blind/ · 답안지)")
-    print(f"🔒 매핑 봉인 → .sealed/blind_map.json")
+    print("✅ 배포 패키지 → dist/ (labeling-guide.md · chunks.json · cases_blind/ · 답안지)")
+    print("🔒 매핑 봉인 → .sealed/blind_map.json")
     print("\n⚠️ dist/ 만 조원에게 전달하세요. corpus/manifest.md 와 .sealed/ 는 절대 금지.")
     return 0
 

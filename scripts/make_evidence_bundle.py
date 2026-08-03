@@ -5,7 +5,10 @@
 
 번들 계약(파일명·필수 키·"없음" 표기)은 app/evidence/schema.py가 SSOT다.
 이 스크립트는 상태를 해석만 하고 그래프·노드를 실행하지 않는다.
-run_graph.py에서 상태를 덤프해 자동 호출하는 배선은 다음 PR에서 다룬다.
+
+run_graph.py가 `--evidence-bundle`로 실행 종료 직후 make_bundle()을 in-process로
+호출한다. 이 파일을 직접 부르는 경로(--state/--out)는 이미 덤프해 둔 state로
+번들을 다시 만들 때 쓴다.
 """
 import argparse
 import json
@@ -21,6 +24,13 @@ from app.evidence.schema import (  # noqa: E402
     BLOCKED_DERIVED_FROM,
     BUNDLE_HASH_FILENAME,
     BUNDLE_SCHEMA_VERSION,
+    CALIBRATION_COMPARISON_REQUIRED_KEYS,
+    CALIBRATION_FILENAME,
+    CALIBRATION_GRADE_KEYS,
+    CALIBRATION_MISMATCH_EXCLUSION_REASON,
+    CALIBRATION_REPORT_SCHEMA_VERSION,
+    CALIBRATION_SOURCE_PATH,
+    CALIBRATION_UNAVAILABLE_NOTE,
     CITATION_VERIFICATION_FILENAME,
     HARD_STOP_RECORD_FILENAME,
     HARD_STOP_SOURCE_PATHS,
@@ -36,7 +46,13 @@ from app.evidence.schema import (  # noqa: E402
     REPLAY_DIFF_PLACEHOLDER_STATUS,
     SUMMARY_FILENAME,
     TRACE_FILENAME,
+    calibration_summary_from_report,
     unavailable,
+)
+from app.evaluation.calibration_modes import (  # noqa: E402
+    CALIBRATION_MODES,
+    OFFICIAL_CALIBRATION_MODES,
+    calibration_mode_issue,
 )
 from app.judge.axes import AXIS_EN_TO_KO  # noqa: E402
 from app.utils.hashing import sha256_of_dict, sha256_of_file  # noqa: E402
@@ -141,7 +157,8 @@ def build_trace(state: dict) -> dict:
             "state의 노드 실행 순서",
             note=(
                 "run_graph.py가 스트리밍 중 지역 변수로만 수집하고 state에 기록하지 "
-                "않는다. 상태 덤프 배선 PR에서 함께 싣는다."
+                "않는다. state를 입력으로 받는 번들에서는 채울 수 없으며, 싣으려면 "
+                "노드 실행 순서를 state에 남기는 변경이 먼저 필요하다."
             ),
         ),
     }
@@ -374,6 +391,111 @@ def build_llm_audit(state: dict, git_sha: object) -> dict:
     }
 
 
+def _calibration_side(report: dict | None, key: str, *, note: str) -> object:
+    """`v1`/`v2` 한쪽. 채울 값이 없으면 사유와 원본 경로를 남긴다."""
+    summary = calibration_summary_from_report((report or {}).get(key))
+    if summary is None:
+        return unavailable(f"{CALIBRATION_SOURCE_PATH}.{key}", note=note)
+    return summary
+
+
+def _calibration_comparison(report: dict | None, *, note: str) -> object:
+    """v1·v2 비교. 계약 키가 하나라도 없으면 부분 결과를 만들지 않는다."""
+    comparison = (report or {}).get("comparison")
+    if not isinstance(comparison, dict):
+        return unavailable(f"{CALIBRATION_SOURCE_PATH}.comparison", note=note)
+    missing = [key for key in CALIBRATION_COMPARISON_REQUIRED_KEYS if key not in comparison]
+    if missing:
+        # 일부만 실으면 감사자가 "비교했는데 값이 빈 칸"으로 읽는다. 통째로 없음 처리한다.
+        return unavailable(
+            f"{CALIBRATION_SOURCE_PATH}.comparison",
+            note=f"비교 계약 키 누락: {', '.join(missing)}",
+        )
+    return {key: comparison[key] for key in CALIBRATION_COMPARISON_REQUIRED_KEYS}
+
+
+def _calibration_source(report: dict | None) -> object:
+    """수치가 어떤 등급의 실행에서 나왔는지. 일치율보다 먼저 봐야 하는 값이다."""
+    if not isinstance(report, dict):
+        return unavailable(CALIBRATION_SOURCE_PATH, note=CALIBRATION_UNAVAILABLE_NOTE)
+    missing = [key for key in CALIBRATION_GRADE_KEYS if key not in report]
+    if missing:
+        # 등급을 모르면 수치도 못 믿는다. 일부만 적어 "공식인 척"하게 두지 않는다.
+        return unavailable(
+            CALIBRATION_SOURCE_PATH,
+            note=f"실행 등급 표시 누락: {', '.join(missing)}",
+        )
+    issue = calibration_mode_issue(
+        report.get("mode"),
+        official_validation_passed=report.get("official_validation_passed"),
+        langsmith_required=report.get("langsmith_required"),
+    )
+    if issue:
+        return unavailable(
+            CALIBRATION_SOURCE_PATH,
+            note=(
+                f"실행 등급 검증 실패: {issue}. "
+                f"허용 mode={list(CALIBRATION_MODES)}, "
+                f"공식 mode={sorted(OFFICIAL_CALIBRATION_MODES)}"
+            ),
+        )
+    return {key: report[key] for key in CALIBRATION_GRADE_KEYS}
+
+
+def _usable_calibration_payload(
+    report: dict | None, source: object
+) -> tuple[dict | None, str]:
+    """수치를 옮겨도 되는 입력인지 판정하고, 안 되면 그 사유를 함께 돌려준다.
+
+    **fail-closed다.** 수치를 실을 수 없는 사유가 하나라도 있으면 payload를 통째로
+    버린다. 등급만 "없음"으로 적고 수치는 그대로 내보내면, 감사자가 등급 줄을
+    지나쳤을 때 출처를 알 수 없는 일치율을 공식 수치로 읽는다.
+
+    사유는 셋 다 다른 사실이라 문구를 섞지 않는다 — 안 줬다 / 등급을 모른다 /
+    줬는데 못 읽는다.
+    """
+    if not isinstance(report, dict):
+        return None, CALIBRATION_UNAVAILABLE_NOTE
+    if isinstance(source, dict) and source.get("available") is False:
+        # 등급을 모르면 수치도 못 믿는다. 어떤 등급 키가 빠졌는지는 source에 있다.
+        return None, f"실행 등급을 확인할 수 없어 수치를 싣지 않는다 — {source.get('reason')}"
+    if report.get("schema_version") != CALIBRATION_REPORT_SCHEMA_VERSION:
+        # 필드 이름이 같아도 뜻이 달라졌을 수 있다. 조용히 옮기면 감사 증거에
+        # 다른 의미의 숫자가 실린다.
+        return None, (
+            f"calibration 리포트 schema_version={report.get('schema_version')!r}는 "
+            f"이 번들이 해석하는 {CALIBRATION_REPORT_SCHEMA_VERSION!r}가 아니다. "
+            "필드 뜻이 달라졌을 수 있어 수치를 옮기지 않는다."
+        )
+    return report, CALIBRATION_UNAVAILABLE_NOTE
+
+
+def build_calibration(report: object) -> dict:
+    """R2 calibration 요약. **R2 진행 상태와 무관하게 항상 생성된다.**
+
+    `hard_stop_record`가 성공 실행에서도 `blocked=false`로 만들어지는 것과 같은
+    원칙이다 — 파일이 아예 없으면 감사자는 "안 만든 것"과 "아직 못 잰 것"을
+    구분할 수 없다. 못 잰 것은 못 쟀다고 사유와 함께 적는다.
+
+    `report`는 `scripts/calibration_report.py --out` 산출물이다. 실행 1회분 state가
+    아니라 사례집 전체를 judge에 돌린 결과라 state에서는 나올 수 없다.
+
+    `source`를 `v1`보다 앞에 두는 이유 — 같은 일치율이라도 `dev_mock`에서 나온
+    수치와 `official`에서 나온 수치는 증거로서 값이 다르다. 등급이 안 보이면
+    감사자가 개발용 리허설 숫자를 공식 실측으로 읽는다.
+    """
+    payload = report if isinstance(report, dict) else None
+    source = _calibration_source(payload)
+    payload, note = _usable_calibration_payload(payload, source)
+    return {
+        "source": source,
+        "v1": _calibration_side(payload, "v1", note=note),
+        "v2": _calibration_side(payload, "v2", note=note),
+        "comparison": _calibration_comparison(payload, note=note),
+        "mismatch_detail_excluded": CALIBRATION_MISMATCH_EXCLUSION_REASON,
+    }
+
+
 # ---------------------------------------------------------------------------
 # summary.md
 # ---------------------------------------------------------------------------
@@ -438,9 +560,13 @@ def build_summary_md(
             "",
             "## 주요 해시",
             "",
+            # 앞의 3개가 docs/reproducibility_scope.md §2가 선언한 재현 지문이다.
+            # 하나라도 빠지면 감사자가 summary.md 한 장으로 재현 범위를 확인할 수
+            # 없어 replay_diff.json을 따로 열어야 한다.
             f"- config_hash: {_value_or_dash(hashes.get('config_hash'))}",
             f"- computation_hash: {_value_or_dash(hashes.get('computation_hash'))}",
-            f"- report_hash: {report_hash} (번들이 report 전문에서 계산)",
+            f"- approval_hash: {_value_or_dash(hashes.get('approval_hash'))}",
+            f"- report_hash: {report_hash} (번들이 report 전문에서 계산, 재현 지문 아님)",
             "",
             "## 추적",
             "",
@@ -455,7 +581,19 @@ def build_summary_md(
 # ---------------------------------------------------------------------------
 # 번들 생성
 # ---------------------------------------------------------------------------
-def make_bundle(state: dict, out_dir: Path, *, run_id: str, generated_at: str) -> Path:
+def make_bundle(
+    state: dict,
+    out_dir: Path,
+    *,
+    run_id: str,
+    generated_at: str,
+    calibration: object = None,
+) -> Path:
+    """번들 한 벌을 만든다.
+
+    `calibration`은 `scripts/calibration_report.py --out` 산출물이다. 넘기지 않아도
+    calibration 파일은 만들어지며, 그 경우 `available:false`로 사유가 실린다.
+    """
     out_dir.mkdir(parents=True, exist_ok=True)
     git_sha = _git_sha()
 
@@ -465,6 +603,7 @@ def make_bundle(state: dict, out_dir: Path, *, run_id: str, generated_at: str) -
     hard_stop = build_hard_stop_record(state)
     replay = build_replay_diff(state)
     llm_audit = build_llm_audit(state, git_sha)
+    calibration_summary_payload = build_calibration(calibration)
 
     report = _get(state, "report") or {}
     report_hash = sha256_of_dict(report) if report else "-"
@@ -476,6 +615,7 @@ def make_bundle(state: dict, out_dir: Path, *, run_id: str, generated_at: str) -
         HARD_STOP_RECORD_FILENAME: hard_stop,
         REPLAY_DIFF_FILENAME: replay,
         LLM_AUDIT_FILENAME: llm_audit,
+        CALIBRATION_FILENAME: calibration_summary_payload,
     }
     for filename, payload in payloads.items():
         (out_dir / filename).write_text(_dumps(payload), encoding="utf-8")
@@ -512,6 +652,16 @@ def make_bundle(state: dict, out_dir: Path, *, run_id: str, generated_at: str) -
     return out_dir
 
 
+def _load_calibration(path: Path | None) -> object:
+    """calibration 리포트를 읽는다. 경로를 준 이상 못 읽으면 조용히 넘기지 않는다."""
+    if path is None:
+        return None
+    report = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(report, dict):
+        raise SystemExit("--calibration JSON은 최상위가 객체여야 합니다.")
+    return report
+
+
 def _resolve_run_id(state: dict, explicit: str | None) -> str:
     if explicit:
         return explicit
@@ -526,15 +676,29 @@ def main() -> None:
     parser.add_argument("--state", required=True, type=Path, help="실행 상태 JSON 경로")
     parser.add_argument("--out", required=True, type=Path, help="번들 출력 디렉터리")
     parser.add_argument("--run-id", default=None, help="번들 run_id (기본: state.trace_id)")
+    parser.add_argument(
+        "--calibration",
+        type=Path,
+        default=None,
+        metavar="PATH",
+        help="R2 calibration 리포트 JSON (scripts/calibration_report.py --out 산출물)",
+    )
     args = parser.parse_args()
 
     state = json.loads(args.state.read_text(encoding="utf-8"))
     if not isinstance(state, dict):
         raise SystemExit("--state JSON은 최상위가 객체여야 합니다.")
 
+    calibration = _load_calibration(args.calibration)
     run_id = _resolve_run_id(state, args.run_id)
     generated_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    out_dir = make_bundle(state, args.out, run_id=run_id, generated_at=generated_at)
+    out_dir = make_bundle(
+        state,
+        args.out,
+        run_id=run_id,
+        generated_at=generated_at,
+        calibration=calibration,
+    )
 
     print(f"증거 번들 생성 완료: {out_dir}")
     for filename in sorted(p.name for p in out_dir.iterdir()):

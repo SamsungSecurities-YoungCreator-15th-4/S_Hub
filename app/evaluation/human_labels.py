@@ -1,7 +1,7 @@
 """R1 정답 사례집(md frontmatter) → HumanLabel 원본 dict 로더.
 
 R1은 사례 1건당 md 파일 1건, frontmatter(YAML)에 id/label/fail_axes/rationale을
-담는다(starter-kit/labeling-guide-template.md §4). 이 모듈은 그 frontmatter만
+담는다(goldenset/starter-kit/labeling-guide-template.md §4). 이 모듈은 그 frontmatter만
 읽어 calibration_schema.HumanLabel이 기대하는 원본 dict로 변환한다 — 본문(리포트
 전문)은 읽지 않는다. judge가 채점할 사례 본문을 넘기는 건 실행·기록 담당의
 로더 몫이라 R2 분석 쪽이 중복으로 읽을 이유가 없다. frontmatter의 다른 필드

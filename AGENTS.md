@@ -37,22 +37,38 @@ Orchestration/
 ├── app/
 │   ├── state.py       # RiskState/IPSProfile — 팀 데이터 계약(SSOT), 임의 수정 금지
 │   ├── graph.py       # StateGraph 조립 (9노드 + 조건부 분기 2개)
+│   ├── hard_stop_policy.py # Hard Stop 정책 버전 로더·검증(SSOT 접근점)
+│   ├── deployment_validation.py # 실제 배포 계약 검증(--validate-deployment)
 │   ├── nodes/         # 그래프 노드 (순수 함수, 바꾼 키만 반환)
 │   ├── engine/        # 결정론 계층 — langchain/llm import 금지
-│   ├── llm/           # AzureChatOpenAI 팩토리
+│   ├── llm/           # AzureChatOpenAI 팩토리·프롬프트 체인
+│   ├── rag/           # 검색·인용 검증·인덱스 배포
+│   ├── judge/         # judge 6축 루브릭 (런타임 판정)
+│   ├── evaluation/    # judge 캘리브레이션 (사람 라벨 대조 — 판정이 아니라 판정의 평가)
+│   ├── evidence/      # R4 증거 번들 스키마·state 덤프
+│   ├── observability/ # LangSmith 트레이싱
 │   └── utils/         # 해시 등 공용 유틸
-├── config/            # config.yaml (seed, as_of_date, VaR 설정)
-├── corpus/            # RAG 근거 문서 (19건, 원문 PDF는 gitignore·로컬 전용 / manifest.md 참조)
+├── config/            # config.yaml · ips_policy.yaml · hard_stop_policy.yaml · rag_sources.json
+├── corpus/            # RAG 근거 문서 (21건, 원문 PDF는 gitignore·로컬 전용 / manifest.md 참조)
 ├── data/              # 시장 데이터 (gitignore 대상 산출물 포함)
+├── docs/              # 계약·계획 문서 (mermaid.mmd 포함)
+├── goldenset/         # R1 사례집·라벨·평가 도구 (starter-kit·reports 포함, dist/는 생성물이라 gitignore)
 ├── scripts/           # CLI 진입점 (run_graph.py)
 ├── tests/             # pytest
 ├── ui/                # Streamlit UI
-└── .github/           # PR 템플릿·CI 등 GitHub 관련 설정
+└── .github/           # PR 템플릿·CI·커뮤니티 문서(CONTRIBUTING·SECURITY·CODE_OF_CONDUCT)
 ```
+
+디렉터리를 새로 만들기 전에 위 목록에 이미 맞는 자리가 있는지 먼저 본다.
+파일 한두 개를 위해 최상위 디렉터리를 만들지 않는다.
 
 ## 그래프 노드 흐름
 
 `app/graph.py`의 실제 조립 기준. 노드 9개, 조건부 분기 2개, HITL 인터럽트 1개.
+
+아래 ①②③은 분기 번호가 아니라 **제어 지점 번호**다 — ① 충돌 재추출 분기 ·
+② HITL 인터럽트 · ③ judge 재작성 분기. 조건부 분기는 ①·③ 둘이고 ②는 인터럽트라
+번호가 ①·③으로 건너뛴다. `scripts/run_graph.py`의 실행 요약 출력과 같은 표기다.
 
 ```
 START
@@ -158,10 +174,21 @@ RAG 근거 문서는 `corpus/`에 카테고리별로 둔다. 상세 목록은 [`
 - **커밋 메시지**: 한국어로, `타입: 설명` 형식. 타입은 `feat`, `fix`, `docs`, `chore`, `refactor`, `test` 중 하나.
   - 예) `feat: 스트레스 시나리오 금리 충격 추가`
   - `Co-Authored-By`, 모델명, 세션 링크 등 AI 도구 attribution·trailer를 커밋과 PR에 넣지 않는다.
-- **빌드/실행 확인**: 푸시 전 반드시 로컬에서 `python scripts/run_graph.py --auto-approve` 완주와 `pytest` 통과를 확인한다.
+- **빌드/실행 확인**: 푸시 전 반드시 로컬에서 아래 정상·차단 경로와
+  `pytest`, `ruff check .`을 모두 통과한다.
+
+  ```bash
+  # 정상 확정 경로: assemble_report 종료
+  python scripts/run_graph.py --auto-approve
+
+  # Judge 재시도 소진 경로: manual_review_gate 종료·다운로드 차단
+  python scripts/run_graph.py --auto-approve --force-judge-fail 3
+  ```
 - **덮어쓰기 알림**: 기존 파일을 지우거나 덮어쓰기 전 사용자에게 먼저 알리고 동의를 받는다.
 - **비밀 정보 금지**: `.env` 파일과 모든 비밀키는 절대 커밋하지 않는다. `.env.example`만 추적 대상이다.
 
 ## 브랜치 전략
 
-- GitFlow: `feature/* → develop → main`. `main` 직접 커밋 금지, 모든 변경은 PR + 리뷰 1명.
+- GitFlow: `feature/*` · `fix/*` · `chore/*` 등 목적별 브랜치 → `develop` → `main`.
+  `main` 직접 커밋 금지, 모든 변경은 PR + 리뷰 1명.
+  상세 규약은 [`.github/CONTRIBUTING.md`](.github/CONTRIBUTING.md)를 따른다.
