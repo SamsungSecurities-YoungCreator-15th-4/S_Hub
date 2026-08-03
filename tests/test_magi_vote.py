@@ -366,6 +366,7 @@ def test_header_records_sampling_condition_and_null_result_phrasing():
         temperature=0.0,
         seed=None,
         runs=3,
+        langsmith_tracing=False,
     )
     assert header["temperature"] == 0.0
     assert header["seed"] is None
@@ -390,6 +391,7 @@ def test_header_records_axis_purity_limit():
         temperature=0.0,
         seed=None,
         runs=3,
+        langsmith_tracing=False,
     )
     caveat = header["axis_purity_caveat"]
     assert "단독으로 걸린 사례는 1건" in caveat
@@ -479,6 +481,7 @@ def test_submission_header_has_no_goldenset_identity_fields():
         temperature=0.0,
         seed=None,
         runs=MAGI_RUNS,
+        langsmith_tracing=False,
     )
 
     assert header["mode"] == "submission"
@@ -506,6 +509,7 @@ def test_goldenset_header_still_declares_its_mode():
         temperature=0.0,
         seed=None,
         runs=MAGI_RUNS,
+        langsmith_tracing=False,
     )
     assert header["mode"] == "goldenset"
     assert header["submission_states"] is None
@@ -586,3 +590,23 @@ def test_main_loads_env_before_building_the_llm(monkeypatch, capsys):
 
     assert exit_info.value.code == EXIT_OK
     assert called == [magi_vote.ROOT / ".env"]
+
+
+def test_header_records_whether_tracing_was_on():
+    """추적 상태가 산출물에 남는다 — 같은 명령이라도 키가 있으면 성격이 달라진다.
+
+    `.env`를 읽으면 `LANGSMITH_*`도 함께 올라와 원격 추적이 켜진 채 돈다.
+    이 하네스는 추적을 켜지도 끄지도 않으므로, 판단하지 않고 상태만 기록한다.
+    """
+    header = magi_vote.build_header(
+        [],
+        targets=FAKE_TARGETS,
+        code_sha="deadbeef",
+        evalset_hash="0" * 64,
+        temperature=0.0,
+        seed=None,
+        runs=MAGI_RUNS,
+        langsmith_tracing=True,
+    )
+
+    assert header["langsmith_tracing"] is True
