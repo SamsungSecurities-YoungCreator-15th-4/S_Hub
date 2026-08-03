@@ -44,6 +44,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
@@ -743,6 +745,11 @@ def _print_submission_plan(cases: list[dict], runs: int) -> None:
 
 
 def main() -> None:
+    # 실제 Azure 실행에 필요한 키를 .env에서 불러온다(judge_runner.py·run_graph.py와
+    # 동일 패턴). 이 하네스는 judge_runner의 `_real_llm`만 빌려 쓰고 그 main()을
+    # 거치지 않으므로 여기서 직접 부른다 — 없으면 런북 §3.6 명령이 환경 변수 누락
+    # RuntimeError로 끝나 제출 전 확인 자체가 성립하지 않는다.
+    load_dotenv(ROOT / ".env")
     parser = argparse.ArgumentParser(
         description="같은 입력에 judge를 3회 돌려 LLM 판정 축의 흔들림을 기록한다(관측 전용)."
     )
