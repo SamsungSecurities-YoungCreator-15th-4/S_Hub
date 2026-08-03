@@ -7,9 +7,9 @@
   "prompt_version": "v6",
   "verifications": [
     {
-      "item": "app/rag/citations.py 동작 동일 확인",
-      "method": "git diff b03560080367f0ba485a32336746c4293359687e fbc85f4a93bc23558f0c5f30e7e004a80230f0db -- app/rag/citations.py",
-      "result": "diff 없음(0줄) — v1 이후 citations.py 미변경. source_validity 축 비교는 code_sha 차이와 무관하게 유효함",
+      "item": "출처 검증 사슬(citations.py -> goldenset_loader.py -> rubric.source_validity()) 동작 동일 확인",
+      "method": "git diff b03560080367f0ba485a32336746c4293359687e(v1 code_sha) fbc85f4a93bc23558f0c5f30e7e004a80230f0db(이 실행의 code_sha) -- app/rag/citations.py app/evaluation/goldenset_loader.py; source_validity() 함수 본문 직접 대조",
+      "result": "citations.py: diff 없음(blob 해시 동일). goldenset_loader.py: diff 없음. source_validity() 함수 본문: v1과 바이트 단위 동일. 같은 구간에서 app/judge/rubric.py 전체는 다른 축 코드 변경으로 수정됐으나, 출처 검증 사슬 3곳(citations.py·goldenset_loader.py·source_validity())은 전부 미변경이라 source_validity 축 비교는 code_sha 차이와 무관하게 유효함.",
       "verified_at": "2026-08-04",
       "verified_by": "지은"
     }
