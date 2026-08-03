@@ -408,3 +408,160 @@ def test_control_group_is_labelled():
     assert summary["by_group"]["control"]["cases"] == 1
     assert summary["by_group"]["primary"]["cases"] == 0
     assert aggregate_case(record)["group"] == "control"
+
+
+# --- 제출 번들 모드 -----------------------------------------------------------
+#
+# R5 라이브 재현 대비. 골든셋과 달리 사람 라벨이 없고, 흔들림이 '관측 대상'이
+# 아니라 '제출 가부 신호'라 종료 코드가 달라진다.
+def _dump(tmp_path, name: str, state: dict) -> Path:
+    """run_graph.py --dump-state 산출물을 흉내 낸 파일을 만든다."""
+    from app.evidence.state_dump import dump_state
+
+    return dump_state(state, tmp_path / f"{name}.json")
+
+
+def test_load_state_cases_strips_nondeterministic_keys(tmp_path):
+    """trace_id는 걷어낸다 — 관측용 재호출이 제출 트레이스에 섞이면 안 된다."""
+    state = {"trace_id": "run-abc", "metrics": {"a": 1}, "explanations": [], "citations": []}
+    case = magi_vote.load_state_cases([_dump(tmp_path, "state_pass1", state)])[0]
+
+    assert case["case_id"] == "state_pass1"
+    assert "trace_id" not in case["state"]
+    assert case["state"]["metrics"] == {"a": 1}
+    assert len(case["state_sha256"]) == 64
+
+
+def test_state_sha256_ignores_trace_id_but_tracks_content(tmp_path):
+    """같은 산출물이면 같은 지문, 내용이 바뀌면 다른 지문이어야 대조에 쓸 수 있다."""
+    base = {"trace_id": "run-1", "metrics": {"var": 1.0}}
+    other_trace = {"trace_id": "run-2", "metrics": {"var": 1.0}}
+    other_content = {"trace_id": "run-1", "metrics": {"var": 2.0}}
+
+    first = magi_vote.load_state_cases([_dump(tmp_path, "a", base)])[0]
+    second = magi_vote.load_state_cases([_dump(tmp_path, "b", other_trace)])[0]
+    third = magi_vote.load_state_cases([_dump(tmp_path, "c", other_content)])[0]
+
+    assert first["state_sha256"] == second["state_sha256"]
+    assert first["state_sha256"] != third["state_sha256"]
+
+
+def test_load_state_cases_rejects_duplicate_case_id(tmp_path):
+    """파일 이름이 사례 ID다 — 겹치면 집계에서 조용히 섞이므로 멈춘다."""
+    first = _dump(tmp_path, "state_pass1", {"metrics": {}})
+    nested = tmp_path / "다른폴더"
+    nested.mkdir()
+    second = _dump(nested, "state_pass1", {"metrics": {}})
+
+    with pytest.raises(SystemExit, match="사례 ID가 겹칩니다"):
+        magi_vote.load_state_cases([first, second])
+
+
+def test_load_state_cases_rejects_missing_file(tmp_path):
+    with pytest.raises(SystemExit, match="찾을 수 없습니다"):
+        magi_vote.load_state_cases([tmp_path / "없는파일.json"])
+
+
+def test_submission_header_has_no_goldenset_identity_fields():
+    """평가셋도 표본 동결도 없는 모드다 — 빈 값을 그럴듯하게 채우지 않는다."""
+    header = magi_vote.build_header(
+        [
+            {
+                "case_id": "state_pass1",
+                "runs": [],
+                "state_sha256": "a" * 64,
+                "source_path": "out/state_pass1.json",
+            }
+        ],
+        targets=None,
+        code_sha="deadbeef",
+        evalset_hash=None,
+        temperature=0.0,
+        seed=None,
+        runs=MAGI_RUNS,
+    )
+
+    assert header["mode"] == "submission"
+    assert header["targets"] is None
+    assert header["targets_sha256"] is None
+    assert header["evalset_hash"] is None
+    assert header["axis_purity_caveat"] is None
+    assert header["submission_states"] == [
+        {
+            "case_id": "state_pass1",
+            "state_sha256": "a" * 64,
+            "source_path": "out/state_pass1.json",
+        }
+    ]
+    # 건수는 표본이 아니라 실제 대상 수에서 온다.
+    assert header["cases"] == 1
+
+
+def test_goldenset_header_still_declares_its_mode():
+    header = magi_vote.build_header(
+        [],
+        targets=FAKE_TARGETS,
+        code_sha="deadbeef",
+        evalset_hash="0" * 64,
+        temperature=0.0,
+        seed=None,
+        runs=MAGI_RUNS,
+    )
+    assert header["mode"] == "goldenset"
+    assert header["submission_states"] is None
+    assert header["targets_sha256"] == MAGI_TARGETS_SHA256
+
+
+def test_submission_group_appears_in_aggregate():
+    """primary·control 두 칸은 유지하고 submission을 덧붙인다."""
+    record = _record_with_llm_votes([True, True, True])
+    record["group"] = magi_vote.SUBMISSION_GROUP
+    summary = aggregate([record])
+
+    assert summary["by_group"][magi_vote.SUBMISSION_GROUP]["cases"] == 1
+    assert summary["by_group"]["primary"]["cases"] == 0
+    assert summary["by_group"]["control"]["cases"] == 0
+
+
+def test_submission_mode_exits_nonzero_when_llm_axis_splits():
+    """제출 모드에서 흔들림은 관측이 아니라 제출 가부 신호다."""
+    record = _record_with_llm_votes([True, False, True])
+    record["group"] = magi_vote.SUBMISSION_GROUP
+    report = build_report([record], header={"mode": "submission"})
+
+    assert report["summary"]["unstable_cases"] == 1
+    assert exit_code_for(report) == magi_vote.EXIT_SUBMISSION_UNSTABLE
+
+
+def test_goldenset_mode_stays_zero_when_llm_axis_splits():
+    """같은 3표라도 골든셋 모드는 0으로 끝난다 — 그쪽은 흔들림을 재는 게 목적이다."""
+    record = _record_with_llm_votes([True, False, True])
+    report = build_report([record], header={"mode": "goldenset"})
+
+    assert report["summary"]["unstable_cases"] == 1
+    assert exit_code_for(report) == EXIT_OK
+
+
+def test_deterministic_drift_wins_over_submission_instability():
+    """결정론 축이 갈렸으면 그게 먼저다 — 코드 결함이 제출 가부보다 앞선다."""
+    record = _record_with_llm_votes([True, False, True])
+    record["group"] = magi_vote.SUBMISSION_GROUP
+    record["runs"][0]["axes"]["disclaimer"]["passed"] = False
+    report = build_report([record], header={"mode": "submission"})
+
+    assert exit_code_for(report) == EXIT_DETERMINISTIC_DRIFT
+
+
+def test_run_submission_records_which_dump_was_measured(scripted_judge, tmp_path):
+    """어느 산출물을 쟀는지가 기록에 남아야 서류철과 대조할 수 있다."""
+    scripted_judge([PASS_AXES, PASS_AXES, PASS_AXES])
+    cases = magi_vote.load_state_cases(
+        [_dump(tmp_path, "state_block", {"metrics": {}, "explanations": [], "citations": []})]
+    )
+
+    records = magi_vote.run_submission(cases, llm=object(), runs=MAGI_RUNS)
+
+    assert records[0]["group"] == magi_vote.SUBMISSION_GROUP
+    assert records[0]["state_sha256"] == cases[0]["state_sha256"]
+    assert records[0]["source_path"] == cases[0]["source_path"]
+    assert len(records[0]["runs"]) == MAGI_RUNS
