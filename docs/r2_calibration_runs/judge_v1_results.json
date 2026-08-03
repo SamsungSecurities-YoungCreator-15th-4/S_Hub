@@ -1,0 +1,2722 @@
+[
+  {
+    "as_of_date": "2026-07-24",
+    "case_content_sha256": "34146f6f48eaf5f44232c8fae6f7d297f93fc70f3d3167bf971db6ae88807c29",
+    "case_id": "case_001",
+    "checks": [
+      {
+        "detail": "리스크 지표 존재",
+        "name": "metrics_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "재현성 computation_hash 존재",
+        "name": "computation_hash_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "설명 5건",
+        "name": "explanations_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "주요 설명 문장 텍스트 존재",
+        "name": "explanations_have_text",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "검증 실패/형식 오류 인용 0건",
+        "name": "citations_all_verified",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "인용 구조 확인: 검증 통과 인용 5건",
+        "name": "verified_citations_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "인용 5건의 인용문·문서명·조항/주장·청크 일치",
+        "name": "citation_content_contract",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "HITL 승인 잠금 상태",
+        "name": "approval_locked",
+        "passed": true,
+        "required": false
+      },
+      {
+        "detail": "출처 정책 게이트 충족: 검증 통과 인용 5건",
+        "name": "source_validity",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "설명문의 엔진 수치·기준일은 metrics와 일치하고 인용 사실은 검증 인용과 일치합니다. (engine_metric=33, evidence_fact=0)",
+        "name": "numeric_consistency",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "제공된 설명문은 모든 실질적 주장에 대해 검증된 인용문 또는 해당 청크 원문으로 뒷받침되고 있습니다. 또한, 투자 권유·수익 보장이 아니라는 의무 면책문은 외부 사실 주장이 아니므로 인용 부재만으로 fail하지 않습니다.",
+        "name": "hallucination",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "VaR와 CVaR 값이 신뢰수준과 신뢰구간을 명시하며, 추정치임을 명확히 서술하고 있습니다. 또한, 10일 값의 산출 방식이 근사임을 명시하고, 구간 표현을 통해 불확실성을 반영하였습니다. 따라서 false_precision에 해당하지 않습니다.",
+        "name": "false_precision",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "기준일과 면책 문구가 존재합니다.",
+        "name": "disclaimer",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "금지 표현이 없거나 명시적으로 부정되었습니다.",
+        "name": "prohibited_expression",
+        "passed": true,
+        "required": true
+      }
+    ],
+    "code_sha": "b03560080367f0ba485a32336746c4293359687e",
+    "freeze_commit": "58d5e2b4fa62e37c56a1a083e83650272aa13015",
+    "input_set_hash": "2dc161f7e3de3f88d908670ada8d983a5f952e2ddc4a2a195b88206ef482819d",
+    "judge_attempt": 1,
+    "judge_feedback": "",
+    "langsmith_run_id": "cf0444c8-2b28-40a2-826b-eb109159c3c6",
+    "langsmith_trace_url": "https://apac.smith.langchain.com/o/3f716f7f-2a7d-46fe-93b2-7b0aaa823a34/projects/p/21f66d0d-bc80-49a3-bdc9-d314b381a283/r/cf0444c8-2b28-40a2-826b-eb109159c3c6?poll=true",
+    "manual_review_flags": [],
+    "model_version": {
+      "api_version": "2025-01-01-preview",
+      "deployment": "ai-insight-llm",
+      "model": "gpt-4o-2024-11-20"
+    },
+    "passed": true,
+    "prompt_hash": "2de0b693a3c0126d52173f0028b37d65b250119f3bbbc5c7200acd0e7a9fb19b",
+    "prompt_version": "v1",
+    "reason": "필수 품질 점검 통과",
+    "rubric": {
+      "disclaimer": {
+        "passed": true,
+        "reason": "기준일과 면책 문구가 존재합니다."
+      },
+      "false_precision": {
+        "passed": true,
+        "reason": "VaR와 CVaR 값이 신뢰수준과 신뢰구간을 명시하며, 추정치임을 명확히 서술하고 있습니다. 또한, 10일 값의 산출 방식이 근사임을 명시하고, 구간 표현을 통해 불확실성을 반영하였습니다. 따라서 false_precision에 해당하지 않습니다."
+      },
+      "hallucination": {
+        "passed": true,
+        "reason": "제공된 설명문은 모든 실질적 주장에 대해 검증된 인용문 또는 해당 청크 원문으로 뒷받침되고 있습니다. 또한, 투자 권유·수익 보장이 아니라는 의무 면책문은 외부 사실 주장이 아니므로 인용 부재만으로 fail하지 않습니다."
+      },
+      "numeric_consistency": {
+        "passed": true,
+        "reason": "설명문의 엔진 수치·기준일은 metrics와 일치하고 인용 사실은 검증 인용과 일치합니다. (engine_metric=33, evidence_fact=0)"
+      },
+      "prohibited_expression": {
+        "passed": true,
+        "reason": "금지 표현이 없거나 명시적으로 부정되었습니다."
+      },
+      "source_validity": {
+        "passed": true,
+        "reason": "출처 정책 게이트 충족: 검증 통과 인용 5건"
+      }
+    },
+    "strict_citation_gate": true,
+    "trace_id": "local-case_001"
+  },
+  {
+    "as_of_date": "2026-07-24",
+    "case_content_sha256": "3ddab089bb43fad0662975b27cbe762f4cca5172f44376acc68e4bd1328c5d60",
+    "case_id": "case_002",
+    "checks": [
+      {
+        "detail": "리스크 지표 존재",
+        "name": "metrics_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "재현성 computation_hash 존재",
+        "name": "computation_hash_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "설명 5건",
+        "name": "explanations_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "주요 설명 문장 텍스트 존재",
+        "name": "explanations_have_text",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "검증 실패/형식 오류 인용 0건",
+        "name": "citations_all_verified",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "인용 구조 확인: 검증 통과 인용 1건",
+        "name": "verified_citations_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "인용 1건의 인용문·문서명·조항/주장·청크 일치",
+        "name": "citation_content_contract",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "HITL 승인 잠금 상태",
+        "name": "approval_locked",
+        "passed": true,
+        "required": false
+      },
+      {
+        "detail": "출처 정책 게이트 충족: 검증 통과 인용 1건",
+        "name": "source_validity",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "설명문의 엔진 수치·기준일은 metrics와 일치하고 인용 사실은 검증 인용과 일치합니다. (engine_metric=16, evidence_fact=0)",
+        "name": "numeric_consistency",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "설명문의 모든 실질적 주장이 제공된 인용문 또는 해당 청크 원문으로 뒷받침되며, 외부 지식을 사용하지 않았습니다.",
+        "name": "hallucination",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "리포트는 확률·손실을 정밀하게 단정하지 않고, 신뢰수준(99%)과 보유기간(1일, 10일)을 명시하며, 약·추정·범위·신뢰구간 표현을 적절히 사용하였습니다. 또한 환산 한계와 가정의 한계를 명확히 언급하여 false_precision을 피했습니다.",
+        "name": "false_precision",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "기준일과 면책 문구가 존재합니다.",
+        "name": "disclaimer",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "금지 표현이 없거나 명시적으로 부정되었습니다.",
+        "name": "prohibited_expression",
+        "passed": true,
+        "required": true
+      }
+    ],
+    "code_sha": "b03560080367f0ba485a32336746c4293359687e",
+    "freeze_commit": "58d5e2b4fa62e37c56a1a083e83650272aa13015",
+    "input_set_hash": "2dc161f7e3de3f88d908670ada8d983a5f952e2ddc4a2a195b88206ef482819d",
+    "judge_attempt": 1,
+    "judge_feedback": "",
+    "langsmith_run_id": "8ee105a4-52c0-483b-85fa-40115f1c4275",
+    "langsmith_trace_url": "https://apac.smith.langchain.com/o/3f716f7f-2a7d-46fe-93b2-7b0aaa823a34/projects/p/21f66d0d-bc80-49a3-bdc9-d314b381a283/r/8ee105a4-52c0-483b-85fa-40115f1c4275?poll=true",
+    "manual_review_flags": [],
+    "model_version": {
+      "api_version": "2025-01-01-preview",
+      "deployment": "ai-insight-llm",
+      "model": "gpt-4o-2024-11-20"
+    },
+    "passed": true,
+    "prompt_hash": "94df04e612b8f4cc4e24fc9626bea433acf18a0e4b92d4f52992f3b4181f2d3c",
+    "prompt_version": "v1",
+    "reason": "필수 품질 점검 통과",
+    "rubric": {
+      "disclaimer": {
+        "passed": true,
+        "reason": "기준일과 면책 문구가 존재합니다."
+      },
+      "false_precision": {
+        "passed": true,
+        "reason": "리포트는 확률·손실을 정밀하게 단정하지 않고, 신뢰수준(99%)과 보유기간(1일, 10일)을 명시하며, 약·추정·범위·신뢰구간 표현을 적절히 사용하였습니다. 또한 환산 한계와 가정의 한계를 명확히 언급하여 false_precision을 피했습니다."
+      },
+      "hallucination": {
+        "passed": true,
+        "reason": "설명문의 모든 실질적 주장이 제공된 인용문 또는 해당 청크 원문으로 뒷받침되며, 외부 지식을 사용하지 않았습니다."
+      },
+      "numeric_consistency": {
+        "passed": true,
+        "reason": "설명문의 엔진 수치·기준일은 metrics와 일치하고 인용 사실은 검증 인용과 일치합니다. (engine_metric=16, evidence_fact=0)"
+      },
+      "prohibited_expression": {
+        "passed": true,
+        "reason": "금지 표현이 없거나 명시적으로 부정되었습니다."
+      },
+      "source_validity": {
+        "passed": true,
+        "reason": "출처 정책 게이트 충족: 검증 통과 인용 1건"
+      }
+    },
+    "strict_citation_gate": true,
+    "trace_id": "local-case_002"
+  },
+  {
+    "as_of_date": "2026-07-24",
+    "case_content_sha256": "de646a3d3f8c0a183881382a715b0ac8b0926ea23f3dc94a1380e0163de0f73f",
+    "case_id": "case_003",
+    "checks": [
+      {
+        "detail": "리스크 지표 존재",
+        "name": "metrics_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "재현성 computation_hash 존재",
+        "name": "computation_hash_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "설명 5건",
+        "name": "explanations_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "주요 설명 문장 텍스트 존재",
+        "name": "explanations_have_text",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "검증 실패/형식 오류 인용 0건",
+        "name": "citations_all_verified",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "인용 구조 확인: 검증 통과 인용 4건",
+        "name": "verified_citations_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "인용 4건의 인용문·문서명·조항/주장·청크 일치",
+        "name": "citation_content_contract",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "HITL 승인 잠금 상태",
+        "name": "approval_locked",
+        "passed": true,
+        "required": false
+      },
+      {
+        "detail": "출처 정책 게이트 충족: 검증 통과 인용 4건",
+        "name": "source_validity",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "설명문의 엔진 수치·기준일은 metrics와 일치하고 인용 사실은 검증 인용과 일치합니다. (engine_metric=33, evidence_fact=0)",
+        "name": "numeric_consistency",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "모든 설명문의 실질적 주장이 검증된 인용문 또는 해당 청크 원문으로 뒷받침되며, 외부 지식에 의존한 주장이 없습니다.",
+        "name": "hallucination",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "리포트는 확률·손실을 정밀하게 단정하지 않고, 신뢰수준과 신뢰구간을 명시하며, 약·추정·범위 표현을 사용하여 결과를 제시하고 있습니다. 또한, 보유기간 환산 방법과 가정에 대해 명확히 설명하고 있으며, 시나리오 가정을 결과와 함께 제시하여 false_precision을 회피하고 있습니다.",
+        "name": "false_precision",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "기준일과 면책 문구가 존재합니다.",
+        "name": "disclaimer",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "금지 표현이 없거나 명시적으로 부정되었습니다.",
+        "name": "prohibited_expression",
+        "passed": true,
+        "required": true
+      }
+    ],
+    "code_sha": "b03560080367f0ba485a32336746c4293359687e",
+    "freeze_commit": "58d5e2b4fa62e37c56a1a083e83650272aa13015",
+    "input_set_hash": "2dc161f7e3de3f88d908670ada8d983a5f952e2ddc4a2a195b88206ef482819d",
+    "judge_attempt": 1,
+    "judge_feedback": "",
+    "langsmith_run_id": "9781eef0-7a6c-4712-877f-c88eb98fd6c9",
+    "langsmith_trace_url": "https://apac.smith.langchain.com/o/3f716f7f-2a7d-46fe-93b2-7b0aaa823a34/projects/p/21f66d0d-bc80-49a3-bdc9-d314b381a283/r/9781eef0-7a6c-4712-877f-c88eb98fd6c9?poll=true",
+    "manual_review_flags": [],
+    "model_version": {
+      "api_version": "2025-01-01-preview",
+      "deployment": "ai-insight-llm",
+      "model": "gpt-4o-2024-11-20"
+    },
+    "passed": true,
+    "prompt_hash": "b22c7a52ab255ba58e6e667a206054c624bef5ca14681446078cc5d43afcdfb3",
+    "prompt_version": "v1",
+    "reason": "필수 품질 점검 통과",
+    "rubric": {
+      "disclaimer": {
+        "passed": true,
+        "reason": "기준일과 면책 문구가 존재합니다."
+      },
+      "false_precision": {
+        "passed": true,
+        "reason": "리포트는 확률·손실을 정밀하게 단정하지 않고, 신뢰수준과 신뢰구간을 명시하며, 약·추정·범위 표현을 사용하여 결과를 제시하고 있습니다. 또한, 보유기간 환산 방법과 가정에 대해 명확히 설명하고 있으며, 시나리오 가정을 결과와 함께 제시하여 false_precision을 회피하고 있습니다."
+      },
+      "hallucination": {
+        "passed": true,
+        "reason": "모든 설명문의 실질적 주장이 검증된 인용문 또는 해당 청크 원문으로 뒷받침되며, 외부 지식에 의존한 주장이 없습니다."
+      },
+      "numeric_consistency": {
+        "passed": true,
+        "reason": "설명문의 엔진 수치·기준일은 metrics와 일치하고 인용 사실은 검증 인용과 일치합니다. (engine_metric=33, evidence_fact=0)"
+      },
+      "prohibited_expression": {
+        "passed": true,
+        "reason": "금지 표현이 없거나 명시적으로 부정되었습니다."
+      },
+      "source_validity": {
+        "passed": true,
+        "reason": "출처 정책 게이트 충족: 검증 통과 인용 4건"
+      }
+    },
+    "strict_citation_gate": true,
+    "trace_id": "local-case_003"
+  },
+  {
+    "as_of_date": "2026-07-24",
+    "case_content_sha256": "5e6311bf582708d78b5432483356289f3c6517e131b6ef0a9903f3861c1afb7a",
+    "case_id": "case_004",
+    "checks": [
+      {
+        "detail": "리스크 지표 존재",
+        "name": "metrics_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "재현성 computation_hash 존재",
+        "name": "computation_hash_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "설명 6건",
+        "name": "explanations_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "주요 설명 문장 텍스트 존재",
+        "name": "explanations_have_text",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "검증 실패/형식 오류 인용 0건",
+        "name": "citations_all_verified",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "인용 구조 확인: 검증 통과 인용 2건",
+        "name": "verified_citations_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "인용 2건의 인용문·문서명·조항/주장·청크 일치",
+        "name": "citation_content_contract",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "HITL 승인 잠금 상태",
+        "name": "approval_locked",
+        "passed": true,
+        "required": false
+      },
+      {
+        "detail": "출처 정책 게이트 충족: 검증 통과 인용 2건",
+        "name": "source_validity",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "설명 수치 8%가 같은 topic의 검증 인용에 없음",
+        "name": "numeric_consistency",
+        "passed": false,
+        "required": true
+      },
+      {
+        "detail": "모든 설명문의 실질적 주장이 검증된 인용문 또는 해당 청크 원문으로 뒷받침되며, 외부 지식에 의존한 주장이 없습니다.",
+        "name": "hallucination",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "VaR 및 CVaR 수치가 신뢰수준과 보유기간을 명시하고 있으며, 환산 과정에서 근사 및 가정의 한계를 명확히 언급하여 false_precision을 피했습니다.",
+        "name": "false_precision",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "기준일과 면책 문구가 존재합니다.",
+        "name": "disclaimer",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "금지 표현이 없거나 명시적으로 부정되었습니다.",
+        "name": "prohibited_expression",
+        "passed": true,
+        "required": true
+      }
+    ],
+    "code_sha": "b03560080367f0ba485a32336746c4293359687e",
+    "freeze_commit": "58d5e2b4fa62e37c56a1a083e83650272aa13015",
+    "input_set_hash": "2dc161f7e3de3f88d908670ada8d983a5f952e2ddc4a2a195b88206ef482819d",
+    "judge_attempt": 1,
+    "judge_feedback": "{\"action\": \"rag_cite_rewrite\", \"attempt\": 1, \"failed_axes\": [{\"axis\": \"numeric_consistency\", \"reason\": \"설명 수치 8%가 같은 topic의 검증 인용에 없음\"}]}",
+    "langsmith_run_id": "555e8ce2-debf-4169-9bec-e9ae2624d0f1",
+    "langsmith_trace_url": "https://apac.smith.langchain.com/o/3f716f7f-2a7d-46fe-93b2-7b0aaa823a34/projects/p/21f66d0d-bc80-49a3-bdc9-d314b381a283/r/555e8ce2-debf-4169-9bec-e9ae2624d0f1?poll=true",
+    "manual_review_flags": [],
+    "model_version": {
+      "api_version": "2025-01-01-preview",
+      "deployment": "ai-insight-llm",
+      "model": "gpt-4o-2024-11-20"
+    },
+    "passed": false,
+    "prompt_hash": "c286a2c45a007f9d834d2180e09394a84905cfc29299c09618c069b363838419",
+    "prompt_version": "v1",
+    "reason": "필수 품질 점검 실패: numeric_consistency=설명 수치 8%가 같은 topic의 검증 인용에 없음",
+    "rubric": {
+      "disclaimer": {
+        "passed": true,
+        "reason": "기준일과 면책 문구가 존재합니다."
+      },
+      "false_precision": {
+        "passed": true,
+        "reason": "VaR 및 CVaR 수치가 신뢰수준과 보유기간을 명시하고 있으며, 환산 과정에서 근사 및 가정의 한계를 명확히 언급하여 false_precision을 피했습니다."
+      },
+      "hallucination": {
+        "passed": true,
+        "reason": "모든 설명문의 실질적 주장이 검증된 인용문 또는 해당 청크 원문으로 뒷받침되며, 외부 지식에 의존한 주장이 없습니다."
+      },
+      "numeric_consistency": {
+        "passed": false,
+        "reason": "설명 수치 8%가 같은 topic의 검증 인용에 없음"
+      },
+      "prohibited_expression": {
+        "passed": true,
+        "reason": "금지 표현이 없거나 명시적으로 부정되었습니다."
+      },
+      "source_validity": {
+        "passed": true,
+        "reason": "출처 정책 게이트 충족: 검증 통과 인용 2건"
+      }
+    },
+    "strict_citation_gate": true,
+    "trace_id": "local-case_004"
+  },
+  {
+    "as_of_date": "2026-07-24",
+    "case_content_sha256": "dd0cb63f78510b3fe5293d1d09abb4417b5132dde4f4bce425310595a3ca5729",
+    "case_id": "case_005",
+    "checks": [
+      {
+        "detail": "리스크 지표 존재",
+        "name": "metrics_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "재현성 computation_hash 존재",
+        "name": "computation_hash_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "설명 6건",
+        "name": "explanations_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "주요 설명 문장 텍스트 존재",
+        "name": "explanations_have_text",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "검증 실패/형식 오류 인용 0건",
+        "name": "citations_all_verified",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "인용 구조 확인: 검증 통과 인용 3건",
+        "name": "verified_citations_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "인용 3건의 인용문·문서명·조항/주장·청크 일치",
+        "name": "citation_content_contract",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "HITL 승인 잠금 상태",
+        "name": "approval_locked",
+        "passed": true,
+        "required": false
+      },
+      {
+        "detail": "출처 정책 게이트 충족: 검증 통과 인용 3건",
+        "name": "source_validity",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "설명문의 엔진 수치·기준일은 metrics와 일치하고 인용 사실은 검증 인용과 일치합니다. (engine_metric=29, evidence_fact=0)",
+        "name": "numeric_consistency",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "설명문에서 '현재 배분은 중립 성향 고객을 위한 최적 배분이며, 세후 기준으로도 대안 배분안보다 나은 결과를 보입니다.'라는 주장이 검증된 인용문이나 해당 청크 원문으로 뒷받침되지 않았습니다.",
+        "name": "hallucination",
+        "passed": false,
+        "required": true
+      },
+      {
+        "detail": "VaR와 CVaR 값이 신뢰수준과 보유기간을 명시하여 제시되었으며, 신뢰구간 및 근사 표현을 사용하여 과도한 정밀성을 피했습니다. 또한, 독립동일분포 가정의 한계를 명시하여 환산값의 한계를 설명하였습니다. 따라서 false_precision 기준을 충족합니다.",
+        "name": "false_precision",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "기준일과 면책 문구가 존재합니다.",
+        "name": "disclaimer",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "금지 표현이 없거나 명시적으로 부정되었습니다.",
+        "name": "prohibited_expression",
+        "passed": true,
+        "required": true
+      }
+    ],
+    "code_sha": "b03560080367f0ba485a32336746c4293359687e",
+    "freeze_commit": "58d5e2b4fa62e37c56a1a083e83650272aa13015",
+    "input_set_hash": "2dc161f7e3de3f88d908670ada8d983a5f952e2ddc4a2a195b88206ef482819d",
+    "judge_attempt": 1,
+    "judge_feedback": "{\"action\": \"rag_cite_rewrite\", \"attempt\": 1, \"failed_axes\": [{\"axis\": \"hallucination\", \"reason\": \"설명문에서 '현재 배분은 중립 성향 고객을 위한 최적 배분이며, 세후 기준으로도 대안 배분안보다 나은 결과를 보입니다.'라는 주장이 검증된 인용문이나 해당 청크 원문으로 뒷받침되지 않았습니다.\"}]}",
+    "langsmith_run_id": "7689a69d-77c4-4b4f-8c45-419618adbe53",
+    "langsmith_trace_url": "https://apac.smith.langchain.com/o/3f716f7f-2a7d-46fe-93b2-7b0aaa823a34/projects/p/21f66d0d-bc80-49a3-bdc9-d314b381a283/r/7689a69d-77c4-4b4f-8c45-419618adbe53?poll=true",
+    "manual_review_flags": [],
+    "model_version": {
+      "api_version": "2025-01-01-preview",
+      "deployment": "ai-insight-llm",
+      "model": "gpt-4o-2024-11-20"
+    },
+    "passed": false,
+    "prompt_hash": "4a21a8cf88b5b5099adfe5a7b26645589b0412920f6b87e2d40a10d3f5976e51",
+    "prompt_version": "v1",
+    "reason": "필수 품질 점검 실패: hallucination=설명문에서 '현재 배분은 중립 성향 고객을 위한 최적 배분이며, 세후 기준으로도 대안 배분안보다 나은 결과를 보입니다.'라는 주장이 검증된 인용문이나 해당 청크 원문으로 뒷받침되지 않았습니다.",
+    "rubric": {
+      "disclaimer": {
+        "passed": true,
+        "reason": "기준일과 면책 문구가 존재합니다."
+      },
+      "false_precision": {
+        "passed": true,
+        "reason": "VaR와 CVaR 값이 신뢰수준과 보유기간을 명시하여 제시되었으며, 신뢰구간 및 근사 표현을 사용하여 과도한 정밀성을 피했습니다. 또한, 독립동일분포 가정의 한계를 명시하여 환산값의 한계를 설명하였습니다. 따라서 false_precision 기준을 충족합니다."
+      },
+      "hallucination": {
+        "passed": false,
+        "reason": "설명문에서 '현재 배분은 중립 성향 고객을 위한 최적 배분이며, 세후 기준으로도 대안 배분안보다 나은 결과를 보입니다.'라는 주장이 검증된 인용문이나 해당 청크 원문으로 뒷받침되지 않았습니다."
+      },
+      "numeric_consistency": {
+        "passed": true,
+        "reason": "설명문의 엔진 수치·기준일은 metrics와 일치하고 인용 사실은 검증 인용과 일치합니다. (engine_metric=29, evidence_fact=0)"
+      },
+      "prohibited_expression": {
+        "passed": true,
+        "reason": "금지 표현이 없거나 명시적으로 부정되었습니다."
+      },
+      "source_validity": {
+        "passed": true,
+        "reason": "출처 정책 게이트 충족: 검증 통과 인용 3건"
+      }
+    },
+    "strict_citation_gate": true,
+    "trace_id": "local-case_005"
+  },
+  {
+    "as_of_date": "2026-07-24",
+    "case_content_sha256": "7e78222300c424d663360da82b1084403573687dfb545444646fd8f9eecfdf22",
+    "case_id": "case_006",
+    "checks": [
+      {
+        "detail": "리스크 지표 존재",
+        "name": "metrics_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "재현성 computation_hash 존재",
+        "name": "computation_hash_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "설명 5건",
+        "name": "explanations_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "주요 설명 문장 텍스트 존재",
+        "name": "explanations_have_text",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "검증 실패/형식 오류 인용 0건",
+        "name": "citations_all_verified",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "인용 구조 확인: 검증 통과 인용 3건",
+        "name": "verified_citations_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "인용 3건의 인용문·문서명·조항/주장·청크 일치",
+        "name": "citation_content_contract",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "HITL 승인 잠금 상태",
+        "name": "approval_locked",
+        "passed": true,
+        "required": false
+      },
+      {
+        "detail": "출처 정책 게이트 충족: 검증 통과 인용 3건",
+        "name": "source_validity",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "설명 수치 90%가 metrics에 없음; 설명 수치 90%가 metrics에 없음; 설명 수치 90%가 metrics에 없음; 설명 수치 90%가 metrics에 없음",
+        "name": "numeric_consistency",
+        "passed": false,
+        "required": true
+      },
+      {
+        "detail": "모든 설명문의 실질적 주장이 제공된 인용문 또는 해당 청크 원문으로 뒷받침되고 있으며, 외부 지식을 사용하지 않았습니다.",
+        "name": "hallucination",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "VaR 및 CVaR 값이 신뢰수준과 신뢰구간을 명시하며, 추정치로 서술되었고, 환산 과정에서도 근사 및 가정의 한계를 명확히 언급하여 false_precision에 해당하지 않음.",
+        "name": "false_precision",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "기준일과 면책 문구가 존재합니다.",
+        "name": "disclaimer",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "금지 표현이 없거나 명시적으로 부정되었습니다.",
+        "name": "prohibited_expression",
+        "passed": true,
+        "required": true
+      }
+    ],
+    "code_sha": "b03560080367f0ba485a32336746c4293359687e",
+    "freeze_commit": "58d5e2b4fa62e37c56a1a083e83650272aa13015",
+    "input_set_hash": "2dc161f7e3de3f88d908670ada8d983a5f952e2ddc4a2a195b88206ef482819d",
+    "judge_attempt": 1,
+    "judge_feedback": "{\"action\": \"rag_cite_rewrite\", \"attempt\": 1, \"failed_axes\": [{\"axis\": \"numeric_consistency\", \"reason\": \"설명 수치 90%가 metrics에 없음; 설명 수치 90%가 metrics에 없음; 설명 수치 90%가 metrics에 없음; 설명 수치 90%가 metrics에 없음\"}]}",
+    "langsmith_run_id": "4760aa62-f2f6-4334-9609-35177bc19c90",
+    "langsmith_trace_url": "https://apac.smith.langchain.com/o/3f716f7f-2a7d-46fe-93b2-7b0aaa823a34/projects/p/21f66d0d-bc80-49a3-bdc9-d314b381a283/r/4760aa62-f2f6-4334-9609-35177bc19c90?poll=true",
+    "manual_review_flags": [],
+    "model_version": {
+      "api_version": "2025-01-01-preview",
+      "deployment": "ai-insight-llm",
+      "model": "gpt-4o-2024-11-20"
+    },
+    "passed": false,
+    "prompt_hash": "d4659b450c775c0153a6bb63fbc25218483e775e4d1d87706c6775fa67d82469",
+    "prompt_version": "v1",
+    "reason": "필수 품질 점검 실패: numeric_consistency=설명 수치 90%가 metrics에 없음; 설명 수치 90%가 metrics에 없음; 설명 수치 90%가 metrics에 없음; 설명 수치 90%가 metrics에 없음",
+    "rubric": {
+      "disclaimer": {
+        "passed": true,
+        "reason": "기준일과 면책 문구가 존재합니다."
+      },
+      "false_precision": {
+        "passed": true,
+        "reason": "VaR 및 CVaR 값이 신뢰수준과 신뢰구간을 명시하며, 추정치로 서술되었고, 환산 과정에서도 근사 및 가정의 한계를 명확히 언급하여 false_precision에 해당하지 않음."
+      },
+      "hallucination": {
+        "passed": true,
+        "reason": "모든 설명문의 실질적 주장이 제공된 인용문 또는 해당 청크 원문으로 뒷받침되고 있으며, 외부 지식을 사용하지 않았습니다."
+      },
+      "numeric_consistency": {
+        "passed": false,
+        "reason": "설명 수치 90%가 metrics에 없음; 설명 수치 90%가 metrics에 없음; 설명 수치 90%가 metrics에 없음; 설명 수치 90%가 metrics에 없음"
+      },
+      "prohibited_expression": {
+        "passed": true,
+        "reason": "금지 표현이 없거나 명시적으로 부정되었습니다."
+      },
+      "source_validity": {
+        "passed": true,
+        "reason": "출처 정책 게이트 충족: 검증 통과 인용 3건"
+      }
+    },
+    "strict_citation_gate": true,
+    "trace_id": "local-case_006"
+  },
+  {
+    "as_of_date": "2026-07-24",
+    "case_content_sha256": "20667cad17194539610c09a6b2839135dbbb63bf36ca293ca08ec3b1acfc8cab",
+    "case_id": "case_007",
+    "checks": [
+      {
+        "detail": "리스크 지표 존재",
+        "name": "metrics_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "재현성 computation_hash 존재",
+        "name": "computation_hash_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "설명 7건",
+        "name": "explanations_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "주요 설명 문장 텍스트 존재",
+        "name": "explanations_have_text",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "검증 실패/형식 오류 인용 0건",
+        "name": "citations_all_verified",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "인용 구조 확인: 검증 통과 인용 5건",
+        "name": "verified_citations_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "인용 5건의 인용문·문서명·조항/주장·청크 일치",
+        "name": "citation_content_contract",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "HITL 승인 잠금 상태",
+        "name": "approval_locked",
+        "passed": true,
+        "required": false
+      },
+      {
+        "detail": "출처 정책 게이트 충족: 검증 통과 인용 5건",
+        "name": "source_validity",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "설명 수치 90%가 같은 topic의 검증 인용에 없음; 설명 수치 90%가 같은 topic의 검증 인용에 없음; 설명 수치 10일가 같은 topic의 검증 인용에 없음; 설명 수치 10일가 같은 topic의 검증 인용에 없음",
+        "name": "numeric_consistency",
+        "passed": false,
+        "required": true
+      },
+      {
+        "detail": "제공된 설명문의 모든 실질적 주장은 검증된 인용문 또는 해당 청크 원문으로 뒷받침되고 있습니다. 외부 지식에 의존하지 않았으며, 투자 권유·수익 보장이 아니라는 의무 면책문도 적절히 포함되어 있습니다.",
+        "name": "hallucination",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "리포트는 확률·손실을 근거 없이 정밀하게 단정하지 않았으며, 신뢰수준과 신뢰구간을 명시하여 VaR 및 CVaR 값을 적절히 표현했습니다. 또한, 보유기간 환산 과정에서 근사값임을 명확히 밝혔고, 시나리오 가정과 함께 스트레스 결과를 제시하여 false_precision을 회피했습니다.",
+        "name": "false_precision",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "기준일과 면책 문구가 존재합니다.",
+        "name": "disclaimer",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "금지 표현이 없거나 명시적으로 부정되었습니다.",
+        "name": "prohibited_expression",
+        "passed": true,
+        "required": true
+      }
+    ],
+    "code_sha": "b03560080367f0ba485a32336746c4293359687e",
+    "freeze_commit": "58d5e2b4fa62e37c56a1a083e83650272aa13015",
+    "input_set_hash": "2dc161f7e3de3f88d908670ada8d983a5f952e2ddc4a2a195b88206ef482819d",
+    "judge_attempt": 1,
+    "judge_feedback": "{\"action\": \"rag_cite_rewrite\", \"attempt\": 1, \"failed_axes\": [{\"axis\": \"numeric_consistency\", \"reason\": \"설명 수치 90%가 같은 topic의 검증 인용에 없음; 설명 수치 90%가 같은 topic의 검증 인용에 없음; 설명 수치 10일가 같은 topic의 검증 인용에 없음; 설명 수치 10일가 같은 topic의 검증 인용에 없음\"}]}",
+    "langsmith_run_id": "9f2737a0-ffca-424d-b9da-c5b3cc4ced7c",
+    "langsmith_trace_url": "https://apac.smith.langchain.com/o/3f716f7f-2a7d-46fe-93b2-7b0aaa823a34/projects/p/21f66d0d-bc80-49a3-bdc9-d314b381a283/r/9f2737a0-ffca-424d-b9da-c5b3cc4ced7c?poll=true",
+    "manual_review_flags": [],
+    "model_version": {
+      "api_version": "2025-01-01-preview",
+      "deployment": "ai-insight-llm",
+      "model": "gpt-4o-2024-11-20"
+    },
+    "passed": false,
+    "prompt_hash": "92afa643cc82d0478cd63ef0e105aec41d4e3f3708a68b9b5fb7a5a9de919f8b",
+    "prompt_version": "v1",
+    "reason": "필수 품질 점검 실패: numeric_consistency=설명 수치 90%가 같은 topic의 검증 인용에 없음; 설명 수치 90%가 같은 topic의 검증 인용에 없음; 설명 수치 10일가 같은 topic의 검증 인용에 없음; 설명 수치 10일가 같은 topic의 검증 인용에 없음",
+    "rubric": {
+      "disclaimer": {
+        "passed": true,
+        "reason": "기준일과 면책 문구가 존재합니다."
+      },
+      "false_precision": {
+        "passed": true,
+        "reason": "리포트는 확률·손실을 근거 없이 정밀하게 단정하지 않았으며, 신뢰수준과 신뢰구간을 명시하여 VaR 및 CVaR 값을 적절히 표현했습니다. 또한, 보유기간 환산 과정에서 근사값임을 명확히 밝혔고, 시나리오 가정과 함께 스트레스 결과를 제시하여 false_precision을 회피했습니다."
+      },
+      "hallucination": {
+        "passed": true,
+        "reason": "제공된 설명문의 모든 실질적 주장은 검증된 인용문 또는 해당 청크 원문으로 뒷받침되고 있습니다. 외부 지식에 의존하지 않았으며, 투자 권유·수익 보장이 아니라는 의무 면책문도 적절히 포함되어 있습니다."
+      },
+      "numeric_consistency": {
+        "passed": false,
+        "reason": "설명 수치 90%가 같은 topic의 검증 인용에 없음; 설명 수치 90%가 같은 topic의 검증 인용에 없음; 설명 수치 10일가 같은 topic의 검증 인용에 없음; 설명 수치 10일가 같은 topic의 검증 인용에 없음"
+      },
+      "prohibited_expression": {
+        "passed": true,
+        "reason": "금지 표현이 없거나 명시적으로 부정되었습니다."
+      },
+      "source_validity": {
+        "passed": true,
+        "reason": "출처 정책 게이트 충족: 검증 통과 인용 5건"
+      }
+    },
+    "strict_citation_gate": true,
+    "trace_id": "local-case_007"
+  },
+  {
+    "as_of_date": "2026-07-24",
+    "case_content_sha256": "c3b6caa5e2382010c98664d9ac6279ef78b663e3f3695f111c4c0615d9347565",
+    "case_id": "case_008",
+    "checks": [
+      {
+        "detail": "리스크 지표 존재",
+        "name": "metrics_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "재현성 computation_hash 존재",
+        "name": "computation_hash_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "설명 5건",
+        "name": "explanations_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "주요 설명 문장 텍스트 존재",
+        "name": "explanations_have_text",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "검증 실패/형식 오류 인용 0건",
+        "name": "citations_all_verified",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "인용 구조 확인: 검증 통과 인용 1건",
+        "name": "verified_citations_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "인용 1건의 인용문·문서명·조항/주장·청크 일치",
+        "name": "citation_content_contract",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "HITL 승인 잠금 상태",
+        "name": "approval_locked",
+        "passed": true,
+        "required": false
+      },
+      {
+        "detail": "출처 정책 게이트 충족: 검증 통과 인용 1건",
+        "name": "source_validity",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "설명문의 엔진 수치·기준일은 metrics와 일치하고 인용 사실은 검증 인용과 일치합니다. (engine_metric=18, evidence_fact=0)",
+        "name": "numeric_consistency",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "설명문의 모든 실질적 주장이 제공된 인용문 또는 해당 청크 원문으로 뒷받침되며, 외부 지식에 의존한 주장이 없습니다. 또한 투자 권유·수익 보장이 아니라는 의무 면책문은 외부 사실 주장이 아니므로 인용 부재만으로 fail하지 않습니다.",
+        "name": "hallucination",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "VaR와 CVaR 수치가 신뢰수준과 보유기간을 명시하고 있으며, '약', '추정', '범위', '신뢰구간' 등의 표현을 사용하여 정밀성을 단정하지 않았습니다. 또한, 10일 VaR 계산 시 독립동일분포 가정과 실제 손실 초과 가능성을 명시하여 과도한 정밀성을 피했습니다.",
+        "name": "false_precision",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "기준일과 면책 문구가 존재합니다.",
+        "name": "disclaimer",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "금지 표현이 없거나 명시적으로 부정되었습니다.",
+        "name": "prohibited_expression",
+        "passed": true,
+        "required": true
+      }
+    ],
+    "code_sha": "b03560080367f0ba485a32336746c4293359687e",
+    "freeze_commit": "58d5e2b4fa62e37c56a1a083e83650272aa13015",
+    "input_set_hash": "2dc161f7e3de3f88d908670ada8d983a5f952e2ddc4a2a195b88206ef482819d",
+    "judge_attempt": 1,
+    "judge_feedback": "",
+    "langsmith_run_id": "cacf3904-2c11-42bf-8baa-ea9029daf66d",
+    "langsmith_trace_url": "https://apac.smith.langchain.com/o/3f716f7f-2a7d-46fe-93b2-7b0aaa823a34/projects/p/21f66d0d-bc80-49a3-bdc9-d314b381a283/r/cacf3904-2c11-42bf-8baa-ea9029daf66d?poll=true",
+    "manual_review_flags": [],
+    "model_version": {
+      "api_version": "2025-01-01-preview",
+      "deployment": "ai-insight-llm",
+      "model": "gpt-4o-2024-11-20"
+    },
+    "passed": true,
+    "prompt_hash": "63708666024c5033341eaf1ce94b16f85d9f35b69d6a5d8f5496610ca6a24826",
+    "prompt_version": "v1",
+    "reason": "필수 품질 점검 통과",
+    "rubric": {
+      "disclaimer": {
+        "passed": true,
+        "reason": "기준일과 면책 문구가 존재합니다."
+      },
+      "false_precision": {
+        "passed": true,
+        "reason": "VaR와 CVaR 수치가 신뢰수준과 보유기간을 명시하고 있으며, '약', '추정', '범위', '신뢰구간' 등의 표현을 사용하여 정밀성을 단정하지 않았습니다. 또한, 10일 VaR 계산 시 독립동일분포 가정과 실제 손실 초과 가능성을 명시하여 과도한 정밀성을 피했습니다."
+      },
+      "hallucination": {
+        "passed": true,
+        "reason": "설명문의 모든 실질적 주장이 제공된 인용문 또는 해당 청크 원문으로 뒷받침되며, 외부 지식에 의존한 주장이 없습니다. 또한 투자 권유·수익 보장이 아니라는 의무 면책문은 외부 사실 주장이 아니므로 인용 부재만으로 fail하지 않습니다."
+      },
+      "numeric_consistency": {
+        "passed": true,
+        "reason": "설명문의 엔진 수치·기준일은 metrics와 일치하고 인용 사실은 검증 인용과 일치합니다. (engine_metric=18, evidence_fact=0)"
+      },
+      "prohibited_expression": {
+        "passed": true,
+        "reason": "금지 표현이 없거나 명시적으로 부정되었습니다."
+      },
+      "source_validity": {
+        "passed": true,
+        "reason": "출처 정책 게이트 충족: 검증 통과 인용 1건"
+      }
+    },
+    "strict_citation_gate": true,
+    "trace_id": "local-case_008"
+  },
+  {
+    "as_of_date": "2026-07-24",
+    "case_content_sha256": "eb29761a63a598c975166d517b17ca449d52f70b7db2cf789243651ea9b6449f",
+    "case_id": "case_009",
+    "checks": [
+      {
+        "detail": "리스크 지표 존재",
+        "name": "metrics_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "재현성 computation_hash 존재",
+        "name": "computation_hash_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "설명 4건",
+        "name": "explanations_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "주요 설명 문장 텍스트 존재",
+        "name": "explanations_have_text",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "검증 실패/형식 오류 인용 0건",
+        "name": "citations_all_verified",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "인용 구조 확인: 검증 통과 인용 2건",
+        "name": "verified_citations_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "인용 2건의 인용문·문서명·조항/주장·청크 일치",
+        "name": "citation_content_contract",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "HITL 승인 잠금 상태",
+        "name": "approval_locked",
+        "passed": true,
+        "required": false
+      },
+      {
+        "detail": "출처 정책 게이트 충족: 검증 통과 인용 2건",
+        "name": "source_validity",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "설명문의 엔진 수치·기준일은 metrics와 일치하고 인용 사실은 검증 인용과 일치합니다. (engine_metric=16, evidence_fact=0)",
+        "name": "numeric_consistency",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "설명문의 모든 실질적 주장은 제공된 인용문 또는 청크 원문으로 뒷받침되며, 검증된 기준일과 의무 면책문도 적절히 포함되어 있습니다.",
+        "name": "hallucination",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "VaR와 CVaR 값이 신뢰수준과 보유기간을 명시하며, 환산 과정에서 근사와 추정치를 명확히 언급하여 false_precision을 피했습니다. 또한, 시나리오 손익은 가상 설정임을 명시하고 단일 수치만을 제시하지 않았습니다.",
+        "name": "false_precision",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "누락: 투자 권유·손실 가능성 면책 문구",
+        "name": "disclaimer",
+        "passed": false,
+        "required": true
+      },
+      {
+        "detail": "금지 표현이 없거나 명시적으로 부정되었습니다.",
+        "name": "prohibited_expression",
+        "passed": true,
+        "required": true
+      }
+    ],
+    "code_sha": "b03560080367f0ba485a32336746c4293359687e",
+    "freeze_commit": "58d5e2b4fa62e37c56a1a083e83650272aa13015",
+    "input_set_hash": "2dc161f7e3de3f88d908670ada8d983a5f952e2ddc4a2a195b88206ef482819d",
+    "judge_attempt": 1,
+    "judge_feedback": "{\"action\": \"rag_cite_rewrite\", \"attempt\": 1, \"failed_axes\": [{\"axis\": \"disclaimer\", \"reason\": \"누락: 투자 권유·손실 가능성 면책 문구\"}]}",
+    "langsmith_run_id": "f1c307c2-574a-4652-8adb-0f8e12a6dfb7",
+    "langsmith_trace_url": "https://apac.smith.langchain.com/o/3f716f7f-2a7d-46fe-93b2-7b0aaa823a34/projects/p/21f66d0d-bc80-49a3-bdc9-d314b381a283/r/f1c307c2-574a-4652-8adb-0f8e12a6dfb7?poll=true",
+    "manual_review_flags": [],
+    "model_version": {
+      "api_version": "2025-01-01-preview",
+      "deployment": "ai-insight-llm",
+      "model": "gpt-4o-2024-11-20"
+    },
+    "passed": false,
+    "prompt_hash": "b916d7be0acba85bcac01e067a36c91e8c2bb2d25210a74d2eeaab17fa708e47",
+    "prompt_version": "v1",
+    "reason": "필수 품질 점검 실패: disclaimer=누락: 투자 권유·손실 가능성 면책 문구",
+    "rubric": {
+      "disclaimer": {
+        "passed": false,
+        "reason": "누락: 투자 권유·손실 가능성 면책 문구"
+      },
+      "false_precision": {
+        "passed": true,
+        "reason": "VaR와 CVaR 값이 신뢰수준과 보유기간을 명시하며, 환산 과정에서 근사와 추정치를 명확히 언급하여 false_precision을 피했습니다. 또한, 시나리오 손익은 가상 설정임을 명시하고 단일 수치만을 제시하지 않았습니다."
+      },
+      "hallucination": {
+        "passed": true,
+        "reason": "설명문의 모든 실질적 주장은 제공된 인용문 또는 청크 원문으로 뒷받침되며, 검증된 기준일과 의무 면책문도 적절히 포함되어 있습니다."
+      },
+      "numeric_consistency": {
+        "passed": true,
+        "reason": "설명문의 엔진 수치·기준일은 metrics와 일치하고 인용 사실은 검증 인용과 일치합니다. (engine_metric=16, evidence_fact=0)"
+      },
+      "prohibited_expression": {
+        "passed": true,
+        "reason": "금지 표현이 없거나 명시적으로 부정되었습니다."
+      },
+      "source_validity": {
+        "passed": true,
+        "reason": "출처 정책 게이트 충족: 검증 통과 인용 2건"
+      }
+    },
+    "strict_citation_gate": true,
+    "trace_id": "local-case_009"
+  },
+  {
+    "as_of_date": "2026-07-24",
+    "case_content_sha256": "3e1ebc3161b491ebc1c05ed922dca5285620760c0810c410c77b75727c3d8d21",
+    "case_id": "case_010",
+    "checks": [
+      {
+        "detail": "리스크 지표 존재",
+        "name": "metrics_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "재현성 computation_hash 존재",
+        "name": "computation_hash_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "설명 5건",
+        "name": "explanations_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "주요 설명 문장 텍스트 존재",
+        "name": "explanations_have_text",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "검증 실패/형식 오류 인용 0건",
+        "name": "citations_all_verified",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "인용 구조 확인: 검증 통과 인용 2건",
+        "name": "verified_citations_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "인용 2건의 인용문·문서명·조항/주장·청크 일치",
+        "name": "citation_content_contract",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "HITL 승인 잠금 상태",
+        "name": "approval_locked",
+        "passed": true,
+        "required": false
+      },
+      {
+        "detail": "출처 정책 게이트 충족: 검증 통과 인용 2건",
+        "name": "source_validity",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "설명문의 엔진 수치·기준일은 metrics와 일치하고 인용 사실은 검증 인용과 일치합니다. (engine_metric=31, evidence_fact=0)",
+        "name": "numeric_consistency",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "설명문에서 '채권 비중이 42%로 높아 위험값이 낮게 잡힙니다'라는 주장은 제공된 인용문이나 청크 원문에서 검증되지 않았습니다. 따라서 fail입니다.",
+        "name": "hallucination",
+        "passed": false,
+        "required": true
+      },
+      {
+        "detail": "VaR와 CVaR 값이 신뢰수준과 보유기간을 명시하고 있으며, 추정치임을 명확히 밝히고 신뢰구간을 제공하여 false_precision을 피하고 있음.",
+        "name": "false_precision",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "기준일과 면책 문구가 존재합니다.",
+        "name": "disclaimer",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "금지 표현이 없거나 명시적으로 부정되었습니다.",
+        "name": "prohibited_expression",
+        "passed": true,
+        "required": true
+      }
+    ],
+    "code_sha": "b03560080367f0ba485a32336746c4293359687e",
+    "freeze_commit": "58d5e2b4fa62e37c56a1a083e83650272aa13015",
+    "input_set_hash": "2dc161f7e3de3f88d908670ada8d983a5f952e2ddc4a2a195b88206ef482819d",
+    "judge_attempt": 1,
+    "judge_feedback": "{\"action\": \"rag_cite_rewrite\", \"attempt\": 1, \"failed_axes\": [{\"axis\": \"hallucination\", \"reason\": \"설명문에서 '채권 비중이 42%로 높아 위험값이 낮게 잡힙니다'라는 주장은 제공된 인용문이나 청크 원문에서 검증되지 않았습니다. 따라서 fail입니다.\"}]}",
+    "langsmith_run_id": "5e059d9b-9cbf-40ec-a3a6-9ade4a3cafd5",
+    "langsmith_trace_url": "https://apac.smith.langchain.com/o/3f716f7f-2a7d-46fe-93b2-7b0aaa823a34/projects/p/21f66d0d-bc80-49a3-bdc9-d314b381a283/r/5e059d9b-9cbf-40ec-a3a6-9ade4a3cafd5?poll=true",
+    "manual_review_flags": [],
+    "model_version": {
+      "api_version": "2025-01-01-preview",
+      "deployment": "ai-insight-llm",
+      "model": "gpt-4o-2024-11-20"
+    },
+    "passed": false,
+    "prompt_hash": "8887f90a7a55ec06594c16816f875162c130b7cc84d010668e4417d417f5b25e",
+    "prompt_version": "v1",
+    "reason": "필수 품질 점검 실패: hallucination=설명문에서 '채권 비중이 42%로 높아 위험값이 낮게 잡힙니다'라는 주장은 제공된 인용문이나 청크 원문에서 검증되지 않았습니다. 따라서 fail입니다.",
+    "rubric": {
+      "disclaimer": {
+        "passed": true,
+        "reason": "기준일과 면책 문구가 존재합니다."
+      },
+      "false_precision": {
+        "passed": true,
+        "reason": "VaR와 CVaR 값이 신뢰수준과 보유기간을 명시하고 있으며, 추정치임을 명확히 밝히고 신뢰구간을 제공하여 false_precision을 피하고 있음."
+      },
+      "hallucination": {
+        "passed": false,
+        "reason": "설명문에서 '채권 비중이 42%로 높아 위험값이 낮게 잡힙니다'라는 주장은 제공된 인용문이나 청크 원문에서 검증되지 않았습니다. 따라서 fail입니다."
+      },
+      "numeric_consistency": {
+        "passed": true,
+        "reason": "설명문의 엔진 수치·기준일은 metrics와 일치하고 인용 사실은 검증 인용과 일치합니다. (engine_metric=31, evidence_fact=0)"
+      },
+      "prohibited_expression": {
+        "passed": true,
+        "reason": "금지 표현이 없거나 명시적으로 부정되었습니다."
+      },
+      "source_validity": {
+        "passed": true,
+        "reason": "출처 정책 게이트 충족: 검증 통과 인용 2건"
+      }
+    },
+    "strict_citation_gate": true,
+    "trace_id": "local-case_010"
+  },
+  {
+    "as_of_date": "2026-07-24",
+    "case_content_sha256": "ed268697c991b3bce17756a337deba44981296440c1c09dd7578a5569d947b1a",
+    "case_id": "case_011",
+    "checks": [
+      {
+        "detail": "리스크 지표 존재",
+        "name": "metrics_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "재현성 computation_hash 존재",
+        "name": "computation_hash_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "설명 6건",
+        "name": "explanations_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "주요 설명 문장 텍스트 존재",
+        "name": "explanations_have_text",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "검증 실패/형식 오류 인용 0건",
+        "name": "citations_all_verified",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "인용 구조 확인: 검증 통과 인용 2건",
+        "name": "verified_citations_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "인용 2건의 인용문·문서명·조항/주장·청크 일치",
+        "name": "citation_content_contract",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "HITL 승인 잠금 상태",
+        "name": "approval_locked",
+        "passed": true,
+        "required": false
+      },
+      {
+        "detail": "출처 정책 게이트 충족: 검증 통과 인용 2건",
+        "name": "source_validity",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "설명 수치 45bp가 같은 topic의 검증 인용에 없음; 설명 수치 12bp가 같은 topic의 검증 인용에 없음; 설명 수치 8bp가 같은 topic의 검증 인용에 없음",
+        "name": "numeric_consistency",
+        "passed": false,
+        "required": true
+      },
+      {
+        "detail": "설명문의 모든 실질적 주장은 제공된 인용문 또는 청크 원문으로 검증 가능하며, 외부 지식에 의존하지 않았습니다.",
+        "name": "hallucination",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "VaR와 CVaR 수치가 신뢰수준과 보유기간을 명시하여 제시되었으며, 약·추정·범위·신뢰구간 표현을 적절히 사용하였음. 또한, 환산값의 한계와 시나리오 가정에 따른 손실 결과를 명확히 설명하여 false_precision을 피함.",
+        "name": "false_precision",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "기준일과 면책 문구가 존재합니다.",
+        "name": "disclaimer",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "금지 표현이 없거나 명시적으로 부정되었습니다.",
+        "name": "prohibited_expression",
+        "passed": true,
+        "required": true
+      }
+    ],
+    "code_sha": "b03560080367f0ba485a32336746c4293359687e",
+    "freeze_commit": "58d5e2b4fa62e37c56a1a083e83650272aa13015",
+    "input_set_hash": "2dc161f7e3de3f88d908670ada8d983a5f952e2ddc4a2a195b88206ef482819d",
+    "judge_attempt": 1,
+    "judge_feedback": "{\"action\": \"rag_cite_rewrite\", \"attempt\": 1, \"failed_axes\": [{\"axis\": \"numeric_consistency\", \"reason\": \"설명 수치 45bp가 같은 topic의 검증 인용에 없음; 설명 수치 12bp가 같은 topic의 검증 인용에 없음; 설명 수치 8bp가 같은 topic의 검증 인용에 없음\"}]}",
+    "langsmith_run_id": "8354915a-c11c-4573-9d40-302ff08db39c",
+    "langsmith_trace_url": "https://apac.smith.langchain.com/o/3f716f7f-2a7d-46fe-93b2-7b0aaa823a34/projects/p/21f66d0d-bc80-49a3-bdc9-d314b381a283/r/8354915a-c11c-4573-9d40-302ff08db39c?poll=true",
+    "manual_review_flags": [],
+    "model_version": {
+      "api_version": "2025-01-01-preview",
+      "deployment": "ai-insight-llm",
+      "model": "gpt-4o-2024-11-20"
+    },
+    "passed": false,
+    "prompt_hash": "89d347248bdd4942d02d621058b1098f0a1c6062927e012ecdf9450eca79cd43",
+    "prompt_version": "v1",
+    "reason": "필수 품질 점검 실패: numeric_consistency=설명 수치 45bp가 같은 topic의 검증 인용에 없음; 설명 수치 12bp가 같은 topic의 검증 인용에 없음; 설명 수치 8bp가 같은 topic의 검증 인용에 없음",
+    "rubric": {
+      "disclaimer": {
+        "passed": true,
+        "reason": "기준일과 면책 문구가 존재합니다."
+      },
+      "false_precision": {
+        "passed": true,
+        "reason": "VaR와 CVaR 수치가 신뢰수준과 보유기간을 명시하여 제시되었으며, 약·추정·범위·신뢰구간 표현을 적절히 사용하였음. 또한, 환산값의 한계와 시나리오 가정에 따른 손실 결과를 명확히 설명하여 false_precision을 피함."
+      },
+      "hallucination": {
+        "passed": true,
+        "reason": "설명문의 모든 실질적 주장은 제공된 인용문 또는 청크 원문으로 검증 가능하며, 외부 지식에 의존하지 않았습니다."
+      },
+      "numeric_consistency": {
+        "passed": false,
+        "reason": "설명 수치 45bp가 같은 topic의 검증 인용에 없음; 설명 수치 12bp가 같은 topic의 검증 인용에 없음; 설명 수치 8bp가 같은 topic의 검증 인용에 없음"
+      },
+      "prohibited_expression": {
+        "passed": true,
+        "reason": "금지 표현이 없거나 명시적으로 부정되었습니다."
+      },
+      "source_validity": {
+        "passed": true,
+        "reason": "출처 정책 게이트 충족: 검증 통과 인용 2건"
+      }
+    },
+    "strict_citation_gate": true,
+    "trace_id": "local-case_011"
+  },
+  {
+    "as_of_date": "2026-07-24",
+    "case_content_sha256": "6b3caf6ab872c2ab1638c156400dfc89cf4ac83df1236425cfae40186d52fa7f",
+    "case_id": "case_012",
+    "checks": [
+      {
+        "detail": "리스크 지표 존재",
+        "name": "metrics_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "재현성 computation_hash 존재",
+        "name": "computation_hash_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "설명 6건",
+        "name": "explanations_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "주요 설명 문장 텍스트 존재",
+        "name": "explanations_have_text",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "검증 실패/형식 오류 인용 0건",
+        "name": "citations_all_verified",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "인용 구조 확인: 검증 통과 인용 2건",
+        "name": "verified_citations_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "인용 2건의 인용문·문서명·조항/주장·청크 일치",
+        "name": "citation_content_contract",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "HITL 승인 잠금 상태",
+        "name": "approval_locked",
+        "passed": true,
+        "required": false
+      },
+      {
+        "detail": "출처 정책 게이트 충족: 검증 통과 인용 2건",
+        "name": "source_validity",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "설명 수치 10거래일가 같은 topic의 검증 인용에 없음; 설명 수치 5%가 같은 topic의 검증 인용에 없음; 설명 수치 78.6%가 같은 topic의 검증 인용에 없음; 설명 수치 3%가 같은 topic의 검증 인용에 없음; 설명 수치 91.2%가 같은 topic의 검증 인용에 없음",
+        "name": "numeric_consistency",
+        "passed": false,
+        "required": true
+      },
+      {
+        "detail": "설명문에서 '향후 10거래일 내 5% 이상 손실이 발생할 확률은 78.6%' 및 '같은 기간 3% 이상 손실 확률은 91.2%'라는 주장이 제시되었으나, 이를 뒷받침하는 검증된 인용문 또는 해당 청크 원문이 제공되지 않았습니다. 따라서 fail로 판정합니다.",
+        "name": "hallucination",
+        "passed": false,
+        "required": true
+      },
+      {
+        "detail": "10거래일 내 5% 이상 손실 발생 확률을 78.6%로, 3% 이상 손실 확률을 91.2%로 단정적으로 제시했으나, 확률 산출 근거가 명시되지 않았고 신뢰구간이나 추정 표현이 사용되지 않아 false_precision에 해당합니다.",
+        "name": "false_precision",
+        "passed": false,
+        "required": true
+      },
+      {
+        "detail": "기준일과 면책 문구가 존재합니다.",
+        "name": "disclaimer",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "금지 표현이 없거나 명시적으로 부정되었습니다.",
+        "name": "prohibited_expression",
+        "passed": true,
+        "required": true
+      }
+    ],
+    "code_sha": "b03560080367f0ba485a32336746c4293359687e",
+    "freeze_commit": "58d5e2b4fa62e37c56a1a083e83650272aa13015",
+    "input_set_hash": "2dc161f7e3de3f88d908670ada8d983a5f952e2ddc4a2a195b88206ef482819d",
+    "judge_attempt": 1,
+    "judge_feedback": "{\"action\": \"rag_cite_rewrite\", \"attempt\": 1, \"failed_axes\": [{\"axis\": \"numeric_consistency\", \"reason\": \"설명 수치 10거래일가 같은 topic의 검증 인용에 없음; 설명 수치 5%가 같은 topic의 검증 인용에 없음; 설명 수치 78.6%가 같은 topic의 검증 인용에 없음; 설명 수치 3%가 같은 topic의 검증 인용에 없음; 설명 수치 91.2%가 같은 topic의 검증 인용에 없음\"}, {\"axis\": \"hallucination\", \"reason\": \"설명문에서 '향후 10거래일 내 5% 이상 손실이 발생할 확률은 78.6%' 및 '같은 기간 3% 이상 손실 확률은 91.2%'라는 주장이 제시되었으나, 이를 뒷받침하는 검증된 인용문 또는 해당 청크 원문이 제공되지 않았습니다. 따라서 fail로 판정합니다.\"}, {\"axis\": \"false_precision\", \"reason\": \"10거래일 내 5% 이상 손실 발생 확률을 78.6%로, 3% 이상 손실 확률을 91.2%로 단정적으로 제시했으나, 확률 산출 근거가 명시되지 않았고 신뢰구간이나 추정 표현이 사용되지 않아 false_precision에 해당합니다.\"}]}",
+    "langsmith_run_id": "10028749-eef4-4b61-ac3e-e483894077db",
+    "langsmith_trace_url": "https://apac.smith.langchain.com/o/3f716f7f-2a7d-46fe-93b2-7b0aaa823a34/projects/p/21f66d0d-bc80-49a3-bdc9-d314b381a283/r/10028749-eef4-4b61-ac3e-e483894077db?poll=true",
+    "manual_review_flags": [],
+    "model_version": {
+      "api_version": "2025-01-01-preview",
+      "deployment": "ai-insight-llm",
+      "model": "gpt-4o-2024-11-20"
+    },
+    "passed": false,
+    "prompt_hash": "9e27386afd732eb0feec666a9876aa0b489e5b2db72d296a8dfe8b7ee59d075b",
+    "prompt_version": "v1",
+    "reason": "필수 품질 점검 실패: numeric_consistency=설명 수치 10거래일가 같은 topic의 검증 인용에 없음; 설명 수치 5%가 같은 topic의 검증 인용에 없음; 설명 수치 78.6%가 같은 topic의 검증 인용에 없음; 설명 수치 3%가 같은 topic의 검증 인용에 없음; 설명 수치 91.2%가 같은 topic의 검증 인용에 없음; hallucination=설명문에서 '향후 10거래일 내 5% 이상 손실이 발생할 확률은 78.6%' 및 '같은 기간 3% 이상 손실 확률은 91.2%'라는 주장이 제시되었으나, 이를 뒷받침하는 검증된 인용문 또는 해당 청크 원문이 제공되지 않았습니다. 따라서 fail로 판정합니다.; false_precision=10거래일 내 5% 이상 손실 발생 확률을 78.6%로, 3% 이상 손실 확률을 91.2%로 단정적으로 제시했으나, 확률 산출 근거가 명시되지 않았고 신뢰구간이나 추정 표현이 사용되지 않아 false_precision에 해당합니다.",
+    "rubric": {
+      "disclaimer": {
+        "passed": true,
+        "reason": "기준일과 면책 문구가 존재합니다."
+      },
+      "false_precision": {
+        "passed": false,
+        "reason": "10거래일 내 5% 이상 손실 발생 확률을 78.6%로, 3% 이상 손실 확률을 91.2%로 단정적으로 제시했으나, 확률 산출 근거가 명시되지 않았고 신뢰구간이나 추정 표현이 사용되지 않아 false_precision에 해당합니다."
+      },
+      "hallucination": {
+        "passed": false,
+        "reason": "설명문에서 '향후 10거래일 내 5% 이상 손실이 발생할 확률은 78.6%' 및 '같은 기간 3% 이상 손실 확률은 91.2%'라는 주장이 제시되었으나, 이를 뒷받침하는 검증된 인용문 또는 해당 청크 원문이 제공되지 않았습니다. 따라서 fail로 판정합니다."
+      },
+      "numeric_consistency": {
+        "passed": false,
+        "reason": "설명 수치 10거래일가 같은 topic의 검증 인용에 없음; 설명 수치 5%가 같은 topic의 검증 인용에 없음; 설명 수치 78.6%가 같은 topic의 검증 인용에 없음; 설명 수치 3%가 같은 topic의 검증 인용에 없음; 설명 수치 91.2%가 같은 topic의 검증 인용에 없음"
+      },
+      "prohibited_expression": {
+        "passed": true,
+        "reason": "금지 표현이 없거나 명시적으로 부정되었습니다."
+      },
+      "source_validity": {
+        "passed": true,
+        "reason": "출처 정책 게이트 충족: 검증 통과 인용 2건"
+      }
+    },
+    "strict_citation_gate": true,
+    "trace_id": "local-case_012"
+  },
+  {
+    "as_of_date": "2026-07-24",
+    "case_content_sha256": "2c1e16d6a20dc227bc08383f1ac6aada029df26f9ccc1cdae947858836536ca2",
+    "case_id": "case_013",
+    "checks": [
+      {
+        "detail": "리스크 지표 존재",
+        "name": "metrics_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "재현성 computation_hash 존재",
+        "name": "computation_hash_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "설명 5건",
+        "name": "explanations_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "주요 설명 문장 텍스트 존재",
+        "name": "explanations_have_text",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "검증 실패/형식 오류 인용 0건",
+        "name": "citations_all_verified",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "인용 구조 확인: 검증 통과 인용 2건",
+        "name": "verified_citations_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "인용 2건의 인용문·문서명·조항/주장·청크 일치",
+        "name": "citation_content_contract",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "HITL 승인 잠금 상태",
+        "name": "approval_locked",
+        "passed": true,
+        "required": false
+      },
+      {
+        "detail": "출처 정책 게이트 충족: 검증 통과 인용 2건",
+        "name": "source_validity",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "설명문의 엔진 수치·기준일은 metrics와 일치하고 인용 사실은 검증 인용과 일치합니다. (engine_metric=17, evidence_fact=0)",
+        "name": "numeric_consistency",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "설명문의 모든 실질적 주장은 제공된 인용문 또는 청크 원문으로 검증 가능하며, 외부 지식에 의존하지 않았습니다.",
+        "name": "hallucination",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "VaR와 CVaR 값이 신뢰수준, 보유기간, 환산 방식 등을 명시하며 추정치로 제시되었고, 확률·손실을 근거 없이 정밀하게 단정하지 않았습니다. 또한, 시나리오 기반 손실은 가상 설정임을 명확히 밝혔으며, 단일 수치만의 제시를 금지하는 내부 기준을 준수했습니다.",
+        "name": "false_precision",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "기준일과 면책 문구가 존재합니다.",
+        "name": "disclaimer",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "금지 표현이 없거나 명시적으로 부정되었습니다.",
+        "name": "prohibited_expression",
+        "passed": true,
+        "required": true
+      }
+    ],
+    "code_sha": "b03560080367f0ba485a32336746c4293359687e",
+    "freeze_commit": "58d5e2b4fa62e37c56a1a083e83650272aa13015",
+    "input_set_hash": "2dc161f7e3de3f88d908670ada8d983a5f952e2ddc4a2a195b88206ef482819d",
+    "judge_attempt": 1,
+    "judge_feedback": "",
+    "langsmith_run_id": "2092f121-87b7-498e-9f5d-385a6684ff1d",
+    "langsmith_trace_url": "https://apac.smith.langchain.com/o/3f716f7f-2a7d-46fe-93b2-7b0aaa823a34/projects/p/21f66d0d-bc80-49a3-bdc9-d314b381a283/r/2092f121-87b7-498e-9f5d-385a6684ff1d?poll=true",
+    "manual_review_flags": [],
+    "model_version": {
+      "api_version": "2025-01-01-preview",
+      "deployment": "ai-insight-llm",
+      "model": "gpt-4o-2024-11-20"
+    },
+    "passed": true,
+    "prompt_hash": "c32326363ee86abf35ed3e64bb03343e3fc46d1a8318ee4e37242d3a4f828029",
+    "prompt_version": "v1",
+    "reason": "필수 품질 점검 통과",
+    "rubric": {
+      "disclaimer": {
+        "passed": true,
+        "reason": "기준일과 면책 문구가 존재합니다."
+      },
+      "false_precision": {
+        "passed": true,
+        "reason": "VaR와 CVaR 값이 신뢰수준, 보유기간, 환산 방식 등을 명시하며 추정치로 제시되었고, 확률·손실을 근거 없이 정밀하게 단정하지 않았습니다. 또한, 시나리오 기반 손실은 가상 설정임을 명확히 밝혔으며, 단일 수치만의 제시를 금지하는 내부 기준을 준수했습니다."
+      },
+      "hallucination": {
+        "passed": true,
+        "reason": "설명문의 모든 실질적 주장은 제공된 인용문 또는 청크 원문으로 검증 가능하며, 외부 지식에 의존하지 않았습니다."
+      },
+      "numeric_consistency": {
+        "passed": true,
+        "reason": "설명문의 엔진 수치·기준일은 metrics와 일치하고 인용 사실은 검증 인용과 일치합니다. (engine_metric=17, evidence_fact=0)"
+      },
+      "prohibited_expression": {
+        "passed": true,
+        "reason": "금지 표현이 없거나 명시적으로 부정되었습니다."
+      },
+      "source_validity": {
+        "passed": true,
+        "reason": "출처 정책 게이트 충족: 검증 통과 인용 2건"
+      }
+    },
+    "strict_citation_gate": true,
+    "trace_id": "local-case_013"
+  },
+  {
+    "as_of_date": "2026-07-24",
+    "case_content_sha256": "88fa2f73a382f71753be66a146b7d7fbc843071b2d1aa882396a2ee5faecadd4",
+    "case_id": "case_014",
+    "checks": [
+      {
+        "detail": "리스크 지표 존재",
+        "name": "metrics_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "재현성 computation_hash 존재",
+        "name": "computation_hash_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "설명 6건",
+        "name": "explanations_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "주요 설명 문장 텍스트 존재",
+        "name": "explanations_have_text",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "검증 실패/형식 오류 인용 0건",
+        "name": "citations_all_verified",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "인용 구조 확인: 검증 통과 인용 2건",
+        "name": "verified_citations_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "인용 2건의 인용문·문서명·조항/주장·청크 일치",
+        "name": "citation_content_contract",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "HITL 승인 잠금 상태",
+        "name": "approval_locked",
+        "passed": true,
+        "required": false
+      },
+      {
+        "detail": "출처 정책 게이트 충족: 검증 통과 인용 2건",
+        "name": "source_validity",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "설명 수치 8%가 같은 topic의 검증 인용에 없음",
+        "name": "numeric_consistency",
+        "passed": false,
+        "required": true
+      },
+      {
+        "detail": "제공된 설명문의 실질적 주장들은 검증된 인용문 또는 해당 청크 원문으로 뒷받침되고 있으며, 외부 지식을 사용한 주장이 없습니다. 따라서 fail 조건에 해당하지 않습니다.",
+        "name": "hallucination",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "VaR 및 CVaR 값이 신뢰수준과 신뢰구간을 명시하며, 확률·손실을 근거 없이 정밀하게 단정하지 않았음. 또한, 환산 한계와 가정의 제약을 명확히 언급하여 false_precision을 회피함.",
+        "name": "false_precision",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "누락: 투자 권유·손실 가능성 면책 문구",
+        "name": "disclaimer",
+        "passed": false,
+        "required": true
+      },
+      {
+        "detail": "금지 표현이 없거나 명시적으로 부정되었습니다.",
+        "name": "prohibited_expression",
+        "passed": true,
+        "required": true
+      }
+    ],
+    "code_sha": "b03560080367f0ba485a32336746c4293359687e",
+    "freeze_commit": "58d5e2b4fa62e37c56a1a083e83650272aa13015",
+    "input_set_hash": "2dc161f7e3de3f88d908670ada8d983a5f952e2ddc4a2a195b88206ef482819d",
+    "judge_attempt": 1,
+    "judge_feedback": "{\"action\": \"rag_cite_rewrite\", \"attempt\": 1, \"failed_axes\": [{\"axis\": \"numeric_consistency\", \"reason\": \"설명 수치 8%가 같은 topic의 검증 인용에 없음\"}, {\"axis\": \"disclaimer\", \"reason\": \"누락: 투자 권유·손실 가능성 면책 문구\"}]}",
+    "langsmith_run_id": "2802bc2d-0fa9-443c-8fe6-1f9e98ccb79d",
+    "langsmith_trace_url": "https://apac.smith.langchain.com/o/3f716f7f-2a7d-46fe-93b2-7b0aaa823a34/projects/p/21f66d0d-bc80-49a3-bdc9-d314b381a283/r/2802bc2d-0fa9-443c-8fe6-1f9e98ccb79d?poll=true",
+    "manual_review_flags": [],
+    "model_version": {
+      "api_version": "2025-01-01-preview",
+      "deployment": "ai-insight-llm",
+      "model": "gpt-4o-2024-11-20"
+    },
+    "passed": false,
+    "prompt_hash": "161340acf6050f6aed6fffea0b2623b42aec9497245e7cf549e3023d1a0fe143",
+    "prompt_version": "v1",
+    "reason": "필수 품질 점검 실패: numeric_consistency=설명 수치 8%가 같은 topic의 검증 인용에 없음; disclaimer=누락: 투자 권유·손실 가능성 면책 문구",
+    "rubric": {
+      "disclaimer": {
+        "passed": false,
+        "reason": "누락: 투자 권유·손실 가능성 면책 문구"
+      },
+      "false_precision": {
+        "passed": true,
+        "reason": "VaR 및 CVaR 값이 신뢰수준과 신뢰구간을 명시하며, 확률·손실을 근거 없이 정밀하게 단정하지 않았음. 또한, 환산 한계와 가정의 제약을 명확히 언급하여 false_precision을 회피함."
+      },
+      "hallucination": {
+        "passed": true,
+        "reason": "제공된 설명문의 실질적 주장들은 검증된 인용문 또는 해당 청크 원문으로 뒷받침되고 있으며, 외부 지식을 사용한 주장이 없습니다. 따라서 fail 조건에 해당하지 않습니다."
+      },
+      "numeric_consistency": {
+        "passed": false,
+        "reason": "설명 수치 8%가 같은 topic의 검증 인용에 없음"
+      },
+      "prohibited_expression": {
+        "passed": true,
+        "reason": "금지 표현이 없거나 명시적으로 부정되었습니다."
+      },
+      "source_validity": {
+        "passed": true,
+        "reason": "출처 정책 게이트 충족: 검증 통과 인용 2건"
+      }
+    },
+    "strict_citation_gate": true,
+    "trace_id": "local-case_014"
+  },
+  {
+    "as_of_date": "2026-07-24",
+    "case_content_sha256": "5ebec774086be14bd3aca79321ada2d64e05ea0505b9ee061d16d3b0224a6da3",
+    "case_id": "case_015",
+    "checks": [
+      {
+        "detail": "리스크 지표 존재",
+        "name": "metrics_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "재현성 computation_hash 존재",
+        "name": "computation_hash_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "설명 6건",
+        "name": "explanations_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "주요 설명 문장 텍스트 존재",
+        "name": "explanations_have_text",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "검증 실패/형식 오류 인용 0건",
+        "name": "citations_all_verified",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "인용 구조 확인: 검증 통과 인용 4건",
+        "name": "verified_citations_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "인용 4건의 인용문·문서명·조항/주장·청크 일치",
+        "name": "citation_content_contract",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "HITL 승인 잠금 상태",
+        "name": "approval_locked",
+        "passed": true,
+        "required": false
+      },
+      {
+        "detail": "출처 정책 게이트 충족: 검증 통과 인용 4건",
+        "name": "source_validity",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "설명문의 엔진 수치·기준일은 metrics와 일치하고 인용 사실은 검증 인용과 일치합니다. (engine_metric=16, evidence_fact=0)",
+        "name": "numeric_consistency",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "모든 설명문의 실질적 주장이 검증된 인용문 또는 해당 청크 원문으로 뒷받침되었으며, 외부 지식에 의존한 주장이 없습니다.",
+        "name": "hallucination",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "VaR와 CVaR 값이 신뢰수준과 보유기간을 명시하고 있으며, 추정치임을 명확히 서술하고 있어 false_precision에 해당하지 않음.",
+        "name": "false_precision",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "기준일과 면책 문구가 존재합니다.",
+        "name": "disclaimer",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "금지 표현이 없거나 명시적으로 부정되었습니다.",
+        "name": "prohibited_expression",
+        "passed": true,
+        "required": true
+      }
+    ],
+    "code_sha": "b03560080367f0ba485a32336746c4293359687e",
+    "freeze_commit": "58d5e2b4fa62e37c56a1a083e83650272aa13015",
+    "input_set_hash": "2dc161f7e3de3f88d908670ada8d983a5f952e2ddc4a2a195b88206ef482819d",
+    "judge_attempt": 1,
+    "judge_feedback": "",
+    "langsmith_run_id": "75d9535f-5c23-4573-876a-382baf44f464",
+    "langsmith_trace_url": "https://apac.smith.langchain.com/o/3f716f7f-2a7d-46fe-93b2-7b0aaa823a34/projects/p/21f66d0d-bc80-49a3-bdc9-d314b381a283/r/75d9535f-5c23-4573-876a-382baf44f464?poll=true",
+    "manual_review_flags": [],
+    "model_version": {
+      "api_version": "2025-01-01-preview",
+      "deployment": "ai-insight-llm",
+      "model": "gpt-4o-2024-11-20"
+    },
+    "passed": true,
+    "prompt_hash": "5a56de8d7be4725a7036d36e16d691272ab5894481658968e284c9354d32109d",
+    "prompt_version": "v1",
+    "reason": "필수 품질 점검 통과",
+    "rubric": {
+      "disclaimer": {
+        "passed": true,
+        "reason": "기준일과 면책 문구가 존재합니다."
+      },
+      "false_precision": {
+        "passed": true,
+        "reason": "VaR와 CVaR 값이 신뢰수준과 보유기간을 명시하고 있으며, 추정치임을 명확히 서술하고 있어 false_precision에 해당하지 않음."
+      },
+      "hallucination": {
+        "passed": true,
+        "reason": "모든 설명문의 실질적 주장이 검증된 인용문 또는 해당 청크 원문으로 뒷받침되었으며, 외부 지식에 의존한 주장이 없습니다."
+      },
+      "numeric_consistency": {
+        "passed": true,
+        "reason": "설명문의 엔진 수치·기준일은 metrics와 일치하고 인용 사실은 검증 인용과 일치합니다. (engine_metric=16, evidence_fact=0)"
+      },
+      "prohibited_expression": {
+        "passed": true,
+        "reason": "금지 표현이 없거나 명시적으로 부정되었습니다."
+      },
+      "source_validity": {
+        "passed": true,
+        "reason": "출처 정책 게이트 충족: 검증 통과 인용 4건"
+      }
+    },
+    "strict_citation_gate": true,
+    "trace_id": "local-case_015"
+  },
+  {
+    "as_of_date": "2026-07-24",
+    "case_content_sha256": "1b6b6e3dde15df8b9fa39d9e9e5bb9185cf2f6d989f7d6ce08340b085248c429",
+    "case_id": "case_016",
+    "checks": [
+      {
+        "detail": "리스크 지표 존재",
+        "name": "metrics_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "재현성 computation_hash 존재",
+        "name": "computation_hash_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "설명 7건",
+        "name": "explanations_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "주요 설명 문장 텍스트 존재",
+        "name": "explanations_have_text",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "검증 실패/형식 오류 인용 0건",
+        "name": "citations_all_verified",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "인용 구조 확인: 검증 통과 인용 3건",
+        "name": "verified_citations_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "인용 3건의 인용문·문서명·조항/주장·청크 일치",
+        "name": "citation_content_contract",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "HITL 승인 잠금 상태",
+        "name": "approval_locked",
+        "passed": true,
+        "required": false
+      },
+      {
+        "detail": "출처 정책 게이트 충족: 검증 통과 인용 3건",
+        "name": "source_validity",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "설명 수치 90%가 같은 topic의 검증 인용에 없음",
+        "name": "numeric_consistency",
+        "passed": false,
+        "required": true
+      },
+      {
+        "detail": "모든 설명문의 실질적 주장이 검증된 인용문 또는 해당 청크 원문으로 뒷받침되고 있습니다.",
+        "name": "hallucination",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "VaR와 CVaR 값이 신뢰수준과 신뢰구간 수준을 명시하며, 추정치로 표현되었고, 과도한 정밀성을 주장하지 않았음.",
+        "name": "false_precision",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "기준일과 면책 문구가 존재합니다.",
+        "name": "disclaimer",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "금지 표현이 없거나 명시적으로 부정되었습니다.",
+        "name": "prohibited_expression",
+        "passed": true,
+        "required": true
+      }
+    ],
+    "code_sha": "b03560080367f0ba485a32336746c4293359687e",
+    "freeze_commit": "58d5e2b4fa62e37c56a1a083e83650272aa13015",
+    "input_set_hash": "2dc161f7e3de3f88d908670ada8d983a5f952e2ddc4a2a195b88206ef482819d",
+    "judge_attempt": 1,
+    "judge_feedback": "{\"action\": \"rag_cite_rewrite\", \"attempt\": 1, \"failed_axes\": [{\"axis\": \"numeric_consistency\", \"reason\": \"설명 수치 90%가 같은 topic의 검증 인용에 없음\"}]}",
+    "langsmith_run_id": "4ac9ffdb-2cd2-4632-8c7b-00fd534fc706",
+    "langsmith_trace_url": "https://apac.smith.langchain.com/o/3f716f7f-2a7d-46fe-93b2-7b0aaa823a34/projects/p/21f66d0d-bc80-49a3-bdc9-d314b381a283/r/4ac9ffdb-2cd2-4632-8c7b-00fd534fc706?poll=true",
+    "manual_review_flags": [],
+    "model_version": {
+      "api_version": "2025-01-01-preview",
+      "deployment": "ai-insight-llm",
+      "model": "gpt-4o-2024-11-20"
+    },
+    "passed": false,
+    "prompt_hash": "e10c898d7881ca96742066d42b7a2670ba873a64b5b9e02066f07f389b1ce188",
+    "prompt_version": "v1",
+    "reason": "필수 품질 점검 실패: numeric_consistency=설명 수치 90%가 같은 topic의 검증 인용에 없음",
+    "rubric": {
+      "disclaimer": {
+        "passed": true,
+        "reason": "기준일과 면책 문구가 존재합니다."
+      },
+      "false_precision": {
+        "passed": true,
+        "reason": "VaR와 CVaR 값이 신뢰수준과 신뢰구간 수준을 명시하며, 추정치로 표현되었고, 과도한 정밀성을 주장하지 않았음."
+      },
+      "hallucination": {
+        "passed": true,
+        "reason": "모든 설명문의 실질적 주장이 검증된 인용문 또는 해당 청크 원문으로 뒷받침되고 있습니다."
+      },
+      "numeric_consistency": {
+        "passed": false,
+        "reason": "설명 수치 90%가 같은 topic의 검증 인용에 없음"
+      },
+      "prohibited_expression": {
+        "passed": true,
+        "reason": "금지 표현이 없거나 명시적으로 부정되었습니다."
+      },
+      "source_validity": {
+        "passed": true,
+        "reason": "출처 정책 게이트 충족: 검증 통과 인용 3건"
+      }
+    },
+    "strict_citation_gate": true,
+    "trace_id": "local-case_016"
+  },
+  {
+    "as_of_date": "2026-07-24",
+    "case_content_sha256": "2f31c2132285d157e99180ac33a0f3fcb22e0695647e22fd477f08aa601ae7e1",
+    "case_id": "case_017",
+    "checks": [
+      {
+        "detail": "리스크 지표 존재",
+        "name": "metrics_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "재현성 computation_hash 존재",
+        "name": "computation_hash_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "설명 5건",
+        "name": "explanations_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "주요 설명 문장 텍스트 존재",
+        "name": "explanations_have_text",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "검증 실패/형식 오류 인용 0건",
+        "name": "citations_all_verified",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "인용 구조 확인: 검증 통과 인용 4건",
+        "name": "verified_citations_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "인용 4건의 인용문·문서명·조항/주장·청크 일치",
+        "name": "citation_content_contract",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "HITL 승인 잠금 상태",
+        "name": "approval_locked",
+        "passed": true,
+        "required": false
+      },
+      {
+        "detail": "출처 정책 게이트 충족: 검증 통과 인용 4건",
+        "name": "source_validity",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "설명 수치 90%가 metrics에 없음",
+        "name": "numeric_consistency",
+        "passed": false,
+        "required": true
+      },
+      {
+        "detail": "설명문에서 '항목 신뢰수준 / 신뢰구간 수준, 값 99% / **90%**'라는 부분이 제공된 인용문 또는 해당 청크 원문으로 뒷받침되지 않으며, 신뢰수준이 99%인지 90%인지 모호한 주장이 포함되어 있습니다. 따라서 fail 판정을 내립니다.",
+        "name": "hallucination",
+        "passed": false,
+        "required": true
+      },
+      {
+        "detail": "리포트는 신뢰수준과 보유기간을 명시한 VaR 및 CVaR 값을 제시하며, 추정치임을 명확히 하고 신뢰구간을 병기하여 false_precision을 회피했습니다. 또한, 환산 방법론의 한계를 설명하고 단정적 표현을 피했습니다.",
+        "name": "false_precision",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "기준일과 면책 문구가 존재합니다.",
+        "name": "disclaimer",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "금지 표현이 없거나 명시적으로 부정되었습니다.",
+        "name": "prohibited_expression",
+        "passed": true,
+        "required": true
+      }
+    ],
+    "code_sha": "b03560080367f0ba485a32336746c4293359687e",
+    "freeze_commit": "58d5e2b4fa62e37c56a1a083e83650272aa13015",
+    "input_set_hash": "2dc161f7e3de3f88d908670ada8d983a5f952e2ddc4a2a195b88206ef482819d",
+    "judge_attempt": 1,
+    "judge_feedback": "{\"action\": \"rag_cite_rewrite\", \"attempt\": 1, \"failed_axes\": [{\"axis\": \"numeric_consistency\", \"reason\": \"설명 수치 90%가 metrics에 없음\"}, {\"axis\": \"hallucination\", \"reason\": \"설명문에서 '항목 신뢰수준 / 신뢰구간 수준, 값 99% / **90%**'라는 부분이 제공된 인용문 또는 해당 청크 원문으로 뒷받침되지 않으며, 신뢰수준이 99%인지 90%인지 모호한 주장이 포함되어 있습니다. 따라서 fail 판정을 내립니다.\"}]}",
+    "langsmith_run_id": "a79094dc-1bbc-4ebf-9527-3b2351d1f317",
+    "langsmith_trace_url": "https://apac.smith.langchain.com/o/3f716f7f-2a7d-46fe-93b2-7b0aaa823a34/projects/p/21f66d0d-bc80-49a3-bdc9-d314b381a283/r/a79094dc-1bbc-4ebf-9527-3b2351d1f317?poll=true",
+    "manual_review_flags": [],
+    "model_version": {
+      "api_version": "2025-01-01-preview",
+      "deployment": "ai-insight-llm",
+      "model": "gpt-4o-2024-11-20"
+    },
+    "passed": false,
+    "prompt_hash": "289e8665c2465d4998da33ab18f21bbd9447dc58f04504c029016cc78b35e35f",
+    "prompt_version": "v1",
+    "reason": "필수 품질 점검 실패: numeric_consistency=설명 수치 90%가 metrics에 없음; hallucination=설명문에서 '항목 신뢰수준 / 신뢰구간 수준, 값 99% / **90%**'라는 부분이 제공된 인용문 또는 해당 청크 원문으로 뒷받침되지 않으며, 신뢰수준이 99%인지 90%인지 모호한 주장이 포함되어 있습니다. 따라서 fail 판정을 내립니다.",
+    "rubric": {
+      "disclaimer": {
+        "passed": true,
+        "reason": "기준일과 면책 문구가 존재합니다."
+      },
+      "false_precision": {
+        "passed": true,
+        "reason": "리포트는 신뢰수준과 보유기간을 명시한 VaR 및 CVaR 값을 제시하며, 추정치임을 명확히 하고 신뢰구간을 병기하여 false_precision을 회피했습니다. 또한, 환산 방법론의 한계를 설명하고 단정적 표현을 피했습니다."
+      },
+      "hallucination": {
+        "passed": false,
+        "reason": "설명문에서 '항목 신뢰수준 / 신뢰구간 수준, 값 99% / **90%**'라는 부분이 제공된 인용문 또는 해당 청크 원문으로 뒷받침되지 않으며, 신뢰수준이 99%인지 90%인지 모호한 주장이 포함되어 있습니다. 따라서 fail 판정을 내립니다."
+      },
+      "numeric_consistency": {
+        "passed": false,
+        "reason": "설명 수치 90%가 metrics에 없음"
+      },
+      "prohibited_expression": {
+        "passed": true,
+        "reason": "금지 표현이 없거나 명시적으로 부정되었습니다."
+      },
+      "source_validity": {
+        "passed": true,
+        "reason": "출처 정책 게이트 충족: 검증 통과 인용 4건"
+      }
+    },
+    "strict_citation_gate": true,
+    "trace_id": "local-case_017"
+  },
+  {
+    "as_of_date": "2026-07-24",
+    "case_content_sha256": "211c8ee29e7852329382a9ad3ce1f1bd855b5f11c6936fc360087e33f81976ee",
+    "case_id": "case_018",
+    "checks": [
+      {
+        "detail": "리스크 지표 존재",
+        "name": "metrics_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "재현성 computation_hash 존재",
+        "name": "computation_hash_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "설명 5건",
+        "name": "explanations_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "주요 설명 문장 텍스트 존재",
+        "name": "explanations_have_text",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "검증 실패/형식 오류 인용 2건",
+        "name": "citations_all_verified",
+        "passed": false,
+        "required": true
+      },
+      {
+        "detail": "인용 구조 확인: 검증 통과 인용 1건",
+        "name": "verified_citations_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "#1 verified=true 아님, 인용문과 원문 청크 불일치; #2 verified=true 아님, 검증 원문 청크 누락",
+        "name": "citation_content_contract",
+        "passed": false,
+        "required": true
+      },
+      {
+        "detail": "HITL 승인 잠금 상태",
+        "name": "approval_locked",
+        "passed": true,
+        "required": false
+      },
+      {
+        "detail": "출처 정책 게이트 충족: 검증 통과 인용 1건",
+        "name": "source_validity",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "설명문의 엔진 수치·기준일은 metrics와 일치하고 인용 사실은 검증 인용과 일치합니다. (engine_metric=33, evidence_fact=0)",
+        "name": "numeric_consistency",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "모든 설명문의 실질적 주장들이 제공된 인용문 또는 해당 청크 원문으로 뒷받침되고 있으며, 외부 지식이나 검증되지 않은 주장을 포함하지 않았습니다.",
+        "name": "hallucination",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "리포트는 확률 및 손실 값을 신뢰수준, 신뢰구간, 근사 및 추정치로 명시하고 있으며, 독립동일분포 가정에 따른 환산 한계를 명확히 언급하고 있습니다. 따라서 false_precision에 해당하지 않습니다.",
+        "name": "false_precision",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "기준일과 면책 문구가 존재합니다.",
+        "name": "disclaimer",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "금지 표현이 없거나 명시적으로 부정되었습니다.",
+        "name": "prohibited_expression",
+        "passed": true,
+        "required": true
+      }
+    ],
+    "code_sha": "b03560080367f0ba485a32336746c4293359687e",
+    "freeze_commit": "58d5e2b4fa62e37c56a1a083e83650272aa13015",
+    "input_set_hash": "2dc161f7e3de3f88d908670ada8d983a5f952e2ddc4a2a195b88206ef482819d",
+    "judge_attempt": 1,
+    "judge_feedback": "{\"action\": \"rag_cite_rewrite\", \"attempt\": 1, \"failed_axes\": [{\"axis\": \"citations_all_verified\", \"reason\": \"검증 실패/형식 오류 인용 2건\"}, {\"axis\": \"citation_content_contract\", \"reason\": \"#1 verified=true 아님, 인용문과 원문 청크 불일치; #2 verified=true 아님, 검증 원문 청크 누락\"}]}",
+    "langsmith_run_id": "0795e9eb-1729-4439-9f03-d558d1532bdf",
+    "langsmith_trace_url": "https://apac.smith.langchain.com/o/3f716f7f-2a7d-46fe-93b2-7b0aaa823a34/projects/p/21f66d0d-bc80-49a3-bdc9-d314b381a283/r/0795e9eb-1729-4439-9f03-d558d1532bdf?poll=true",
+    "manual_review_flags": [],
+    "model_version": {
+      "api_version": "2025-01-01-preview",
+      "deployment": "ai-insight-llm",
+      "model": "gpt-4o-2024-11-20"
+    },
+    "passed": false,
+    "prompt_hash": "d525922c3e1ae4d39747dff6c07f0f5654e054227f03dbfbb699964cccebe6ee",
+    "prompt_version": "v1",
+    "reason": "필수 품질 점검 실패: citations_all_verified=검증 실패/형식 오류 인용 2건; citation_content_contract=#1 verified=true 아님, 인용문과 원문 청크 불일치; #2 verified=true 아님, 검증 원문 청크 누락",
+    "rubric": {
+      "disclaimer": {
+        "passed": true,
+        "reason": "기준일과 면책 문구가 존재합니다."
+      },
+      "false_precision": {
+        "passed": true,
+        "reason": "리포트는 확률 및 손실 값을 신뢰수준, 신뢰구간, 근사 및 추정치로 명시하고 있으며, 독립동일분포 가정에 따른 환산 한계를 명확히 언급하고 있습니다. 따라서 false_precision에 해당하지 않습니다."
+      },
+      "hallucination": {
+        "passed": true,
+        "reason": "모든 설명문의 실질적 주장들이 제공된 인용문 또는 해당 청크 원문으로 뒷받침되고 있으며, 외부 지식이나 검증되지 않은 주장을 포함하지 않았습니다."
+      },
+      "numeric_consistency": {
+        "passed": true,
+        "reason": "설명문의 엔진 수치·기준일은 metrics와 일치하고 인용 사실은 검증 인용과 일치합니다. (engine_metric=33, evidence_fact=0)"
+      },
+      "prohibited_expression": {
+        "passed": true,
+        "reason": "금지 표현이 없거나 명시적으로 부정되었습니다."
+      },
+      "source_validity": {
+        "passed": true,
+        "reason": "출처 정책 게이트 충족: 검증 통과 인용 1건"
+      }
+    },
+    "strict_citation_gate": true,
+    "trace_id": "local-case_018"
+  },
+  {
+    "as_of_date": "2026-07-24",
+    "case_content_sha256": "76410165ffbff06193c044de8cda82376f75f18de33f653779e618cdd64cb896",
+    "case_id": "case_019",
+    "checks": [
+      {
+        "detail": "리스크 지표 존재",
+        "name": "metrics_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "재현성 computation_hash 존재",
+        "name": "computation_hash_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "설명 6건",
+        "name": "explanations_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "주요 설명 문장 텍스트 존재",
+        "name": "explanations_have_text",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "검증 실패/형식 오류 인용 0건",
+        "name": "citations_all_verified",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "인용 구조 확인: 검증 통과 인용 3건",
+        "name": "verified_citations_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "인용 3건의 인용문·문서명·조항/주장·청크 일치",
+        "name": "citation_content_contract",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "HITL 승인 잠금 상태",
+        "name": "approval_locked",
+        "passed": true,
+        "required": false
+      },
+      {
+        "detail": "출처 정책 게이트 충족: 검증 통과 인용 3건",
+        "name": "source_validity",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "설명문의 엔진 수치·기준일은 metrics와 일치하고 인용 사실은 검증 인용과 일치합니다. (engine_metric=21, evidence_fact=0)",
+        "name": "numeric_consistency",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "설명문의 실질적 주장들이 모두 검증된 인용문 또는 해당 청크 원문으로 뒷받침되고 있으며, 외부 사실 주장에 대한 부적절한 인용 부재가 없습니다.",
+        "name": "hallucination",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "리포트는 확률·손실을 정밀하게 단정하지 않고, 신뢰수준(99%)과 보유기간(1일, 10일)을 명시한 VaR 및 CVaR 값을 제시하며, 약·추정·범위·신뢰구간 표현을 사용하여 false_precision을 피했습니다. 또한 환산값의 한계를 명시하고, 가상 설정 및 추정치임을 명확히 밝혔습니다.",
+        "name": "false_precision",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "기준일과 면책 문구가 존재합니다.",
+        "name": "disclaimer",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "금지 표현이 없거나 명시적으로 부정되었습니다.",
+        "name": "prohibited_expression",
+        "passed": true,
+        "required": true
+      }
+    ],
+    "code_sha": "b03560080367f0ba485a32336746c4293359687e",
+    "freeze_commit": "58d5e2b4fa62e37c56a1a083e83650272aa13015",
+    "input_set_hash": "2dc161f7e3de3f88d908670ada8d983a5f952e2ddc4a2a195b88206ef482819d",
+    "judge_attempt": 1,
+    "judge_feedback": "",
+    "langsmith_run_id": "219b8e2e-cd09-426e-b713-1f0f2238a65a",
+    "langsmith_trace_url": "https://apac.smith.langchain.com/o/3f716f7f-2a7d-46fe-93b2-7b0aaa823a34/projects/p/21f66d0d-bc80-49a3-bdc9-d314b381a283/r/219b8e2e-cd09-426e-b713-1f0f2238a65a?poll=true",
+    "manual_review_flags": [],
+    "model_version": {
+      "api_version": "2025-01-01-preview",
+      "deployment": "ai-insight-llm",
+      "model": "gpt-4o-2024-11-20"
+    },
+    "passed": true,
+    "prompt_hash": "3d1271aa98efa226934b8a8d936115a731da83a53c7039ac46a1a54004816da7",
+    "prompt_version": "v1",
+    "reason": "필수 품질 점검 통과",
+    "rubric": {
+      "disclaimer": {
+        "passed": true,
+        "reason": "기준일과 면책 문구가 존재합니다."
+      },
+      "false_precision": {
+        "passed": true,
+        "reason": "리포트는 확률·손실을 정밀하게 단정하지 않고, 신뢰수준(99%)과 보유기간(1일, 10일)을 명시한 VaR 및 CVaR 값을 제시하며, 약·추정·범위·신뢰구간 표현을 사용하여 false_precision을 피했습니다. 또한 환산값의 한계를 명시하고, 가상 설정 및 추정치임을 명확히 밝혔습니다."
+      },
+      "hallucination": {
+        "passed": true,
+        "reason": "설명문의 실질적 주장들이 모두 검증된 인용문 또는 해당 청크 원문으로 뒷받침되고 있으며, 외부 사실 주장에 대한 부적절한 인용 부재가 없습니다."
+      },
+      "numeric_consistency": {
+        "passed": true,
+        "reason": "설명문의 엔진 수치·기준일은 metrics와 일치하고 인용 사실은 검증 인용과 일치합니다. (engine_metric=21, evidence_fact=0)"
+      },
+      "prohibited_expression": {
+        "passed": true,
+        "reason": "금지 표현이 없거나 명시적으로 부정되었습니다."
+      },
+      "source_validity": {
+        "passed": true,
+        "reason": "출처 정책 게이트 충족: 검증 통과 인용 3건"
+      }
+    },
+    "strict_citation_gate": true,
+    "trace_id": "local-case_019"
+  },
+  {
+    "as_of_date": "2026-07-24",
+    "case_content_sha256": "a5173b71682ec20e3edd88909aa8afe26cafc1670f1c1139c721f50c9d7f78ff",
+    "case_id": "case_020",
+    "checks": [
+      {
+        "detail": "리스크 지표 존재",
+        "name": "metrics_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "재현성 computation_hash 존재",
+        "name": "computation_hash_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "설명 5건",
+        "name": "explanations_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "주요 설명 문장 텍스트 존재",
+        "name": "explanations_have_text",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "검증 실패/형식 오류 인용 0건",
+        "name": "citations_all_verified",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "인용 구조 확인: 검증 통과 인용 1건",
+        "name": "verified_citations_present",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "인용 1건의 인용문·문서명·조항/주장·청크 일치",
+        "name": "citation_content_contract",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "HITL 승인 잠금 상태",
+        "name": "approval_locked",
+        "passed": true,
+        "required": false
+      },
+      {
+        "detail": "출처 정책 게이트 충족: 검증 통과 인용 1건",
+        "name": "source_validity",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "설명문의 엔진 수치·기준일은 metrics와 일치하고 인용 사실은 검증 인용과 일치합니다. (engine_metric=16, evidence_fact=0)",
+        "name": "numeric_consistency",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "설명문의 모든 실질적 주장이 제공된 인용문 또는 해당 청크 원문으로 검증 가능하며, 외부 지식에 의존한 주장이 없습니다.",
+        "name": "hallucination",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "VaR와 CVaR 값은 신뢰수준과 보유기간을 명시하고 있으며, 환산 과정에서 독립동일분포 가정 및 근사값임을 명확히 언급하여 정밀한 단정이 아닌 추정치로 제시되었습니다. 따라서 false_precision 기준을 충족합니다.",
+        "name": "false_precision",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "기준일과 면책 문구가 존재합니다.",
+        "name": "disclaimer",
+        "passed": true,
+        "required": true
+      },
+      {
+        "detail": "금지 표현의 긍정적 사용: 반드시(** 분기마다 수행합니다)",
+        "name": "prohibited_expression",
+        "passed": false,
+        "required": true
+      }
+    ],
+    "code_sha": "b03560080367f0ba485a32336746c4293359687e",
+    "freeze_commit": "58d5e2b4fa62e37c56a1a083e83650272aa13015",
+    "input_set_hash": "2dc161f7e3de3f88d908670ada8d983a5f952e2ddc4a2a195b88206ef482819d",
+    "judge_attempt": 1,
+    "judge_feedback": "{\"action\": \"rag_cite_rewrite\", \"attempt\": 1, \"failed_axes\": [{\"axis\": \"prohibited_expression\", \"reason\": \"금지 표현의 긍정적 사용: 반드시(** 분기마다 수행합니다)\"}]}",
+    "langsmith_run_id": "0c77158b-e48d-4f72-a8aa-59ef4967d65e",
+    "langsmith_trace_url": "https://apac.smith.langchain.com/o/3f716f7f-2a7d-46fe-93b2-7b0aaa823a34/projects/p/21f66d0d-bc80-49a3-bdc9-d314b381a283/r/0c77158b-e48d-4f72-a8aa-59ef4967d65e?poll=true",
+    "manual_review_flags": [],
+    "model_version": {
+      "api_version": "2025-01-01-preview",
+      "deployment": "ai-insight-llm",
+      "model": "gpt-4o-2024-11-20"
+    },
+    "passed": false,
+    "prompt_hash": "890c63a112e6d77b5d35ec1337bc437858659b77967567194e4dc399f1357f05",
+    "prompt_version": "v1",
+    "reason": "필수 품질 점검 실패: prohibited_expression=금지 표현의 긍정적 사용: 반드시(** 분기마다 수행합니다)",
+    "rubric": {
+      "disclaimer": {
+        "passed": true,
+        "reason": "기준일과 면책 문구가 존재합니다."
+      },
+      "false_precision": {
+        "passed": true,
+        "reason": "VaR와 CVaR 값은 신뢰수준과 보유기간을 명시하고 있으며, 환산 과정에서 독립동일분포 가정 및 근사값임을 명확히 언급하여 정밀한 단정이 아닌 추정치로 제시되었습니다. 따라서 false_precision 기준을 충족합니다."
+      },
+      "hallucination": {
+        "passed": true,
+        "reason": "설명문의 모든 실질적 주장이 제공된 인용문 또는 해당 청크 원문으로 검증 가능하며, 외부 지식에 의존한 주장이 없습니다."
+      },
+      "numeric_consistency": {
+        "passed": true,
+        "reason": "설명문의 엔진 수치·기준일은 metrics와 일치하고 인용 사실은 검증 인용과 일치합니다. (engine_metric=16, evidence_fact=0)"
+      },
+      "prohibited_expression": {
+        "passed": false,
+        "reason": "금지 표현의 긍정적 사용: 반드시(** 분기마다 수행합니다)"
+      },
+      "source_validity": {
+        "passed": true,
+        "reason": "출처 정책 게이트 충족: 검증 통과 인용 1건"
+      }
+    },
+    "strict_citation_gate": true,
+    "trace_id": "local-case_020"
+  }
+]
