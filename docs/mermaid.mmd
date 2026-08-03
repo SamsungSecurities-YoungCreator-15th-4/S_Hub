@@ -1,6 +1,7 @@
 %%{init: {"theme": "base", "flowchart": {"htmlLabels": true, "curve": "linear"}}}%%
 %% S.ymphony Mermaid 아키텍처
 %% 실제 LangGraph 노드 9개 · 실행 단계 4개 · 아키텍처 계층 3개 · 조건부 루프 2개 · HITL 1개
+%% MAGI·Evidence Bundle·LangSmith는 그래프 밖 감사·관측 레이어이며 런타임 판정을 바꾸지 않음
 flowchart TB
 
     %% 실행 흐름과 분리된 아키텍처 계층 범례
@@ -38,23 +39,25 @@ flowchart TB
         N4 -. "block" .-> STOP
     end
 
-    %% 3단계: 정량 리스크 엔진, XAI, 검증 및 추적
-    subgraph STEP3["3. 정량 리스크 및 스트레스 연산 · RAG 근거 · Judge LLM"]
+    %% 3단계: 정량 리스크 엔진, XAI, Judge v6 검증 및 추적
+    subgraph STEP3["3. 정량 리스크 및 스트레스 연산 · RAG 근거 · Judge v6"]
         direction LR
         N5["⑤ var_engine<br/>yfinance 실데이터·Parquet 캐싱<br/>VaR·CVaR·스트레스 연산<br/>계산 해시 기록"]
         N6["⑥ rag_cite<br/>코퍼스 category 라우팅<br/>인용문·문서명·조항·청크 원문 검증<br/>검증 통과 citation+provenance 저장"]
-        N7["⑦ judge_eval<br/>6축 Judge LLM 루브릭+정밀 인용 재검증<br/>판정 사유·재시도 로그 기록"]
+        N7["⑦ judge_eval · v6<br/>6축 루브릭: 출처·수치 정합·환각<br/>위조정밀도·면책·금지표현<br/>결정론 4축 + LLM 2축 판정·사유 기록"]
+        RETRY["재시도 상한 SSOT<br/>config.yaml: judge_max_retries<br/>누락·오염 시 실행 거부"]
 
         N5 --> N6
         N6 --> N7
         N7 -. "미통과 & judge_retries < judge_max_retries<br/>RAG 재시도" .-> N6
+        RETRY -. "상한 제공" .-> N7
     end
 
     %% 4단계: Hard Stop 또는 최종 리스크 리포트 확정
     subgraph STEP4["4. Hard Stop 또는 리스크 리포트 확정"]
         direction LR
-        N8["⑧ manual_review_gate<br/>Judge 재시도 상한 소진 시 Hard Stop<br/>확정·다운로드 차단<br/>실패 축·결정 지문 기록"]
-        N9["⑨ assemble_report<br/>Judge 통과 결과를 확정 리포트로 생성"]
+        N8["⑧ manual_review_gate<br/>Judge 재시도 상한 소진 시 Hard Stop<br/>pending_manual_review · finalized=false<br/>export_allowed=false · decision_hash 기록"]
+        N9["⑨ assemble_report<br/>Judge v6 통과 결과를 확정 리포트로 생성<br/>finalized=true · export_allowed=true"]
         END((END))
 
         N8 --> END
@@ -67,10 +70,31 @@ flowchart TB
     N7 -->|"미통과 & judge_retries ≥ judge_max_retries"| N8
     N7 -->|"통과"| N9
 
-    %% 그래프 외 공통 감사 요소: 단일 연결로 교차선을 최소화
-    AUDIT["전 노드 RiskState 체크포인트<br/>[LangSmith]<br/>입력·충돌·계산 해시<br/>trace URL"]
-    N8 -. "차단 증거 기록" .-> AUDIT
-    N9 -. "전 과정 기록 및 추적" .-> AUDIT
+    %% 그래프 외 감사·관측 레이어: 런타임 판정과 분리
+    subgraph PROOF["그래프 외 검증·감사 증거 레이어"]
+        direction LR
+        CAL["Judge v1→v6 캘리브레이션<br/>Gold Label PASS 10 · FAIL 10<br/>동일 evalset으로 정확도·미탐·오탐 비교<br/>공식 LangSmith 실행 기록"]
+        TRACE["LangSmith 추적<br/>IPS·RAG·Judge 호출 이력<br/>trace ID · trace URL<br/>입출력 마스킹"]
+        BUNDLE["Evidence Bundle 자동 생성<br/>Judge 사유·인용 검증·Hard Stop 기록<br/>manifest · SHA-256 · 재현 지문"]
+        STATE["제출 후보 state dump<br/>성공 2건 · 차단 1건<br/>번들과 trace_id로 연결"]
+        MAGI["MAGI 판정 안정성 관측<br/>현재 Judge를 동일 입력에 3회 재호출<br/>LLM 2축 split·전원일치 여부 기록<br/>공식 PASS/FAIL에는 미반영"]
+        SUBMIT["모의 감사 제출<br/>Evidence Bundle 3건<br/>+ magi_submission.json"]
+
+        CAL -->|"calibration summary"| BUNDLE
+        BUNDLE --> SUBMIT
+        STATE --> MAGI
+        MAGI --> SUBMIT
+    end
+
+    CAL -. "v6 루브릭·프롬프트" .-> N7
+    N2 -. "LLM trace" .-> TRACE
+    N6 -. "RAG trace" .-> TRACE
+    N7 -. "Judge v6 trace" .-> TRACE
+    N8 -. "차단 state" .-> BUNDLE
+    N9 -. "확정 state" .-> BUNDLE
+    N8 -. "--dump-state" .-> STATE
+    N9 -. "--dump-state" .-> STATE
+    TRACE -. "trace 식별자" .-> BUNDLE
 
     %% 3계층은 실행 순서를 유지한 채 노드 색상으로 구분
     classDef deterministic fill:#EDF4FC,stroke:#3B5CCC,color:#111827,stroke-width:2px;
@@ -79,6 +103,7 @@ flowchart TB
     classDef terminal fill:#172033,stroke:#172033,color:#FFFFFF,stroke-width:2px;
     classDef stop fill:#FFF1F2,stroke:#DC2626,color:#991B1B,stroke-width:1.5px;
     classDef audit fill:#FFF7E6,stroke:#D97706,color:#7C2D12,stroke-width:1.5px,stroke-dasharray:5 3;
+    classDef stability fill:#F5F3FF,stroke:#7C3AED,color:#4C1D95,stroke-width:1.5px,stroke-dasharray:5 3;
     classDef note fill:#F8FAFC,stroke:#64748B,color:#334155,stroke-width:1.5px,stroke-dasharray:5 3;
 
     class KEY_DET,N1,N3,N5,N8,N9 deterministic;
@@ -86,11 +111,13 @@ flowchart TB
     class KEY_HITL,PAUSE,N4 hitlNode;
     class START,END terminal;
     class STOP stop;
-    class AUDIT audit;
-    class CONFLICT note;
+    class TRACE,BUNDLE,STATE,SUBMIT audit;
+    class CAL,MAGI stability;
+    class CONFLICT,RETRY note;
 
     style LEGEND fill:#FFFFFF,stroke:#CBD5E1,stroke-width:1px
     style STEP1 fill:#FFFFFF,stroke:#CBD5E1,stroke-width:1px
     style STEP2 fill:#FFFFFF,stroke:#CBD5E1,stroke-width:1px
     style STEP3 fill:#FFFFFF,stroke:#CBD5E1,stroke-width:1px
     style STEP4 fill:#FFFFFF,stroke:#CBD5E1,stroke-width:1px
+    style PROOF fill:#FFFBEB,stroke:#F59E0B,stroke-width:1px
