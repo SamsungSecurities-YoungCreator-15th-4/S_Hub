@@ -357,6 +357,45 @@ python scripts/magi_vote.py \
 **"이 설정에서 3회 관측 결과 판정이 동일했다"**로 말한다. 산출물의
 `header.null_result_phrasing`에 같은 문장이 들어 있다.
 
+#### 흔들림이 0건이어도 산출물은 나온다
+
+**"안정적이라 파일이 안 생겼다"는 오해를 먼저 막는다.** 하네스는 판정 결과와 무관하게
+`--out` 경로에 보고서를 쓴다. 흔들림 0건은 **측정 결과이지 미실행이 아니다** —
+`summary.unstable_cases: 0`과 `header.submission_states` 3건이 그 실행의 증거다.
+종료 코드 `0`도 "돌지 않았다"가 아니라 "3회 판정이 모두 같았다"는 뜻이다(§3.6 표).
+
+#### 제출물 구성과 대조 절차 — MAGI 산출물은 번들 밖에 있다
+
+번들은 **실행 1회분** 증거라 3건에 걸친 측정을 담지 않는다(구성의 원천은
+`app/evidence/schema.py:50` (BUNDLE_FILENAMES)). 그래서 서류철과 **나란히** 낸다.
+
+```
+제출물
+├── 성공①·성공②·차단 번들 3건
+├── success_1 · success_2 · blocked state 덤프 3건   (§1.1)
+└── magi_submission.json                            (§3.6)
+```
+
+**셋을 잇는 것은 파일 이름이 아니라 지문이다.** 아래 순서로 대조한다.
+
+1. `magi_submission.json`의 `header.submission_states[].state_sha256`
+2. 같은 값이 덤프에서 재계산되는지 확인 — 아래 명령
+3. 그 덤프의 `trace_id`가 번들 `summary.md` §추적의 `trace_id`와 같은지 (§1.1)
+
+```bash
+python -c "
+import json
+from app.evidence.state_dump import canonical_for_replay
+from app.utils.hashing import sha256_of_dict
+print(sha256_of_dict(canonical_for_replay(json.load(open('<덤프 경로>')))))
+"
+```
+
+**파일 `sha256sum`으로는 맞지 않는다.** 하네스가 `canonical_for_replay`로 `trace_id`를
+걷어낸 사본을 해시하기 때문이다 — `app/evidence/state_dump.py:159` (canonical_for_replay).
+관측용 재호출이 제출 번들의 트레이스에 섞이지 않게 하려는 것이고, 그 이유는
+`scripts/magi_vote.py:194` (load_state_cases)에 적혀 있다.
+
 ---
 
 ## 4. 먼저 밝힐 것 — 감사자가 화면에서 발견하기 전에 말한다
