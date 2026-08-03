@@ -5,5 +5,13 @@
   "input_set_hash": "2dc161f7e3de3f88d908670ada8d983a5f952e2ddc4a2a195b88206ef482819d",
   "langsmith_run": "Orchestration_Team4",
   "prompt_version": "v5",
-  "verifications": []
+  "verifications": [
+    {
+      "item": "app/rag/citations.py 동작 동일 확인",
+      "method": "git diff b03560080367f0ba485a32336746c4293359687e bed043e2f6d57994ee80f079ee47ebcbffc1a664 -- app/rag/citations.py",
+      "result": "diff 없음(0줄) — v1 이후 citations.py 미변경. source_validity 축 비교는 code_sha 차이와 무관하게 유효함",
+      "verified_at": "2026-08-04",
+      "verified_by": "지은"
+    }
+  ]
 }

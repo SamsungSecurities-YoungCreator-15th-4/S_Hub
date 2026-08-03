@@ -5,5 +5,13 @@
   "input_set_hash": "2dc161f7e3de3f88d908670ada8d983a5f952e2ddc4a2a195b88206ef482819d",
   "langsmith_run": "Orchestration_Team4",
   "prompt_version": "v1",
-  "verifications": []
+  "verifications": [
+    {
+      "item": "app/rag/citations.py 동작 동일 확인",
+      "method": "v1 자신이 비교 기준점(baseline)이라 diff 대상 없음",
+      "result": "해당 없음 (baseline)",
+      "verified_at": "2026-08-04",
+      "verified_by": "지은"
+    }
+  ]
 }
