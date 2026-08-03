@@ -66,6 +66,10 @@ def test_client_and_portfolio_inputs_render_without_exception():
         "대체투자 (%)": 10.0,
         "현금성자산 (%)": 5.0,
     }
+    force_fail = next(
+        field for field in app.number_input if field.label == "Judge 강제 실패 횟수"
+    )
+    assert force_fail.max == 3
     styles = "\n".join(
         element.value for element in app.markdown if "<style>" in element.value
     )
