@@ -52,7 +52,7 @@ def test_client_and_portfolio_inputs_render_without_exception():
     assert len(app.text_area) == 1
     assert app.text_area[0].label == "고객 정보"
     assert app.text_area[0].value == ""
-    assert len(app.number_input) == 7  # 포트폴리오 6종 + judge 강제 실패 횟수
+    assert len(app.number_input) == 7  # 포트폴리오 6종 + Judge 강제 실패 횟수
     portfolio_defaults = {
         field.label: field.value
         for field in app.number_input
@@ -66,6 +66,10 @@ def test_client_and_portfolio_inputs_render_without_exception():
         "대체투자 (%)": 10.0,
         "현금성자산 (%)": 5.0,
     }
+    force_fail = next(
+        field for field in app.number_input if field.label == "Judge 강제 실패 횟수"
+    )
+    assert force_fail.max == 3
     styles = "\n".join(
         element.value for element in app.markdown if "<style>" in element.value
     )
