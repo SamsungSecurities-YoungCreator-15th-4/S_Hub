@@ -44,10 +44,13 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from app.judge.rubric import AXIS_NAMES  # noqa: E402
+from app.observability.langsmith import langsmith_enabled  # noqa: E402
 from app.utils.hashing import sha256_of_dict  # noqa: E402
 
 # R2 러너와 **같은 로더·같은 LLM 팩토리**를 쓴다. 여기서 별도 경로를 만들면 측정된
@@ -593,6 +596,7 @@ def build_header(
     temperature: float | None,
     seed: int | None,
     runs: int,
+    langsmith_tracing: bool,
 ) -> dict:
     """해석에 필요한 조건을 전부 남긴다 — 나중에 이 수치를 읽는 사람 기준.
 
@@ -641,6 +645,10 @@ def build_header(
             "temperature·seed는 app/llm/client.py:get_llm의 값을 그대로 읽어 기록만 "
             "한다. 이 하네스는 샘플링 파라미터를 바꾸지 않는다."
         ),
+        # .env를 읽으면 LANGSMITH_*도 함께 환경에 올라와, 같은 명령이라도 키가 있는
+        # 환경에서는 원격 추적이 켜진 채 돈다. 실행 성격이 갈리는 조건이라 값만 남긴다
+        # (이 하네스는 추적을 켜지도 끄지도 않는다).
+        "langsmith_tracing": langsmith_tracing,
         "null_result_phrasing": NULL_RESULT_PHRASING,
         # 축 순수성 한계는 골든셋 표본 구성에서 오는 제약이라 제출 모드에는 없다.
         "axis_purity_caveat": None if submission else AXIS_PURITY_CAVEAT,
@@ -743,6 +751,11 @@ def _print_submission_plan(cases: list[dict], runs: int) -> None:
 
 
 def main() -> None:
+    # 실제 Azure 실행에 필요한 키를 .env에서 불러온다(judge_runner.py·run_graph.py와
+    # 동일 패턴). 이 하네스는 judge_runner의 `_real_llm`만 빌려 쓰고 그 main()을
+    # 거치지 않으므로 여기서 직접 부른다 — 없으면 런북 §3.6 명령이 환경 변수 누락
+    # RuntimeError로 끝나 제출 전 확인 자체가 성립하지 않는다.
+    load_dotenv(ROOT / ".env")
     parser = argparse.ArgumentParser(
         description="같은 입력에 judge를 3회 돌려 LLM 판정 축의 흔들림을 기록한다(관측 전용)."
     )
@@ -821,6 +834,7 @@ def main() -> None:
         temperature=getattr(llm, "temperature", None),
         seed=getattr(llm, "seed", None),
         runs=args.runs,
+        langsmith_tracing=langsmith_enabled(),
     )
     report = build_report(records, header=header)
     out_path = write_report(report, args.out)
