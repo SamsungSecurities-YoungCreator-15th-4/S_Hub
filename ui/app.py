@@ -14,10 +14,12 @@ from dotenv import load_dotenv
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.graph import build_graph
+from app.nodes.judge_eval import resolve_max_judge_retries
 from app.nodes.load_inputs import (
     ASSET_DEFINITIONS,
     DUMMY_PORTFOLIO,
     TOTAL_ASSET_KRW,
+    load_inputs,
     portfolio_from_percentages,
 )
 from app.observability.langsmith import (
@@ -52,6 +54,7 @@ from ui.start_page import render_start_page
 
 ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(ROOT / ".env")
+JUDGE_MAX_RETRIES = resolve_max_judge_retries(load_inputs({}))
 
 st.set_page_config(page_title="S.ymphony", layout="wide")
 
@@ -1027,7 +1030,18 @@ if not report:
             unsafe_allow_html=True,
         )
 
-        force_judge_fail = 0
+        with st.expander("개발·Hard Stop 시연 옵션"):
+            st.caption(
+                "강제 실패는 Judge의 결함 탐지 성능이 아니라 재시도·수동검토 차단 "
+                "동작만 시연합니다. 일반 분석에서는 0을 유지하세요."
+            )
+            force_judge_fail = st.number_input(
+                "Judge 강제 실패 횟수",
+                min_value=0,
+                max_value=JUDGE_MAX_RETRIES,
+                value=0,
+                label_visibility="collapsed",
+            )
 
         prepare_clicked = st.button("IPS 추출", type="primary")
 
