@@ -294,6 +294,53 @@ R1 사례집 20건을 judge에 돌리는 `scripts/judge_runner.py --r1`이 그 �
 
 질문이 나오면 §5의 15번을 연다.
 
+### 3.6 제출 전에 확인할 것 — 라이브에서 판정이 뒤집히지 않는가
+
+**차단 번들과 확정 번들의 위험이 서로 다르다.** 이 구분을 먼저 한다.
+
+| 번들 | 라이브 재실행에서 뒤집힐 수 있나 | 이유 |
+| --- | --- | --- |
+| **차단 1건** | 아니오 | `--force-judge-fail`이 judge 판정을 덮어쓴다(§3.5). 실패 신호가 LLM 판정에서 오지 않으므로 흔들릴 자리가 없다 |
+| **확정 2건** | **가능하다** | judge가 실제로 pass를 줘야 확정된다. 그 판정에 LLM 2축(환각·위조정밀도)이 들어가고, 그 둘은 `reproducibility_scope.md` §2.1 **조건부** 항목이다 |
+
+즉 위험은 차단 쪽이 아니라 **확정 쪽**에 있다. 심사장에서 확정 번들을 다시 돌렸을 때
+판정이 fail로 뒤집히면 "확정됐던 리포트가 눈앞에서 차단"되고, 그 자리에서 설명할 방법이 없다.
+
+**그래서 제출 전에 같은 방법으로 미리 잰다.** 번들을 만들 때 `--dump-state`로 남긴 state를
+`scripts/magi_vote.py`의 제출 모드에 넣어 각 3회씩 다시 판정시킨다.
+
+```bash
+# 번들 생성 시 state를 함께 남긴다 (§1.1과 같은 절차)
+python scripts/run_graph.py --auto-approve --dump-state out/state_pass1.json --evidence-bundle
+python scripts/run_graph.py --auto-approve --dump-state out/state_pass2.json --evidence-bundle
+python scripts/run_graph.py --auto-approve --force-judge-fail 3 \
+    --dump-state out/state_block.json --evidence-bundle
+
+# 제출 후보 3건의 판정 안정성 확인 (사례당 3회 · LLM 호출 18회)
+python scripts/magi_vote.py \
+    --from-state out/state_pass1.json \
+    --from-state out/state_pass2.json \
+    --from-state out/state_block.json \
+    --out out/magi_submission.json
+```
+
+종료 코드로 판단한다.
+
+| 코드 | 뜻 | 할 것 |
+| --- | --- | --- |
+| `0` | 3회 판정이 모두 같음 | 그대로 제출한다 |
+| `1` | judge 호출이 재시도 후에도 실패 | 측정이 성립하지 않았다. 네트워크·쿼터를 보고 다시 잰다 |
+| `2` | **결정론 4축이 갈렸다** | 흔들림이 아니라 코드 결함이다. 제출보다 먼저 원인을 찾는다 |
+| `3` | LLM 축이 갈린 후보가 있다 | 해당 후보를 다른 실행으로 교체하거나, 뒤집힘 가능성을 알고 제출할지 팀이 정한다 |
+
+산출물 `header.submission_states`에 각 후보의 `state_sha256`이 남는다. **서류철에 실린 번들과
+이 측정이 같은 산출물인지는 이 지문으로 대조한다** — 경로만으로는 증명되지 않는다.
+
+**이 확인의 한계를 함께 말한다.** 한 가지 샘플링 설정(`header.temperature`·`header.seed`)에서
+3회 관측한 것이다. 흔들림이 안 나와도 "흔들리지 않는다"로 일반화하지 않고,
+**"이 설정에서 3회 관측 결과 판정이 동일했다"**로 말한다. 산출물의
+`header.null_result_phrasing`에 같은 문장이 들어 있다.
+
 ---
 
 ## 4. 먼저 밝힐 것 — 감사자가 화면에서 발견하기 전에 말한다
