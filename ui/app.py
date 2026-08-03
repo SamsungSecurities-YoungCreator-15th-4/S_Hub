@@ -14,12 +14,10 @@ from dotenv import load_dotenv
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.graph import build_graph
-from app.nodes.judge_eval import resolve_max_judge_retries
 from app.nodes.load_inputs import (
     ASSET_DEFINITIONS,
     DUMMY_PORTFOLIO,
     TOTAL_ASSET_KRW,
-    load_inputs,
     portfolio_from_percentages,
 )
 from app.observability.langsmith import (
@@ -54,7 +52,6 @@ from ui.start_page import render_start_page
 
 ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(ROOT / ".env")
-JUDGE_MAX_RETRIES = resolve_max_judge_retries(load_inputs({}))
 
 st.set_page_config(page_title="S.ymphony", layout="wide")
 
@@ -1030,16 +1027,7 @@ if not report:
             unsafe_allow_html=True,
         )
 
-        with st.expander("개발·Hard Stop 시연 옵션"):
-            st.caption(
-                "강제 실패는 Judge의 결함 탐지 성능이 아니라 재시도·수동검토 차단 "
-                "동작만 시연합니다. 일반 분석에서는 0을 유지하세요."
-            )
-            force_judge_fail = st.number_input(
-                "Judge 강제 실패 횟수",
-                min_value=0, max_value=JUDGE_MAX_RETRIES, value=0,
-                label_visibility="collapsed",
-            )
+        force_judge_fail = 0
 
         prepare_clicked = st.button("IPS 추출", type="primary")
 
@@ -1293,9 +1281,7 @@ if not report:
                                 },
                             },
                         )
-                        with st.spinner(
-                            "리스크 연산·RAG 인용·Judge 검증 및 감사 기록 생성 중…"
-                        ):
+                        with st.spinner("리스크 분석 중..."):
                             with tracing_scope(resume_invocation):
                                 for _ in graph.stream(
                                     None,
@@ -1370,7 +1356,6 @@ else:
             type="primary",
             icon=":material/download:",
             disabled=not _pdf_export.enabled,
-            help=_pdf_export.help_text,
             width="stretch",
         )
     with _evidence_col:
@@ -1390,11 +1375,7 @@ else:
             key="download_evidence_bundle",
             icon=":material/folder_zip:",
             disabled=_evidence_download is None,
-            help=(
-                "성공·차단 실행의 Judge, 인용, LangSmith, Hard Stop 기록을 내려받습니다."
-                if _evidence_download
-                else "이 세션에는 최종 state 기반 감사 번들이 없습니다. 분석을 다시 실행해 주세요."
-            ),
+            help="리스크 분석 과정 검증 기록을 확인할 수 있습니다.",
             width="stretch",
         )
     if _pdf_save_clicked and _pdf_export.enabled:
