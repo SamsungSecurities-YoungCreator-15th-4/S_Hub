@@ -108,6 +108,16 @@ def test_source_validity_fails_when_any_citation_is_unverified():
     assert passed is False
     assert "2건 중 1건" in reason
 
+
+def test_source_validity_fails_when_a_citation_is_not_a_dict():
+    """dict가 아닌 인용(예: 문자열)이 섞이면 예전엔 조용히 걸러져 나머지 dict
+    인용만으로 통과 판정이 났다 — judge_eval의 citations_all_verified 필수검사는
+    같은 입력에서 이미 fail하므로 축과 필수검사가 다른 답을 내는 사각지대였다.
+    is_verified_citation이 isinstance 검사를 포함하므로 이제 미검증으로 집계된다."""
+    passed, reason = source_validity([VERIFIED_CITATION, "이상한_문자열"], strict=False)
+    assert passed is False
+    assert "2건 중 1건" in reason
+
     # 인용이 전부 검증되면(strict 무관) 여전히 통과한다.
     assert source_validity([VERIFIED_CITATION, VERIFIED_CITATION], strict=False)[0] is True
 
