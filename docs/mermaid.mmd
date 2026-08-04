@@ -39,12 +39,12 @@ flowchart TB
         N4 -. "block" .-> STOP
     end
 
-    %% 3단계: 정량 리스크 엔진, XAI, Judge v6 검증 및 추적
-    subgraph STEP3["3. 정량 리스크 및 스트레스 연산 · RAG 근거 · Judge LLM v6"]
+    %% 3단계: 정량 리스크 엔진, XAI, Judge v7 검증 및 추적
+    subgraph STEP3["3. 정량 리스크 및 스트레스 연산 · RAG 근거 · Judge LLM v7"]
         direction LR
         N5["⑤ var_engine<br/>yfinance 실데이터·Parquet 캐싱<br/>VaR·CVaR·스트레스 연산<br/>계산 해시 기록"]
         N6["⑥ rag_cite<br/>코퍼스 category 라우팅<br/>인용문·문서명·조항·청크 원문 검증"]
-        N7["⑦ judge_eval · v6<br/>6축 루브릭: 출처·수치 정합·환각<br/>위조정밀도·면책·금지표현"]
+        N7["⑦ judge_eval · v7<br/>6축 루브릭: 출처·수치 정합·환각<br/>위조정밀도·면책·금지표현"]
 
         N5 --> N6
         N6 --> N7
@@ -71,7 +71,7 @@ flowchart TB
     %% 그래프 외 감사·관측 레이어: 런타임 판정과 분리
     subgraph PROOF["추가 레이어"]
         direction LR
-        CAL["Judge v1→v6 캘리브레이션<br/>Gold Label Set PASS 10 · FAIL 10"]
+        CAL["Judge v1→v7 캘리브레이션<br/>Gold Label Set PASS 10 · FAIL 10"]
         TRACE["LangSmith 추적<br/>IPS·RAG·Judge 호출 이력<br/>trace ID · trace URL"]
         BUNDLE["Evidence Bundle 생성<br/>Judge 사유·인용 검증·Hard Stop 기록<br/>manifest · SHA-256 · 재현 지문"]
         MAGI["MAGI 시스템 도입측<br/>현재 Judge를 동일 입력에 3회 재호출<br/>안정 or 불안정 json을 생성해 재현성 체크"]
