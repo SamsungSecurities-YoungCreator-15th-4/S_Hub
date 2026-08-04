@@ -87,16 +87,18 @@ def _explanation_text(explanations: list) -> str:
 
 
 def source_validity(citations: list, strict: bool) -> tuple[bool, str]:
-    verified = [
-        citation
-        for citation in citations
-        if isinstance(citation, dict) and citation.get("verified") is True
-    ]
-    if verified:
-        return True, f"출처 정책 게이트 충족: 검증 통과 인용 {len(verified)}건"
-    if strict:
-        return False, "strict citation gate에서 검증 통과 인용이 0건입니다."
-    return True, "검증 통과 인용이 0건이므로 수동검토 대상으로 통과합니다."
+    dict_citations = [citation for citation in citations if isinstance(citation, dict)]
+    if not dict_citations:
+        if strict:
+            return False, "strict citation gate에서 검증 통과 인용이 0건입니다."
+        return True, "검증 통과 인용이 0건이므로 수동검토 대상으로 통과합니다."
+    unverified = [c for c in dict_citations if c.get("verified") is not True]
+    if unverified:
+        return (
+            False,
+            f"인용 {len(dict_citations)}건 중 {len(unverified)}건이 검증되지 않았습니다.",
+        )
+    return True, f"출처 정책 게이트 충족: 검증 통과 인용 {len(dict_citations)}건"
 
 
 def _metric_numbers(value, *, key: str = "") -> set[float]:
