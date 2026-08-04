@@ -26,6 +26,7 @@
 | 오케스트레이션 | LangGraph (StateGraph, MemorySaver, HITL 인터럽트) |
 | LLM | Azure OpenAI (LangChain, temperature=0) — IPS 추출·RAG 인용·Judge |
 | 결정론 엔진 | numpy/scipy — historical VaR/CVaR, 스트레스 테스트 |
+| RAG 검색 | Chroma(langchain-chroma) + AzureOpenAIEmbeddings — 코퍼스 21건 인용·검증 |
 | 관측성 | LangSmith 트레이싱 |
 | UI | Streamlit |
 | 협업 | GitHub, Notion, Slack |
