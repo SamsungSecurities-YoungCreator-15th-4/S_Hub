@@ -24,17 +24,19 @@ R1 골든셋 20건 기준, judge 6축 루브릭의 버전별 official 계열(off
 | `v3_v4_compare_summary.json` | v3→v4 | official_code_change | `ec27d22`→`e3b0122` (#177→#178) | 70.0%→70.0% | disclaimer·prohibited_expression 코드 수정(프롬프트 불변). 축별 recall은 개선(면책 2/3→3/3, 금지표현 1/2→2/2)했으나 같은 케이스의 다른 축이 여전히 틀려 전체 confusion matrix는 불변 |
 | `v4_v5_compare_summary.json` | v4→v5 | official | `e3b0122`→`bed043e` (#178→#179) | 70.0%→75.0% | false_precision confidence/ci_level 오탐 완화 |
 | `v5_v6_compare_summary.json` | v5→v6 | official | `bed043e`→`fbc85f4` (#179→#180) | 75.0%→80.0% | hallucination B1("일반 시장 원리" 예외) 적용 범위 축소 |
-| `v6_report_summary.json` | v6 (단독) | official | `fbc85f4` (단독) | **80.0% (16/20)** | v6 라운드 단독 요약 — v6 공식 성능의 단일 참조점 |
-| (집계 대기) | v6→v7 | official_code_change | `fbc85f4`→`d5166e5` (#180→#196) | 집계 대기 | `source_validity` 사각지대 코드 수정(프롬프트 불변). 실행·기록 완료, **사람 라벨 대조 집계는 R2 분석 담당 몫**이라 이 표의 요약 파일은 아직 없다 |
+| `v6_report_summary.json` | v6 (단독) | official | `fbc85f4` (단독) | 80.0% (16/20) | v6 라운드 단독 요약 |
+| `v6_v7_compare_summary.json` | v6→v7 | official_code_change | `fbc85f4`→`d5166e5` (#180→#196) | 80.0%→80.0% (동일) | `source_validity` 사각지대 코드 수정(프롬프트 불변). confusion matrix 완전 동일(fn1·fp3·tn7·tp9) — 20/20 전체 pass/fail 불변, 부작용 없음 |
+| `v7_report_summary.json` | v7 (최종, 단독) | official | `d5166e5` (단독) | **80.0% (16/20)** | 최종 라운드 단독 요약 — 이 파일이 v7 공식 최종 성능의 단일 참조점 |
 
 > **v7 실행 기록** — `docs/r2_calibration_runs/judge_v7_results.json`·`.manifest.json`.
 > `code_sha=d5166e5`, `freeze_commit=58d5e2b`, `input_set_hash`·`case_content_sha256` 20건이
 > v6과 동일하고 `prompt_hash`도 v6과 같다 — **같은 문제집·같은 프롬프트에 코드만 바뀌었다**는
 > 것이 해시로 증명되므로 등급은 `official_code_change`다. LangSmith run 20/20 기록,
 > `judge_attempt` 전부 1, 제출 등급 계약 20건 전부 통과(`scripts/verify_judge_results.py`).
-> judge 판정 기준 축별 실패 건수는 `source_validity` 0→1이고 나머지 5축과 20건의 전체
-> pass/fail은 v6과 동일하다(아래 [알려진 한계](#알려진-한계)의 `source_validity` 항목 참조).
-> 최종 일치율은 사람 라벨 대조 후 확정된다.
+> **사람 라벨 대조 집계 완료(R2 분석 담당)** — `v6_v7_compare_summary.json`·`v7_report_summary.json`
+> 참조. 전체 confusion matrix가 v6과 완전히 동일해(fn1·fp3·tn7·tp9), 코드 수정이 의도한 축에만
+> 작용하고 다른 축·전체 판정에는 부작용이 없었음이 확인됐다(아래 [알려진 한계](#알려진-한계)의
+> `source_validity` 항목 참조).
 
 ## 계획 대비 변경
 
