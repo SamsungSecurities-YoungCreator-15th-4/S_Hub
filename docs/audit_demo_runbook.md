@@ -114,7 +114,8 @@ python -c "import json;print(json.load(open('submitted.json'))['demo_options'])"
 - `summary.md`의 `report_hash`는 재현 지문이 **아니다.** 번들이 `report` 전문에서 계산한 값이며, 화면에 "재현 지문 아님"이라고 적혀 있다.
 - 같은 값이 `replay_diff.json`의 `hashes`에도 있다 — `scripts/make_evidence_bundle.py:329` (build_replay_diff). 감사자가 "summary가 옮겨 적은 것 아니냐"고 물으면 그쪽을 열어 대조한다.
 - 왜 3종뿐인지 묻거든 `docs/reproducibility_scope.md` §3 「제외 대상에 대한 원칙」을 연다.
-- `replay_diff.json`을 열면 `status: single_run_only`가 같이 보인다. **먼저 말한다** — 이 번들은 1회 실행분 해시만 싣고 있고 2회 대조는 3분 재실행에서 지금 한다고 예고한다.
+- `replay_diff.json`을 열면 `status: single_run_only`가 같이 보인다. **먼저 말한다** — 번들 하나는 실행 1회분이라 그 안에서 2회 대조가 성립하지 않는다.
+  그 대조는 **제출물에 이미 들어 있다** — `replay_verification.txt`(§3.6). 3분 재실행은 그것을 현장에서 한 번 더 하는 것이지, 없던 것을 처음 만드는 것이 아니다.
 
 ### 2.3 ⑥ 구간 — `available:false`가 나왔을 때 말할 것
 
@@ -126,11 +127,22 @@ python -c "import json;print(json.load(open('submitted.json'))['demo_options'])"
 | `trace.node_execution_order` | state에 없는 값이라 채울 수 없음. CLI 출력에만 존재 | 〃 §8.2 |
 | `hard_stop_record.manual_review_gate` (성공 번들) | 공백이 아니라 **정상**. 같은 파일 `blocked=false`가 같은 사실을 파생값으로 확인 | 〃 §8.5 |
 | `LangSmith trace URL: 없음 (...)` | 추적이 꺼진 실행. `trace_id`는 그대로 있고 원본 키 경로가 사유에 적혀 있음 | 〃 §5 |
-| `calibration_summary.json`의 `v2`·`comparison` | 제출 번들은 v6 **단일 측정**이라 비교 자리가 비어 있음. `source`·`v1`은 채워져 있고, 파일은 어느 경우든 항상 생성됨 | 〃 §8.4 |
+| `calibration_summary.json`의 `v2`·`comparison` | **제출 번들에서는 채워져 있다** — v1(개선 전)→v7(개선 후) 2라운드를 넘겨 만들기 때문(§3.6). 이 줄은 `--calibration`을 단일 라운드로 넘긴 실행에서만 해당된다 | 〃 §8.4 |
+
+**`comparison`을 열면 두 점만 보인다 — 먼저 말한다.** 번들 스키마의 `comparison`이 2라운드
+구조라 v1(75%)→v7(80%) 끝점 둘만 실린다. 그대로 두면 **좋은 구간만 고른 것처럼** 읽히므로,
+감사자가 묻기 전에 이렇게 말한다.
+
+> "이 표는 v1과 v7 두 점입니다. 중간에 **v2에서 55%까지 떨어진 라운드**가 있었고
+> (오탐 4→8건), 7라운드 전 구간 기록은 `goldenset/reports/r2_calibration/README.md`
+> 요약 표에 있습니다."
+
+`docs/symphony_proof_plan.md` §3의 "개선 후 나빠진 축도 그대로 제출"과 같은 원칙이다.
+숨긴 것이 아니라 **파일 하나가 담을 수 있는 자리가 둘**이라는 것을 밝히는 것이다.
 
 핵심 문장은 하나다 — **"없는 것"과 "안 채운 것"을 구분해 사유와 원본 키 경로를 함께 적었다** (`docs/evidence_bundle_schema.md` §5).
 
-제출 번들 3건은 calibration이 **채워진 채로** 나간다(`mode: official`·`prompt_version: v6`).
+제출 번들 3건은 calibration이 **채워진 채로** 나간다(`mode: official`·`v1`은 `prompt_version: v1`·`v2`는 `v7`).
 그래서 아래 문단이 예외가 아니라 기본 동선이다.
 
 **calibration이 채워진 번들이라면 `source.mode`를 먼저 짚는다.** 허용 모드는 `dev_mock`·`offline_rehearsal`·`official`·`official_code_change`·`official_offline_code_change`이며, 공식 제출 가능 모드는 LangSmith까지 검증한 `official`·`official_code_change`뿐이다. 감사자가 일치율을 먼저 읽기 전에 등급을 말한다. 알 수 없는 mode나 모순된 검증 플래그에서는 수치도 함께 비워지므로(fail-closed), "수치는 있는데 등급을 모르는" 상태는 나오지 않는다 — `docs/evidence_bundle_schema.md` §4.8.
@@ -312,7 +324,18 @@ R1 사례집 20건을 judge에 돌리는 `scripts/judge_runner.py --r1`이 그 �
 **그래서 제출 전에 같은 방법으로 미리 잰다.** 번들을 만들 때 `--dump-state`로 남긴 state를
 `scripts/magi_vote.py`의 제출 모드에 넣어 각 3회씩 다시 판정시킨다.
 
+**아래 캘리브레이션 명령은 R2 분석 담당이 실행한다.** `--human-labels-dir goldenset/cases`가
+사람 라벨을 직접 읽으므로, R2 실행·기록 담당은 이 블록을 실행하지 않는다 — 이 프로젝트의
+leakage 경계다(`goldenset/case-format.md` §0, `goldenset/reports/r2_calibration/README.md` 머리말).
+
 ```bash
+# R2 원본 리포트를 먼저 만든다 — v1(개선 전)→v7(개선 후) 2라운드.
+# 한 라운드만 넘기면 번들의 comparison(개선 전후 비교표) 자리가 비어서 나간다.
+python scripts/calibration_report.py --human-labels-dir goldenset/cases \
+    --judge-results    docs/r2_calibration_runs/judge_v1_results.json \
+    --judge-results-v2 docs/r2_calibration_runs/judge_v7_results.json \
+    --official --out out/calibration_v1_v7.json
+
 # 번들 생성 시 state를 함께 남긴다 (§1.1과 같은 절차 — 플래그·경로도 §1.1을 따른다)
 python scripts/run_graph.py --auto-approve --offline --evidence-bundle \
     --calibration <R2 원본 리포트> --dump-state evidence/state_dumps/success_1.json
@@ -339,6 +362,27 @@ python scripts/magi_vote.py \
   (`schema_version`·`mode`·`official_validation_passed`·`langsmith_required`)가 최상위에 있어야
   하며, 이미 번들에 실린 스트립본을 되먹이면 fail-closed로 수치가 통째로 비워진다
   (`docs/evidence_bundle_schema.md` §4.8).
+- **이 원본은 제출물이 아니다.** `records[].human_rationale`에 사람 라벨 원문이 들어 있어,
+  제출물에 넣으면 답안지가 증거물로 새어 나간다. 번들에는 집계값만 스트립되어 실린다
+  (`app/evidence/schema.py`의 `CALIBRATION_MISMATCH_EXCLUSION_REASON`). `out/`은 gitignore 대상이다.
+
+**같은 입력 2회 실행 대조도 여기서 만든다.** 번들 하나는 실행 1회분이라
+`replay_diff.json`이 `status: single_run_only`로 나간다(`docs/evidence_bundle_schema.md` §8.3).
+대조는 성공①을 같은 플래그로 한 번 더 돌려 `replay_verify.py`로 만든다 — 손으로 비교하지 않는다.
+
+```bash
+python scripts/run_graph.py --auto-approve --offline \
+    --dump-state evidence/state_dumps/success_1_replay.json
+
+python scripts/replay_verify.py \
+    evidence/state_dumps/success_1.json \
+    evidence/state_dumps/success_1_replay.json | tee replay_verification.txt
+```
+
+- **`--evidence-bundle`·`--calibration`은 걸지 않는다.** 4번째 번들이 필요하지 않고, 두 플래그는
+  `demo_options`·`config_hash` 어디에도 들어가지 않아 "같은 입력"이 그대로 성립한다.
+- 종료 코드 `0`이 아니면 **같은 입력에 결과가 갈린 것**이라 제출보다 원인이 먼저다.
+  대조 범위의 원천은 `app/evidence/replay_scope.py`이고 선언은 `docs/reproducibility_scope.md`다.
 
 종료 코드로 판단한다.
 
@@ -372,9 +416,21 @@ python scripts/magi_vote.py \
 ```
 제출물
 ├── 성공①·성공②·차단 번들 3건
-├── success_1 · success_2 · blocked state 덤프 3건   (§1.1)
-└── magi_submission.json                            (§3.6)
+├── success_1 · success_2 · blocked state 덤프 3건        (§1.1)
+├── magi_submission.json                                 (§3.6)
+├── replay_verification.txt                              (§3.6 — 같은 입력 2회 실행 대조)
+└── success_1_replay state 덤프 1건                       (〃 대조의 2회차 원본)
 ```
+
+**덤프 파일명이 두 자리에서 다른 이유** — 만들 때와 담을 때가 다르다. `--dump-state`는
+`evidence/state_dumps/<이름>.json`으로 만들고(§1.1), 제출물로 담을 때 `<이름>_state.json`으로
+복사한다. 8/4 새벽 제출본이 이미 그 규칙이다(`success_1.json` → `success_1_state.json`).
+재현 대조의 2회차도 같다 — `success_1_replay.json` → `success_1_replay_state.json`.
+
+**뒤의 셋이 번들 밖에 있는 이유는 같다** — 번들 구성의 원천은 `BUNDLE_FILENAMES`
+(`app/evidence/schema.py:50`) 하나뿐이고, 셋 다 실행 **1회분을 넘는** 측정이라 그 목록에
+들어갈 자리가 없다. MAGI는 3후보×3회, 재현 대조는 2회 실행이다. 번들을 늘리는 대신
+나란히 낸다.
 
 **셋을 잇는 것은 파일 이름이 아니라 지문이다.** 아래 순서로 대조한다.
 
