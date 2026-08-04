@@ -55,7 +55,7 @@ flowchart TB
     subgraph STEP4["4. Hard Stop or 리스크 리포트 확정"]
         direction LR
         N8["⑧ manual_review_gate<br/>Judge 재시도 상한 소진 시 Hard Stop<br/>리포트 생성 불가"]
-        N9["⑨ assemble_report<br/>Judge v6 통과 결과를 확정 리포트로 생성"]
+        N9["⑨ assemble_report<br/>Judge v7 통과 결과를 확정 리포트로 생성"]
         END((END))
 
         N8 --> END
@@ -81,7 +81,7 @@ flowchart TB
 
     CAL -. "Judge 보강(프롬프트 및 결정론적 코드 개선)" .-> N7
     N6 -. "RAG trace" .-> TRACE
-    N7 -. "Judge v6 trace" .-> TRACE
+    N7 -. "Judge v7 trace" .-> TRACE
     N8 -. "차단 state" .-> BUNDLE
     N9 -. "확정 state" .-> BUNDLE
     TRACE -. "trace 식별자" .-> BUNDLE
