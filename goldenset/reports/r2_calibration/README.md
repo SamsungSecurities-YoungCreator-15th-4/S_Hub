@@ -1,4 +1,4 @@
-# R2 judge 캘리브레이션 — v1~v6 추적 기록
+# R2 judge 캘리브레이션 — v1~v7 추적 기록
 
 R1 골든셋 20건 기준, judge 6축 루브릭의 버전별 official 계열(official·official_code_change,
 전부 LangSmith 검증) 측정 결과 요약본. 원본(사람 라벨 근거 `human_rationale` 등 케이스별 상세
@@ -24,7 +24,17 @@ R1 골든셋 20건 기준, judge 6축 루브릭의 버전별 official 계열(off
 | `v3_v4_compare_summary.json` | v3→v4 | official_code_change | `ec27d22`→`e3b0122` (#177→#178) | 70.0%→70.0% | disclaimer·prohibited_expression 코드 수정(프롬프트 불변). 축별 recall은 개선(면책 2/3→3/3, 금지표현 1/2→2/2)했으나 같은 케이스의 다른 축이 여전히 틀려 전체 confusion matrix는 불변 |
 | `v4_v5_compare_summary.json` | v4→v5 | official | `e3b0122`→`bed043e` (#178→#179) | 70.0%→75.0% | false_precision confidence/ci_level 오탐 완화 |
 | `v5_v6_compare_summary.json` | v5→v6 | official | `bed043e`→`fbc85f4` (#179→#180) | 75.0%→80.0% | hallucination B1("일반 시장 원리" 예외) 적용 범위 축소 |
-| `v6_report_summary.json` | v6 (최종, 단독) | official | `fbc85f4` (단독) | **80.0% (16/20)** | 최종 라운드 단독 요약 — 이 파일이 v6 공식 최종 성능의 단일 참조점 |
+| `v6_report_summary.json` | v6 (단독) | official | `fbc85f4` (단독) | **80.0% (16/20)** | v6 라운드 단독 요약 — v6 공식 성능의 단일 참조점 |
+| (집계 대기) | v6→v7 | official_code_change | `fbc85f4`→`d5166e5` (#180→#196) | 집계 대기 | `source_validity` 사각지대 코드 수정(프롬프트 불변). 실행·기록 완료, **사람 라벨 대조 집계는 R2 분석 담당 몫**이라 이 표의 요약 파일은 아직 없다 |
+
+> **v7 실행 기록** — `docs/r2_calibration_runs/judge_v7_results.json`·`.manifest.json`.
+> `code_sha=d5166e5`, `freeze_commit=58d5e2b`, `input_set_hash`·`case_content_sha256` 20건이
+> v6과 동일하고 `prompt_hash`도 v6과 같다 — **같은 문제집·같은 프롬프트에 코드만 바뀌었다**는
+> 것이 해시로 증명되므로 등급은 `official_code_change`다. LangSmith run 20/20 기록,
+> `judge_attempt` 전부 1, 제출 등급 계약 20건 전부 통과(`scripts/verify_judge_results.py`).
+> judge 판정 기준 축별 실패 건수는 `source_validity` 0→1이고 나머지 5축과 20건의 전체
+> pass/fail은 v6과 동일하다(아래 [알려진 한계](#알려진-한계)의 `source_validity` 항목 참조).
+> 최종 일치율은 사람 라벨 대조 후 확정된다.
 
 ## 계획 대비 변경
 
@@ -97,6 +107,12 @@ R1 골든셋 20건 기준, judge 6축 루브릭의 버전별 official 계열(off
     citation in unique_verified]` — `app/nodes/rag_cite.py:1004`) 탈락분은 `citation_rejections`로
     분리하므로, 미검증 인용이 애초에 이 축에 도달하지 않는다. F1(PR #181)이 두 경로 모두에서
     관측되지 않았던 것과 달리, 이번 건은 **calibration 경로에서만 작동**한다(PR #196 리뷰, 다경).
+  - **v7 실측 결과, 의도한 대로 작동했다.** 이 축의 실패 판정이 6라운드 만에 처음으로 나왔고
+    (0건 → 1건), 나머지 5축의 실패 건수는 **한 건도 움직이지 않았으며**(수치정합 8·환각 2·
+    위조정밀도 2·면책 3·금지표현 2로 v6과 동일), 20건의 전체 pass/fail 판정도 **20/20 모두 v6과
+    같았다.** 코드 수정이 의도한 축에만 의도한 만큼 작용했고 다른 축에 부작용이 없었다는
+    단일 변수 확인이다. 전체 일치율이 아니라 **축별 일치율에서 이 축을 처음으로 측정 가능하게
+    만드는 것**이 이 라운드의 목적이었고, 그대로 달성됐다.
 - **LLM 2축(`hallucination`·`false_precision`)의 라운드 간 변화는 프롬프트 개선 효과와 벤더
   비결정성을 분리하지 못한다.** 이 두 축만 LLM 판정이고, 각 버전을 **1회씩만** 실행했다.
   `docs/reproducibility_scope.md`는 judge 6축 판정을 무조건 보장 대상이 아닌 **반복 실측 대상**으로
