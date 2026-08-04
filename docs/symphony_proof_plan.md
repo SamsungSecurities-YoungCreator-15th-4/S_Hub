@@ -87,14 +87,16 @@ goldenset/
 
 **완료 기준 (DoD)**
 
-- [ ] `case_001`~`case_020` 20건 존재, `GS-EX-*` 접두 0건
-- [ ] 라벨링 가이드 §2 경계 사례 규칙 6칸 전부 채워짐 — **이거 없이 라벨링 시작 금지**
-- [ ] fail 10건이 6축 전부 커버 (축별 최소 1건)
-- [ ] `fail_axes` 값이 허용 6문자열에만 속함 (스키마 테스트 통과)
-- [ ] 2인 독립 라벨 일치율이 `initial_agreement`에 기록됨
-- [ ] 전 사례에 합성·가상 데이터 명시, LLM 초안 사용 사례에 표기
+- [x] `case_001`~`case_020` 20건 존재, `GS-EX-*` 접두 0건
+- [x] 라벨링 가이드 §2 경계 사례 규칙 6칸 전부 채워짐 — 축별 7·7·7·16·10·7칸
+- [x] fail 10건이 6축 전부 커버 — 출처3 · 수치정합3 · 환각3 · 면책3 · 위조정밀도2 · 금지표현2
+- [x] `fail_axes` 값이 허용 6문자열에만 속함 — `tests/test_goldenset_integrity.py` 31 passed
+- [x] 2인 독립 라벨 일치율이 `initial_agreement`에 기록됨 — 20건 전부, 사람 간 일치율 18/20
+- [x] 전 사례에 합성·가상 데이터 명시, LLM 초안 사용 사례에 표기 — 누락 0건
 
-**산출**: `goldenset/**`, `app/judge/axes.py`, `tests/test_goldenset_schema.py`
+**산출**: `goldenset/**`, `app/judge/axes.py`, `tests/test_goldenset_schema.py`·`tests/test_goldenset_integrity.py`
+
+**완료** — 라벨 확정 후 `v1-freeze`(`58d5e2b`)로 동결. 사례 본문은 `goldenset/case_hashes.json`으로 고정되며, R2 v1~v7 전 라운드가 같은 `freeze_commit`·`input_set_hash`를 기록한다. 산출 경위는 `goldenset/reports/agreement_before.md`.
 
 ---
 
