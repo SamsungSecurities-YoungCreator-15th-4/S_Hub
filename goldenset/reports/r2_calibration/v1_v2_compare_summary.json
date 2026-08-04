@@ -1,0 +1,463 @@
+{
+  "comparison": {
+    "after": {
+      "false_negative": 1,
+      "false_positive": 8,
+      "match": 11,
+      "match_rate": 0.55,
+      "total": 20,
+      "true_negative": 2,
+      "true_positive": 9
+    },
+    "after_code_sha": "5d5dfeb2f155db6747ade8870becf0f5ca0d7664",
+    "axis_after": {
+      "disclaimer": {
+        "axis": "disclaimer",
+        "axis_ko": "면책",
+        "defect_recall": 0.6667,
+        "false_negative": 1,
+        "false_positive": 0,
+        "human_fail_support": 3,
+        "human_pass_support": 17,
+        "match": 19,
+        "match_rate": 0.95,
+        "total": 20,
+        "true_negative": 17,
+        "true_positive": 2
+      },
+      "false_precision": {
+        "axis": "false_precision",
+        "axis_ko": "위조정밀도",
+        "defect_recall": 1.0,
+        "false_negative": 0,
+        "false_positive": 10,
+        "human_fail_support": 2,
+        "human_pass_support": 18,
+        "match": 10,
+        "match_rate": 0.5,
+        "total": 20,
+        "true_negative": 8,
+        "true_positive": 2
+      },
+      "hallucination": {
+        "axis": "hallucination",
+        "axis_ko": "환각",
+        "defect_recall": 0.3333,
+        "false_negative": 2,
+        "false_positive": 5,
+        "human_fail_support": 3,
+        "human_pass_support": 17,
+        "match": 13,
+        "match_rate": 0.65,
+        "total": 20,
+        "true_negative": 12,
+        "true_positive": 1
+      },
+      "numeric_consistency": {
+        "axis": "numeric_consistency",
+        "axis_ko": "수치 정합",
+        "defect_recall": 0.6667,
+        "false_negative": 1,
+        "false_positive": 6,
+        "human_fail_support": 3,
+        "human_pass_support": 17,
+        "match": 13,
+        "match_rate": 0.65,
+        "total": 20,
+        "true_negative": 11,
+        "true_positive": 2
+      },
+      "prohibited_expression": {
+        "axis": "prohibited_expression",
+        "axis_ko": "금지표현",
+        "defect_recall": 0.5,
+        "false_negative": 1,
+        "false_positive": 0,
+        "human_fail_support": 2,
+        "human_pass_support": 18,
+        "match": 19,
+        "match_rate": 0.95,
+        "total": 20,
+        "true_negative": 18,
+        "true_positive": 1
+      },
+      "source_validity": {
+        "axis": "source_validity",
+        "axis_ko": "출처",
+        "defect_recall": 0.0,
+        "false_negative": 3,
+        "false_positive": 0,
+        "human_fail_support": 3,
+        "human_pass_support": 17,
+        "match": 17,
+        "match_rate": 0.85,
+        "total": 20,
+        "true_negative": 17,
+        "true_positive": 0
+      }
+    },
+    "axis_before": {
+      "disclaimer": {
+        "axis": "disclaimer",
+        "axis_ko": "면책",
+        "defect_recall": 0.6667,
+        "false_negative": 1,
+        "false_positive": 0,
+        "human_fail_support": 3,
+        "human_pass_support": 17,
+        "match": 19,
+        "match_rate": 0.95,
+        "total": 20,
+        "true_negative": 17,
+        "true_positive": 2
+      },
+      "false_precision": {
+        "axis": "false_precision",
+        "axis_ko": "위조정밀도",
+        "defect_recall": 0.5,
+        "false_negative": 1,
+        "false_positive": 0,
+        "human_fail_support": 2,
+        "human_pass_support": 18,
+        "match": 19,
+        "match_rate": 0.95,
+        "total": 20,
+        "true_negative": 18,
+        "true_positive": 1
+      },
+      "hallucination": {
+        "axis": "hallucination",
+        "axis_ko": "환각",
+        "defect_recall": 0.0,
+        "false_negative": 3,
+        "false_positive": 4,
+        "human_fail_support": 3,
+        "human_pass_support": 17,
+        "match": 13,
+        "match_rate": 0.65,
+        "total": 20,
+        "true_negative": 13,
+        "true_positive": 0
+      },
+      "numeric_consistency": {
+        "axis": "numeric_consistency",
+        "axis_ko": "수치 정합",
+        "defect_recall": 0.6667,
+        "false_negative": 1,
+        "false_positive": 6,
+        "human_fail_support": 3,
+        "human_pass_support": 17,
+        "match": 13,
+        "match_rate": 0.65,
+        "total": 20,
+        "true_negative": 11,
+        "true_positive": 2
+      },
+      "prohibited_expression": {
+        "axis": "prohibited_expression",
+        "axis_ko": "금지표현",
+        "defect_recall": 0.5,
+        "false_negative": 1,
+        "false_positive": 0,
+        "human_fail_support": 2,
+        "human_pass_support": 18,
+        "match": 19,
+        "match_rate": 0.95,
+        "total": 20,
+        "true_negative": 18,
+        "true_positive": 1
+      },
+      "source_validity": {
+        "axis": "source_validity",
+        "axis_ko": "출처",
+        "defect_recall": 0.0,
+        "false_negative": 3,
+        "false_positive": 0,
+        "human_fail_support": 3,
+        "human_pass_support": 17,
+        "match": 17,
+        "match_rate": 0.85,
+        "total": 20,
+        "true_negative": 17,
+        "true_positive": 0
+      }
+    },
+    "before": {
+      "false_negative": 1,
+      "false_positive": 4,
+      "match": 15,
+      "match_rate": 0.75,
+      "total": 20,
+      "true_negative": 6,
+      "true_positive": 9
+    },
+    "before_code_sha": "b03560080367f0ba485a32336746c4293359687e",
+    "evalset_hash": "70a75abcd2d5ea9d2a752695ecc9e296c014b7866afb18e18275469cdcaeaf75",
+    "false_negative_delta": 0,
+    "false_positive_delta": 4,
+    "match_rate_delta": -0.2
+  },
+  "mismatch_detail_excluded": "오판 사례 상세는 사람 라벨 원문(human_rationale)을 포함하므로 번들에 싣지 않는다. scripts/calibration_report.py --out 산출물을 참조한다.",
+  "source": {
+    "langsmith_required": true,
+    "mode": "official",
+    "official_validation_passed": true,
+    "schema_version": "1"
+  },
+  "v1": {
+    "confusion_matrix": {
+      "false_negative": 1,
+      "false_positive": 4,
+      "true_negative": 6,
+      "true_positive": 9
+    },
+    "derived": {
+      "false_negative": 1,
+      "false_positive": 4,
+      "match": 15,
+      "match_rate": 0.75
+    },
+    "evalset_case_count": 20,
+    "evalset_hash": "70a75abcd2d5ea9d2a752695ecc9e296c014b7866afb18e18275469cdcaeaf75",
+    "per_axis": {
+      "disclaimer": {
+        "axis_ko": "면책",
+        "confusion_matrix": {
+          "false_negative": 1,
+          "false_positive": 0,
+          "true_negative": 17,
+          "true_positive": 2
+        },
+        "defect_recall": 0.6667,
+        "derived": {
+          "false_negative": 1,
+          "false_positive": 0,
+          "match": 19,
+          "match_rate": 0.95
+        },
+        "human_fail_support": 3,
+        "total": 20
+      },
+      "false_precision": {
+        "axis_ko": "위조정밀도",
+        "confusion_matrix": {
+          "false_negative": 1,
+          "false_positive": 0,
+          "true_negative": 18,
+          "true_positive": 1
+        },
+        "defect_recall": 0.5,
+        "derived": {
+          "false_negative": 1,
+          "false_positive": 0,
+          "match": 19,
+          "match_rate": 0.95
+        },
+        "human_fail_support": 2,
+        "total": 20
+      },
+      "hallucination": {
+        "axis_ko": "환각",
+        "confusion_matrix": {
+          "false_negative": 3,
+          "false_positive": 4,
+          "true_negative": 13,
+          "true_positive": 0
+        },
+        "defect_recall": 0.0,
+        "derived": {
+          "false_negative": 3,
+          "false_positive": 4,
+          "match": 13,
+          "match_rate": 0.65
+        },
+        "human_fail_support": 3,
+        "total": 20
+      },
+      "numeric_consistency": {
+        "axis_ko": "수치 정합",
+        "confusion_matrix": {
+          "false_negative": 1,
+          "false_positive": 6,
+          "true_negative": 11,
+          "true_positive": 2
+        },
+        "defect_recall": 0.6667,
+        "derived": {
+          "false_negative": 1,
+          "false_positive": 6,
+          "match": 13,
+          "match_rate": 0.65
+        },
+        "human_fail_support": 3,
+        "total": 20
+      },
+      "prohibited_expression": {
+        "axis_ko": "금지표현",
+        "confusion_matrix": {
+          "false_negative": 1,
+          "false_positive": 0,
+          "true_negative": 18,
+          "true_positive": 1
+        },
+        "defect_recall": 0.5,
+        "derived": {
+          "false_negative": 1,
+          "false_positive": 0,
+          "match": 19,
+          "match_rate": 0.95
+        },
+        "human_fail_support": 2,
+        "total": 20
+      },
+      "source_validity": {
+        "axis_ko": "출처",
+        "confusion_matrix": {
+          "false_negative": 3,
+          "false_positive": 0,
+          "true_negative": 17,
+          "true_positive": 0
+        },
+        "defect_recall": 0.0,
+        "derived": {
+          "false_negative": 3,
+          "false_positive": 0,
+          "match": 17,
+          "match_rate": 0.85
+        },
+        "human_fail_support": 3,
+        "total": 20
+      }
+    },
+    "prompt_version": "v1",
+    "total": 20
+  },
+  "v2": {
+    "confusion_matrix": {
+      "false_negative": 1,
+      "false_positive": 8,
+      "true_negative": 2,
+      "true_positive": 9
+    },
+    "derived": {
+      "false_negative": 1,
+      "false_positive": 8,
+      "match": 11,
+      "match_rate": 0.55
+    },
+    "evalset_case_count": 20,
+    "evalset_hash": "70a75abcd2d5ea9d2a752695ecc9e296c014b7866afb18e18275469cdcaeaf75",
+    "per_axis": {
+      "disclaimer": {
+        "axis_ko": "면책",
+        "confusion_matrix": {
+          "false_negative": 1,
+          "false_positive": 0,
+          "true_negative": 17,
+          "true_positive": 2
+        },
+        "defect_recall": 0.6667,
+        "derived": {
+          "false_negative": 1,
+          "false_positive": 0,
+          "match": 19,
+          "match_rate": 0.95
+        },
+        "human_fail_support": 3,
+        "total": 20
+      },
+      "false_precision": {
+        "axis_ko": "위조정밀도",
+        "confusion_matrix": {
+          "false_negative": 0,
+          "false_positive": 10,
+          "true_negative": 8,
+          "true_positive": 2
+        },
+        "defect_recall": 1.0,
+        "derived": {
+          "false_negative": 0,
+          "false_positive": 10,
+          "match": 10,
+          "match_rate": 0.5
+        },
+        "human_fail_support": 2,
+        "total": 20
+      },
+      "hallucination": {
+        "axis_ko": "환각",
+        "confusion_matrix": {
+          "false_negative": 2,
+          "false_positive": 5,
+          "true_negative": 12,
+          "true_positive": 1
+        },
+        "defect_recall": 0.3333,
+        "derived": {
+          "false_negative": 2,
+          "false_positive": 5,
+          "match": 13,
+          "match_rate": 0.65
+        },
+        "human_fail_support": 3,
+        "total": 20
+      },
+      "numeric_consistency": {
+        "axis_ko": "수치 정합",
+        "confusion_matrix": {
+          "false_negative": 1,
+          "false_positive": 6,
+          "true_negative": 11,
+          "true_positive": 2
+        },
+        "defect_recall": 0.6667,
+        "derived": {
+          "false_negative": 1,
+          "false_positive": 6,
+          "match": 13,
+          "match_rate": 0.65
+        },
+        "human_fail_support": 3,
+        "total": 20
+      },
+      "prohibited_expression": {
+        "axis_ko": "금지표현",
+        "confusion_matrix": {
+          "false_negative": 1,
+          "false_positive": 0,
+          "true_negative": 18,
+          "true_positive": 1
+        },
+        "defect_recall": 0.5,
+        "derived": {
+          "false_negative": 1,
+          "false_positive": 0,
+          "match": 19,
+          "match_rate": 0.95
+        },
+        "human_fail_support": 2,
+        "total": 20
+      },
+      "source_validity": {
+        "axis_ko": "출처",
+        "confusion_matrix": {
+          "false_negative": 3,
+          "false_positive": 0,
+          "true_negative": 17,
+          "true_positive": 0
+        },
+        "defect_recall": 0.0,
+        "derived": {
+          "false_negative": 3,
+          "false_positive": 0,
+          "match": 17,
+          "match_rate": 0.85
+        },
+        "human_fail_support": 3,
+        "total": 20
+      }
+    },
+    "prompt_version": "v2",
+    "total": 20
+  }
+}

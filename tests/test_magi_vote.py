@@ -366,6 +366,7 @@ def test_header_records_sampling_condition_and_null_result_phrasing():
         temperature=0.0,
         seed=None,
         runs=3,
+        langsmith_tracing=False,
     )
     assert header["temperature"] == 0.0
     assert header["seed"] is None
@@ -390,6 +391,7 @@ def test_header_records_axis_purity_limit():
         temperature=0.0,
         seed=None,
         runs=3,
+        langsmith_tracing=False,
     )
     caveat = header["axis_purity_caveat"]
     assert "단독으로 걸린 사례는 1건" in caveat
@@ -479,6 +481,7 @@ def test_submission_header_has_no_goldenset_identity_fields():
         temperature=0.0,
         seed=None,
         runs=MAGI_RUNS,
+        langsmith_tracing=False,
     )
 
     assert header["mode"] == "submission"
@@ -506,6 +509,7 @@ def test_goldenset_header_still_declares_its_mode():
         temperature=0.0,
         seed=None,
         runs=MAGI_RUNS,
+        langsmith_tracing=False,
     )
     assert header["mode"] == "goldenset"
     assert header["submission_states"] is None
@@ -565,3 +569,44 @@ def test_run_submission_records_which_dump_was_measured(scripted_judge, tmp_path
     assert records[0]["state_sha256"] == cases[0]["state_sha256"]
     assert records[0]["source_path"] == cases[0]["source_path"]
     assert len(records[0]["runs"]) == MAGI_RUNS
+
+
+def test_main_loads_env_before_building_the_llm(monkeypatch, capsys):
+    """진입점이 .env를 읽어야 런북 §3.6 명령이 그대로 돈다.
+
+    이 하네스는 judge_runner의 `_real_llm`만 빌려 쓰고 그 main()을 거치지 않는다.
+    그래서 judge_runner가 자기 main()에서 하는 load_dotenv가 여기엔 적용되지 않고,
+    빠지면 Azure 키가 .env에만 있는 환경에서 RuntimeError로 끝난다.
+    """
+    called: list[Path] = []
+    monkeypatch.setattr(magi_vote, "load_dotenv", lambda path: called.append(path))
+    monkeypatch.setattr(
+        "sys.argv", ["magi_vote.py", "--dry-run", "--from-state", "없어도-되는-경로.json"]
+    )
+    monkeypatch.setattr(magi_vote, "load_state_cases", lambda paths: [])
+
+    with pytest.raises(SystemExit) as exit_info:
+        magi_vote.main()
+
+    assert exit_info.value.code == EXIT_OK
+    assert called == [magi_vote.ROOT / ".env"]
+
+
+def test_header_records_whether_tracing_was_on():
+    """추적 상태가 산출물에 남는다 — 같은 명령이라도 키가 있으면 성격이 달라진다.
+
+    `.env`를 읽으면 `LANGSMITH_*`도 함께 올라와 원격 추적이 켜진 채 돈다.
+    이 하네스는 추적을 켜지도 끄지도 않으므로, 판단하지 않고 상태만 기록한다.
+    """
+    header = magi_vote.build_header(
+        [],
+        targets=FAKE_TARGETS,
+        code_sha="deadbeef",
+        evalset_hash="0" * 64,
+        temperature=0.0,
+        seed=None,
+        runs=MAGI_RUNS,
+        langsmith_tracing=True,
+    )
+
+    assert header["langsmith_tracing"] is True

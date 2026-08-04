@@ -2,8 +2,8 @@
 
 > 대상: 8/7 모의 감사 현장 진행 · 담당: 발표자 1명 + 보조 1명
 > 이 문서는 대본이 아니라 **체크리스트**다. 팀 누구나 이 순서를 그대로 밟을 수 있어야 한다.
-> 시간 수치는 전부 [`docs/reproducibility_scope.md`](reproducibility_scope.md) §4.1·§4.2·§7의 실측 인용이며,
-> 이 문서에서 새로 측정한 값은 없다(§7 참조).
+> 동선 판단에 쓰는 시간 수치는 전부 [`docs/reproducibility_scope.md`](reproducibility_scope.md) §4.1·§4.2·§7의
+> 실측 인용이다. 이 문서가 직접 확인한 것은 §7.1의 기록뿐이며, 그것도 배분을 바꾸지 않는다.
 
 ---
 
@@ -126,9 +126,12 @@ python -c "import json;print(json.load(open('submitted.json'))['demo_options'])"
 | `trace.node_execution_order` | state에 없는 값이라 채울 수 없음. CLI 출력에만 존재 | 〃 §8.2 |
 | `hard_stop_record.manual_review_gate` (성공 번들) | 공백이 아니라 **정상**. 같은 파일 `blocked=false`가 같은 사실을 파생값으로 확인 | 〃 §8.5 |
 | `LangSmith trace URL: 없음 (...)` | 추적이 꺼진 실행. `trace_id`는 그대로 있고 원본 키 경로가 사유에 적혀 있음 | 〃 §5 |
-| `calibration_summary.json`의 `source`·`v1`·`v2`·`comparison` | R2 측정 전이라 비어 있음. **파일은 항상 생성되고** 사유와 복원 방법(`--calibration`)이 실려 있음 | 〃 §8.4 |
+| `calibration_summary.json`의 `v2`·`comparison` | 제출 번들은 v6 **단일 측정**이라 비교 자리가 비어 있음. `source`·`v1`은 채워져 있고, 파일은 어느 경우든 항상 생성됨 | 〃 §8.4 |
 
 핵심 문장은 하나다 — **"없는 것"과 "안 채운 것"을 구분해 사유와 원본 키 경로를 함께 적었다** (`docs/evidence_bundle_schema.md` §5).
+
+제출 번들 3건은 calibration이 **채워진 채로** 나간다(`mode: official`·`prompt_version: v6`).
+그래서 아래 문단이 예외가 아니라 기본 동선이다.
 
 **calibration이 채워진 번들이라면 `source.mode`를 먼저 짚는다.** 허용 모드는 `dev_mock`·`offline_rehearsal`·`official`·`official_code_change`·`official_offline_code_change`이며, 공식 제출 가능 모드는 LangSmith까지 검증한 `official`·`official_code_change`뿐이다. 감사자가 일치율을 먼저 읽기 전에 등급을 말한다. 알 수 없는 mode나 모순된 검증 플래그에서는 수치도 함께 비워지므로(fail-closed), "수치는 있는데 등급을 모르는" 상태는 나오지 않는다 — `docs/evidence_bundle_schema.md` §4.8.
 
@@ -279,7 +282,7 @@ python scripts/replay_verify.py submitted.json replay.json
 **이 구분을 놓치면 발표에서 사실과 다른 주장을 하게 된다.**
 
 `--force-judge-fail N`은 judge의 실제 판정 결과를 **덮어쓴다**. 6축이 전부 통과했더라도
-`failed_axes=["forced_failure"]`로 강제 실패시킨다 — `app/nodes/judge_eval.py:404` (force_fail_n).
+`failed_axes=["forced_failure"]`로 강제 실패시킨다 — `app/nodes/judge_eval.py:394` (force_fail_n).
 `reproducibility_scope.md` §4.2의 측정 조건에도 `failed_axes=["forced_failure"]`가 그대로 적혀 있다.
 
 따라서 차단 번들 라이브 재실행이 보이는 것은:
@@ -310,19 +313,32 @@ R1 사례집 20건을 judge에 돌리는 `scripts/judge_runner.py --r1`이 그 �
 `scripts/magi_vote.py`의 제출 모드에 넣어 각 3회씩 다시 판정시킨다.
 
 ```bash
-# 번들 생성 시 state를 함께 남긴다 (§1.1과 같은 절차)
-python scripts/run_graph.py --auto-approve --dump-state out/state_pass1.json --evidence-bundle
-python scripts/run_graph.py --auto-approve --dump-state out/state_pass2.json --evidence-bundle
-python scripts/run_graph.py --auto-approve --force-judge-fail 3 \
-    --dump-state out/state_block.json --evidence-bundle
+# 번들 생성 시 state를 함께 남긴다 (§1.1과 같은 절차 — 플래그·경로도 §1.1을 따른다)
+python scripts/run_graph.py --auto-approve --offline --evidence-bundle \
+    --calibration <R2 원본 리포트> --dump-state evidence/state_dumps/success_1.json
+python scripts/run_graph.py --auto-approve --offline --evidence-bundle \
+    --calibration <R2 원본 리포트> --dump-state evidence/state_dumps/success_2.json \
+    --force-judge-fail 1
+python scripts/run_graph.py --auto-approve --offline --evidence-bundle \
+    --calibration <R2 원본 리포트> --dump-state evidence/state_dumps/blocked.json \
+    --force-judge-fail 3
 
 # 제출 후보 3건의 판정 안정성 확인 (사례당 3회 · LLM 호출 18회)
 python scripts/magi_vote.py \
-    --from-state out/state_pass1.json \
-    --from-state out/state_pass2.json \
-    --from-state out/state_block.json \
+    --from-state evidence/state_dumps/success_1.json \
+    --from-state evidence/state_dumps/success_2.json \
+    --from-state evidence/state_dumps/blocked.json \
     --out out/magi_submission.json
 ```
+
+- **`--offline`을 빼지 않는다.** 라이브 재현을 `--offline`으로 돌기로 했으므로(§1.1·§4)
+  제출 번들도 같은 플래그로 만들어야 "같은 입력"이 성립한다.
+- **`--force-judge-fail`의 N은 §1.1 표를 따른다** — 성공②는 `judge_max_retries`보다 작은 값,
+  차단은 그 이상. 위 숫자는 `config/config.yaml`이 3일 때의 예시다.
+- `--calibration`에 넘기는 것은 **`scripts/calibration_report.py --out` 원본**이다. 등급 키
+  (`schema_version`·`mode`·`official_validation_passed`·`langsmith_required`)가 최상위에 있어야
+  하며, 이미 번들에 실린 스트립본을 되먹이면 fail-closed로 수치가 통째로 비워진다
+  (`docs/evidence_bundle_schema.md` §4.8).
 
 종료 코드로 판단한다.
 
@@ -340,6 +356,45 @@ python scripts/magi_vote.py \
 3회 관측한 것이다. 흔들림이 안 나와도 "흔들리지 않는다"로 일반화하지 않고,
 **"이 설정에서 3회 관측 결과 판정이 동일했다"**로 말한다. 산출물의
 `header.null_result_phrasing`에 같은 문장이 들어 있다.
+
+#### 흔들림이 0건이어도 산출물은 나온다
+
+**"안정적이라 파일이 안 생겼다"는 오해를 먼저 막는다.** 하네스는 판정 결과와 무관하게
+`--out` 경로에 보고서를 쓴다. 흔들림 0건은 **측정 결과이지 미실행이 아니다** —
+`summary.unstable_cases: 0`과 `header.submission_states` 3건이 그 실행의 증거다.
+종료 코드 `0`도 "돌지 않았다"가 아니라 "3회 판정이 모두 같았다"는 뜻이다(§3.6 표).
+
+#### 제출물 구성과 대조 절차 — MAGI 산출물은 번들 밖에 있다
+
+번들은 **실행 1회분** 증거라 3건에 걸친 측정을 담지 않는다(구성의 원천은
+`app/evidence/schema.py:50` (BUNDLE_FILENAMES)). 그래서 서류철과 **나란히** 낸다.
+
+```
+제출물
+├── 성공①·성공②·차단 번들 3건
+├── success_1 · success_2 · blocked state 덤프 3건   (§1.1)
+└── magi_submission.json                            (§3.6)
+```
+
+**셋을 잇는 것은 파일 이름이 아니라 지문이다.** 아래 순서로 대조한다.
+
+1. `magi_submission.json`의 `header.submission_states[].state_sha256`
+2. 같은 값이 덤프에서 재계산되는지 확인 — 아래 명령
+3. 그 덤프의 `trace_id`가 번들 `summary.md` §추적의 `trace_id`와 같은지 (§1.1)
+
+```bash
+python -c "
+import json
+from app.evidence.state_dump import canonical_for_replay
+from app.utils.hashing import sha256_of_dict
+print(sha256_of_dict(canonical_for_replay(json.load(open('<덤프 경로>')))))
+"
+```
+
+**파일 `sha256sum`으로는 맞지 않는다.** 하네스가 `canonical_for_replay`로 `trace_id`를
+걷어낸 사본을 해시하기 때문이다 — `app/evidence/state_dump.py:159` (canonical_for_replay).
+관측용 재호출이 제출 번들의 트레이스에 섞이지 않게 하려는 것이고, 그 이유는
+`scripts/magi_vote.py:194` (load_state_cases)에 적혀 있다.
 
 ---
 
@@ -378,7 +433,7 @@ RAG 검색·rag_cite·judge_eval은 실제 Azure를 호출한다 (`reproducibili
 | 12 | 차단 지문 | 차단 지문이 실행마다 같나 | `docs/reproducibility_scope.md` §4.2 · `docs/evidence_bundle_schema.md` §4.5 |
 | 13 | 누락 표기 | "없음"으로 나온 칸은 안 채운 것 아닌가 | `docs/evidence_bundle_schema.md` §5 · §8 |
 | 14 | 탈락 인용 | 떨어진 인용은 어디에 남나 | `docs/hard_stop_contract.md` §5 「탈락 인용 기록」 · `scripts/make_evidence_bundle.py:249` (_rejected_citations) |
-| 15 | 시연 범위 | 방금 차단된 건 judge가 결함을 잡은 건가 | 이 문서 §3.5 · `app/nodes/judge_eval.py:404` (force_fail_n) · R2 판별 증거는 `scripts/judge_runner.py` + `docs/evidence_bundle_schema.md` §4.8 |
+| 15 | 시연 범위 | 방금 차단된 건 judge가 결함을 잡은 건가 | 이 문서 §3.5 · `app/nodes/judge_eval.py:394` (force_fail_n) · R2 판별 증거는 `scripts/judge_runner.py` + `docs/evidence_bundle_schema.md` §4.8 |
 | 16 | 재현 해시 검증 | R2 사례집 채점에서 `computation_hash_present`가 전부 통과한 건 무슨 뜻인가 | `app/evaluation/goldenset_loader.py:190` (_synthesize_hash) · `docs/reproducibility_scope.md` §2 |
 
 ---
@@ -396,7 +451,7 @@ RAG 검색·rag_cite·judge_eval은 실제 Azure를 호출한다 (`reproducibili
 
 `--offline`이어도 RAG·judge는 Azure를 호출하므로(§4의 마지막 줄) **재실행 자체가 성립하지 않는다.**
 네트워크가 없으면 인용이 0건이 되고, `config/config.yaml`의 `strict_citation_gate`가 켜져 있으면 출처 축이 실패해
-정상적으로 차단된다 — `app/judge/rubric.py:89` (source_validity). 결함이 아니라 설계된 fail-closed 동작이지만,
+정상적으로 차단된다 — `app/judge/rubric.py:109` (source_validity). 결함이 아니라 설계된 fail-closed 동작이지만,
 **재현 데모로는 쓸 수 없다.**
 
 대응 — 제출된 번들 파일만으로 되는 **오프라인 무결성 검증 2종**으로 전환한다. 둘 다 네트워크가 필요 없다.
@@ -446,16 +501,33 @@ manifest가 바뀌고, bundle_hash가 바뀐다 (`docs/evidence_bundle_schema.md
   실측 결과 8.6초가 음수가 되면 §6.3의 기본 경로를 성공 경로로 되돌린다.
 - **§3.3 표의 초 단위 수치는 전부 인용이다.** 이 문서 작성 시 그래프를 실행하지 않았다.
   출처는 `reproducibility_scope.md` §4.1(모드 A·B·C)과 §7이며, 측정 기준 커밋은 그 문서 머리말이 밝힌다.
-- **`replay_verify.py`의 대조 시간을 실물 번들 덤프로 재보지 않았다.** §3.3의 계산은 대조가
-  사실상 시간을 쓰지 않는다는 전제 위에 있는데, 그 근거인 실측은 **합성 덤프 기준**이다.
-  실제 실행 state 덤프는 `citations` 20여 건과 감사 기록이 붙어 더 크다. 번들 3건을 만든 뒤
-  실물 덤프로 다시 재고, 유의미하게 느리면 §3.2 차단 경로 배분을 고쳐야 한다.
-- **번들 3건의 실물이 아직 없다.** 현재 레포에 `evidence/` 디렉터리가 없다. 8/6 제출 전에 3건을 만들고,
-  만든 뒤 이 런북의 파일명·키 이름을 실물로 한 번 더 대조한다. **§1.1의 state 덤프 3건도 이때 같이 만든다** —
-  번들만 만들고 덤프를 빠뜨리면 3분 재실행이 종료 코드 `2`로 끝난다. 만든 뒤 번들 `trace_id`와 덤프 `trace_id`가
-  실제로 맞물리는지 3쌍 모두 확인한다.
-- **§6.2의 검증 명령 2종은 합성 state로 만든 번들에서만 확인했다.** 그래프를 돌리지 않고
-  `make_bundle`(직렬화기)만 호출해 만든 번들이라 파일 구조·해시 체계는 같지만, 실행 산출물이 들어간
-  실물 번들에서 다시 한 번 돌려 봐야 한다.
 - **UI 시연 동선은 이 문서 범위 밖이다.** §6.3의 `pdf_export_state` 1건만 확인했고,
   Streamlit 화면의 다른 위치는 확인하지 않았다.
+
+### 7.1 실물 번들로 해소된 항목 — 무엇을 어떻게 확인했는가
+
+이전 판에서 "아직 못 해봤다"고 적어 둔 항목 셋은 제출 번들 3건을 실제로 만들면서 확인했다.
+**아래는 그 확인의 기록이지 이 문서가 새로 만든 기준이 아니다** — 판단 기준은 그대로
+`reproducibility_scope.md`와 `evidence_bundle_schema.md`에 있다.
+
+| 이전 미검증 항목 | 확인 결과 |
+| --- | --- |
+| 번들 3건의 실물이 없다 | 3건 생성 완료. `trace_id`가 덤프와 3쌍 모두 맞물리는 것까지 확인 |
+| §6.2 무결성 검증 2종이 합성 번들에서만 확인됐다 | 실물 번들 3건에서 통과 — `bundle_hash` 일치, `manifest.files` 전건 일치 |
+| `replay_verify.py` 대조 시간을 실물 덤프로 안 재봤다 | 실물 덤프로 0.1초 미만. §3.2 배분을 고칠 이유가 없다 |
+
+- 3건 전부 `calibration_summary`가 `mode: official`·`prompt_version: v6`로 채워져 나갔다.
+- 같은 실행분으로 §3.6의 제출 안정성 확인도 종료 코드 `0`이었다(3건 각 3회, 갈린 축 없음).
+  이 값의 해석 한계는 §3.6 마지막 문단 그대로다 — "흔들리지 않는다"가 아니라 "이 설정에서
+  3회 관측 결과 판정이 동일했다"다.
+
+**아직 남은 것은 사람이 말하는 시간이다.** 위 항목들은 기계가 재는 값이라 확인됐지만,
+§7 첫 두 항목(구간별 목표 시간·§3.3의 ①③ 구간)은 여전히 리허설에서 타이머로 재야 한다.
+
+### 7.2 번들을 다시 만들어야 하는 때
+
+**서류철을 만든 뒤 코드가 바뀌면 3건을 다시 만든다.** 번들 `manifest.generated_by.git_sha`가
+생성 시점 커밋을 못 박기 때문에, 그 뒤에 커밋이 들어간 상태로 심사장에서 라이브 재실행하면
+번들이 가리키는 코드와 실제 도는 코드가 어긋난다. 문서만 바꾼 커밋도 마찬가지로 sha를 옮긴다.
+
+재생성 비용은 3건 + §3.6 안정성 확인까지 합쳐 10분 안쪽이다. 어긋난 채 제출하는 것보다 싸다.

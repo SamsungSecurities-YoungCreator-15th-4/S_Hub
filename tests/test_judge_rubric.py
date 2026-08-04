@@ -94,6 +94,24 @@ def test_source_validity_pass_and_fail():
     assert "0건" in reason
 
 
+def test_source_validity_fails_when_any_citation_is_unverified():
+    """R2 리뷰(중현·다경) — 검증 통과 인용이 1건이라도 있으면 나머지 인용이
+    위조·불일치여도 통과하던 사각지대. strict 여부와 무관하게, 제시된 인용
+    중 하나라도 미검증이면 fail해야 한다."""
+    unverified_citation = {**VERIFIED_CITATION, "verified": False}
+
+    passed, reason = source_validity([VERIFIED_CITATION, unverified_citation], strict=False)
+    assert passed is False
+    assert "2건 중 1건" in reason
+
+    passed, reason = source_validity([VERIFIED_CITATION, unverified_citation], strict=True)
+    assert passed is False
+    assert "2건 중 1건" in reason
+
+    # 인용이 전부 검증되면(strict 무관) 여전히 통과한다.
+    assert source_validity([VERIFIED_CITATION, VERIFIED_CITATION], strict=False)[0] is True
+
+
 def test_numeric_consistency_pass_and_fail():
     good = _explanations(
         f"기준일 {AS_OF_DATE}, 99% 신뢰수준에서 1일 VaR은 약 3,000만원입니다."
