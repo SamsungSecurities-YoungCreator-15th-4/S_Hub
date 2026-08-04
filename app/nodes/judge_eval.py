@@ -14,7 +14,7 @@ import os
 import re
 from datetime import date
 
-from app.judge.rubric import AXIS_NAMES, evaluate_rubric
+from app.judge.rubric import AXIS_NAMES, evaluate_rubric, is_verified_citation
 from app.llm.audit import with_llm_audit
 from app.observability.langsmith import annotate_current_run
 from app.rag.citations import citation_contract_issues
@@ -84,22 +84,12 @@ def _has_text(value) -> bool:
     return isinstance(value, str) and bool(value.strip())
 
 
-def _is_verified_citation(citation) -> bool:
-    return (
-        isinstance(citation, dict)
-        and citation.get("verified") is True
-        and _has_text(citation.get("quote"))
-        and _has_text(citation.get("source"))
-        and _has_text(citation.get("chunk_id"))
-    )
-
-
 def _verified_citations(citations: list) -> list[dict]:
-    return [citation for citation in citations if _is_verified_citation(citation)]
+    return [citation for citation in citations if is_verified_citation(citation)]
 
 
 def _invalid_citations(citations: list) -> list[dict]:
-    return [citation for citation in citations if not _is_verified_citation(citation)]
+    return [citation for citation in citations if not is_verified_citation(citation)]
 
 
 def _citation_content_check(citations: list, *, strict: bool) -> dict:

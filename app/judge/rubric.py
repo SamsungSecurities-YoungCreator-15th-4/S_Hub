@@ -86,13 +86,33 @@ def _explanation_text(explanations: list) -> str:
     )
 
 
+def _has_text(value) -> bool:
+    return isinstance(value, str) and bool(value.strip())
+
+
+def is_verified_citation(citation) -> bool:
+    """judge_eval의 필수 검사(citations_all_verified)와 동일한 기준.
+
+    `verified=True`뿐 아니라 quote·source·chunk_id 텍스트까지 요구한다. 이 기준을
+    두 곳에서 각자 정의하면, 한쪽만 고쳐질 때 축과 필수 검사가 서로 다른 질문에
+    답하는 문제(PR #196의 근본 원인)가 재발한다 — PR #196 리뷰(다경) 참조.
+    """
+    return (
+        isinstance(citation, dict)
+        and citation.get("verified") is True
+        and _has_text(citation.get("quote"))
+        and _has_text(citation.get("source"))
+        and _has_text(citation.get("chunk_id"))
+    )
+
+
 def source_validity(citations: list, strict: bool) -> tuple[bool, str]:
     dict_citations = [citation for citation in citations if isinstance(citation, dict)]
     if not dict_citations:
         if strict:
             return False, "strict citation gate에서 검증 통과 인용이 0건입니다."
         return True, "검증 통과 인용이 0건이므로 수동검토 대상으로 통과합니다."
-    unverified = [c for c in dict_citations if c.get("verified") is not True]
+    unverified = [c for c in dict_citations if not is_verified_citation(c)]
     if unverified:
         return (
             False,

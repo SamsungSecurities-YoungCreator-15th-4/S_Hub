@@ -91,6 +91,12 @@ R1 골든셋 20건 기준, judge 6축 루브릭의 버전별 official 계열(off
     judge는 그 축을 pass로 두고 다른 이름의 검사로 실패시키므로, 이 축의 `fail_axes` 대조는
     judge의 검출력을 반영하지 못한다(집계는 `fail_axes`와 `failed_required_checks`를 분리해
     기록한다 — `app/evaluation/calibration_schema.py`).
+  - **PR #196에서 수정했다** — 제시된 인용이 있으면 전부 검증돼야 통과하도록 바꿨다(v7부터 적용).
+    다만 이 수정이 실제로 작동하는 것은 **calibration 경로뿐이다.** 라이브 그래프 실행에서는
+    `rag_cite`가 검증 통과분만 `state["citations"]`에 넣고(`citations=[citation.to_dict() for
+    citation in unique_verified]` — `app/nodes/rag_cite.py:1004`) 탈락분은 `citation_rejections`로
+    분리하므로, 미검증 인용이 애초에 이 축에 도달하지 않는다. F1(PR #181)이 두 경로 모두에서
+    관측되지 않았던 것과 달리, 이번 건은 **calibration 경로에서만 작동**한다(PR #196 리뷰, 다경).
 - **LLM 2축(`hallucination`·`false_precision`)의 라운드 간 변화는 프롬프트 개선 효과와 벤더
   비결정성을 분리하지 못한다.** 이 두 축만 LLM 판정이고, 각 버전을 **1회씩만** 실행했다.
   `docs/reproducibility_scope.md`는 judge 6축 판정을 무조건 보장 대상이 아닌 **반복 실측 대상**으로
