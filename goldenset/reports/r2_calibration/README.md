@@ -17,16 +17,16 @@ R1 골든셋 20건 기준, judge 6축 루브릭의 버전별 official 계열(off
 
 | 파일 | 라운드 | mode | code_sha (before→after) | match_rate | 비고 |
 |---|---|---|---|---|---|
-| `v1_report_summary.json` | v1 (baseline, 단독) | official | `b035600` (단독) | 75.0% (15/20) | 최초 측정 |
-| `v1_v2_compare_summary.json` | v1→v2 | official | `b035600`→`5d5dfeb` (#169→#175) | 75.0%→55.0% | 오탐 급증 (fp 4→8) |
-| `v2_report_summary.json` | v2 (단독) | official | `5d5dfeb` (단독) | 55.0% (11/20) | v1_v2_compare와 동일 결과, 단독 참조용 |
-| `v2_v3_compare_summary.json` | v2→v3 | official | `5d5dfeb`→`ec27d22` (#175→#177) | 55.0%→70.0% | hallucination·false_precision 경계 예외 보강 |
-| `v3_v4_compare_summary.json` | v3→v4 | official_code_change | `ec27d22`→`e3b0122` (#177→#178) | 70.0%→70.0% | disclaimer·prohibited_expression 코드 수정(프롬프트 불변). 축별 recall은 개선(면책 2/3→3/3, 금지표현 1/2→2/2)했으나 같은 케이스의 다른 축이 여전히 틀려 전체 confusion matrix는 불변 |
-| `v4_v5_compare_summary.json` | v4→v5 | official | `e3b0122`→`bed043e` (#178→#179) | 70.0%→75.0% | false_precision confidence/ci_level 오탐 완화 |
-| `v5_v6_compare_summary.json` | v5→v6 | official | `bed043e`→`fbc85f4` (#179→#180) | 75.0%→80.0% | hallucination B1("일반 시장 원리" 예외) 적용 범위 축소 |
-| `v6_report_summary.json` | v6 (단독) | official | `fbc85f4` (단독) | 80.0% (16/20) | v6 라운드 단독 요약 |
-| `v6_v7_compare_summary.json` | v6→v7 | official_code_change | `fbc85f4`→`d5166e5` (#180→#196) | 80.0%→80.0% (동일) | `source_validity` 사각지대 코드 수정(프롬프트 불변). confusion matrix 완전 동일(fn1·fp3·tn7·tp9) — 20/20 전체 pass/fail 불변, 부작용 없음 |
-| `v7_report_summary.json` | v7 (최종, 단독) | official | `d5166e5` (단독) | **80.0% (16/20)** | 최종 라운드 단독 요약 — 이 파일이 v7 공식 최종 성능의 단일 참조점 |
+| `v1_report_summary.json` | v1 (baseline, 단독) | official | `b035600` (단독) | 75% (15/20) | 최초 측정 |
+| `v1_v2_compare_summary.json` | v1→v2 | official | `b035600`→`5d5dfeb` (#169→#175) | 75%→55% | 오탐 급증 (fp 4→8) |
+| `v2_report_summary.json` | v2 (단독) | official | `5d5dfeb` (단독) | 55% (11/20) | v1_v2_compare와 동일 결과, 단독 참조용 |
+| `v2_v3_compare_summary.json` | v2→v3 | official | `5d5dfeb`→`ec27d22` (#175→#177) | 55%→70% | hallucination·false_precision 경계 예외 보강 |
+| `v3_v4_compare_summary.json` | v3→v4 | official_code_change | `ec27d22`→`e3b0122` (#177→#178) | 70%→70% | disclaimer·prohibited_expression 코드 수정(프롬프트 불변). 축별 recall은 개선(면책 2/3→3/3, 금지표현 1/2→2/2)했으나 같은 케이스의 다른 축이 여전히 틀려 전체 confusion matrix는 불변 |
+| `v4_v5_compare_summary.json` | v4→v5 | official | `e3b0122`→`bed043e` (#178→#179) | 70%→75% | false_precision confidence/ci_level 오탐 완화 |
+| `v5_v6_compare_summary.json` | v5→v6 | official | `bed043e`→`fbc85f4` (#179→#180) | 75%→80% | hallucination B1("일반 시장 원리" 예외) 적용 범위 축소 |
+| `v6_report_summary.json` | v6 (단독) | official | `fbc85f4` (단독) | 80% (16/20) | v6 라운드 단독 요약 |
+| `v6_v7_compare_summary.json` | v6→v7 | official_code_change | `fbc85f4`→`d5166e5` (#180→#196) | 80%→80% (동일) | `source_validity` 사각지대 코드 수정(프롬프트 불변). confusion matrix 완전 동일(fn1·fp3·tn7·tp9) — 20/20 전체 pass/fail 불변, 부작용 없음 |
+| `v7_report_summary.json` | v7 (최종, 단독) | official | `d5166e5` (단독) | **80% (16/20)** | 최종 라운드 단독 요약 — 이 파일이 v7 공식 최종 성능의 단일 참조점 |
 
 > **v7 실행 기록** — `docs/r2_calibration_runs/judge_v7_results.json`·`.manifest.json`.
 > `code_sha=d5166e5`, `freeze_commit=58d5e2b`, `input_set_hash`·`case_content_sha256` 20건이
@@ -37,6 +37,12 @@ R1 골든셋 20건 기준, judge 6축 루브릭의 버전별 official 계열(off
 > 참조. 전체 confusion matrix가 v6과 완전히 동일해(fn1·fp3·tn7·tp9), 코드 수정이 의도한 축에만
 > 작용하고 다른 축·전체 판정에는 부작용이 없었음이 확인됐다(아래 [알려진 한계](#알려진-한계)의
 > `source_validity` 항목 참조).
+
+> **사람 일치율과 나란히 보기** — judge-gold 16/20(v7)과 사람-사람 18/20(`goldenset/reports/
+> agreement_before.md` §7)은 **서로 다른 것을 재는 별개 지표**다. judge는 개별 라벨러가 아니라
+> 조정을 거친 gold label과 비교되므로, judge가 사람-사람 일치율(18/20)을 넘는 것도 정상이고
+> 이론상 20/20도 가능하다. 사람-사람 값을 judge의 상한처럼 읽지 않는다 — 근거는
+> `agreement_before.md` §7 참조.
 
 ## 계획 대비 변경
 
@@ -51,7 +57,7 @@ R1 골든셋 20건 기준, judge 6축 루브릭의 버전별 official 계열(off
 
 ## 알려진 한계
 
-- v2가 왜 크게 나빠졌는지(75.0%→55.0%, 오탐 급증)는 `v1_v2_compare_summary.json`에 정식 비교로
+- v2가 왜 크게 나빠졌는지(75%→55%, 오탐 급증)는 `v1_v2_compare_summary.json`에 정식 비교로
   남아 있고, 이후 라운드(v3)의 경계 규칙 보강으로 대응했다.
 - **입력 어댑터가 계획 대비 좁게 구현됐다.** `docs/symphony_proof_plan.md`의 R2 로더 변환 규칙(§1
   고객 요약 → `run_config`, `portfolio`)은 `portfolio`를 포함하나, 실제 로더는 이를 담지 않는다.
