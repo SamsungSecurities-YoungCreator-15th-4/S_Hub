@@ -1,7 +1,11 @@
 # S.ymphony
 
 **LangGraph 기반 재현가능·설명가능 리스크 리포트 엔진**
-삼성증권 영크리에이터 15기 4조 · 과제2
+삼성증권 영크리에이터 15기 4조 · 과제2(리스크 리포트 엔진) · 과제4(S.ymphony Proof — 신뢰 증명)
+
+> **R 번호는 과제마다 뜻이 다르다.** 과제2는 `R0`~`R7`, 과제4는 `R1`~`R5`이고 서로 겹치는
+> 기호가 다른 것을 가리킨다. 아래 두 매핑 표를 각각 본다 —
+> [과제2 (R0–R7)](#과제2-요구사항-매핑-r0r7) · [과제4 (R1–R5)](#과제4-요구사항-매핑-r1r5).
 
 ```mermaid
 %%{init: {"theme": "base", "flowchart": {"htmlLabels": true, "curve": "linear"}}}%%
@@ -181,6 +185,9 @@ START
   (형상관리)를 지원한다. 기본 설정은 입력·출력을 숨겨 상담정보를 외부 trace에 남기지 않는다.
 - Judge 평가셋 20건(결정론 15 + Azure LLM 5)으로 judge 정확도를 검증하며,
   `scripts/register_judge_dataset.py`로 LangSmith 데이터셋에 등록한다.
+  **이 20건은 과제4의 R1 골든셋 20건과 다른 것이다** — 이쪽은 7월 시스템 회귀용 코드
+  평가셋(`EC-01`~`EC-20`)이고, 사람이 정답을 매긴 R1 사례집은 `goldenset/cases/`에 있다.
+  둘의 관계는 [`docs/hard_stop_contract.md`](docs/hard_stop_contract.md) §8을 따른다.
 
 ## 기술 스택
 
@@ -304,7 +311,27 @@ fake LLM을 쓴다.
 - `data/chroma/`, 실데이터 parquet는 로컬 전용이다.
 - Streamlit 배포에는 private Azure Blob의 검증된 Chroma 아티팩트를 사용한다.
 
-## 과제 요구사항 매핑 (R0–R7)
+## 과제4 요구사항 매핑 (R1–R5)
+
+S.ymphony Proof — 기존 엔진 위에 얹은 **검증 레이어**다. 새 기능·새 화면이 아니다.
+
+| 요구사항 | 구현 | 근거 |
+| --- | --- | --- |
+| R1 정답 사례집 20건 | 정상 10 · 결함 10, 사람 2인 독립 라벨 후 조정. 출제자는 라벨러에서 배제 | `goldenset/cases/` · `goldenset/labeling-guide.md` · 사람 간 일치율은 [`agreement_before.md`](goldenset/reports/agreement_before.md) |
+| R2 judge 캘리브레이션 | 같은 20건으로 v1~v7 측정, 일치율·미탐·오탐·혼동행렬·축별 일치율 산출. 전 라운드 LangSmith 기록 | [`r2_calibration/README.md`](goldenset/reports/r2_calibration/README.md) · `docs/r2_calibration_runs/` |
+| R3 hard stop 규칙 | 재시도 상한 SSOT는 `config.yaml`의 `judge_max_retries` 하나. 소진 실패는 `manual_review_gate`에서 확정·다운로드 차단. 규칙별 1:1 테스트 + 속성 테스트 3건 | [`docs/hard_stop_contract.md`](docs/hard_stop_contract.md) (§2 SSOT · §7 규칙-테스트 1:1) |
+| R4 evidence bundle | 실행 1회 = 서류철 1개 자동 생성. 사람이 조립하는 단계 0건 | `scripts/make_evidence_bundle.py` · [`docs/evidence_bundle_schema.md`](docs/evidence_bundle_schema.md) |
+| R5 재현성 + 모의 감사 | 같은 입력 2회 실행을 해시로 대조. 재현 대상 범위는 실행 **전에** 선언 | `scripts/replay_verify.py` · [`docs/reproducibility_scope.md`](docs/reproducibility_scope.md) · [`docs/audit_demo_runbook.md`](docs/audit_demo_runbook.md) |
+
+진행 현황과 담당은 [`docs/현황판.md`](docs/현황판.md), 설계 판단과 완료 기준은
+[`docs/symphony_proof_plan.md`](docs/symphony_proof_plan.md)를 본다.
+
+> **재현 보장의 경계를 먼저 읽는다.** 결정론 계층(`config_hash`·`computation_hash`·
+> `approval_hash`·metrics·explanations)은 무조건 보장이고, LLM이 개입하는 인용 집합·
+> judge 사유 문구는 재현 대상이 아니다. 무엇이 어느 쪽인지는
+> [`docs/reproducibility_scope.md`](docs/reproducibility_scope.md)가 단일 원천이다.
+
+## 과제2 요구사항 매핑 (R0–R7)
 
 | 요구사항 | 구현 |
 | --- | --- |

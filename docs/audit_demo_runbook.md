@@ -572,7 +572,11 @@ manifest가 바뀌고, bundle_hash가 바뀐다 (`docs/evidence_bundle_schema.md
 | §6.2 무결성 검증 2종이 합성 번들에서만 확인됐다 | 실물 번들 3건에서 통과 — `bundle_hash` 일치, `manifest.files` 전건 일치 |
 | `replay_verify.py` 대조 시간을 실물 덤프로 안 재봤다 | 실물 덤프로 0.1초 미만. §3.2 배분을 고칠 이유가 없다 |
 
-- 3건 전부 `calibration_summary`가 `mode: official`·`prompt_version: v6`로 채워져 나갔다.
+- 3건 전부 `calibration_summary`가 `mode: official`로 채워져 나갔다. **실린 비교표는
+  v1 → v7**(75% → 80%, `before_code_sha=b035600` → `after_code_sha=d5166e5`)이다 —
+  최종 제출 번들 3건에서 확인한 값이다. 이 줄이 한때 `v6`이라고 적었던 것은 v7 병합
+  이전 리허설 번들을 보고 쓴 것이라 정정했다. 값을 다시 확인하려면 번들 안
+  `calibration_summary.json`의 `comparison.after_code_sha`를 연다.
 - 같은 실행분으로 §3.6의 제출 안정성 확인도 종료 코드 `0`이었다(3건 각 3회, 갈린 축 없음).
   이 값의 해석 한계는 §3.6 마지막 문단 그대로다 — "흔들리지 않는다"가 아니라 "이 설정에서
   3회 관측 결과 판정이 동일했다"다.
