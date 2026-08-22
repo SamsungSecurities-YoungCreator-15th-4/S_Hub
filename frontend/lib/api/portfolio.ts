@@ -7,7 +7,7 @@
 
 import { ApiError, apiPost } from "@/lib/api";
 import { PORTFOLIOS, type BacktestPoint, type Portfolio, type PortfolioMetrics } from "@/lib/mockData";
-import type { CalcUnitWeights } from "@/lib/assetMapping";
+import { CALC_UNITS, type CalcUnitWeights, type CurrentWeightsInput } from "@/lib/assetMapping";
 import { type ApiResult, fallback, live } from "./result";
 import type { CorrelationHeatmapResponse, PortfolioTaxResponse, StressTaxData, StressTaxGauge, TaxWaterfallResponse } from "./types";
 
@@ -250,6 +250,8 @@ export interface PortfolioCalcOptions {
   fxKrw: number;
   /** 연금계좌(IRP) 세액공제 적격성 판단에 필수 — 없으면 백엔드가 IRP를 무조건 사용 불가 처리한다. */
   age?: number;
+  /** 고객이 지금 실제로 들고 있는 자산 비중 — 없으면 백엔드가 현금 100%로 폴백한다. */
+  currentWeights?: CurrentWeightsInput;
   consultationId?: string;
   clientId?: string;
 }
@@ -301,6 +303,9 @@ export async function fetchPortfolioCalculate(
       liquidity_need: mapLiquidity(opts.liquidity),
       // 없으면 백엔드 calculate_irp_status가 IRP를 무조건 사용 불가(0원)로 처리한다.
       age: opts.age,
+      // 없으면 백엔드가 "현재 포트폴리오"를 현금 100%로 계산한다(중앙 대시보드
+      // "현재" 카드·절세 효과·스트레스 테스트가 전부 이 값을 공유한다).
+      current_weights: mapCurrentWeightsInputToBackend(opts.currentWeights ?? {}),
     },
     scenario: {
       base_interest_rate: opts.ratePct / 100,
@@ -388,6 +393,10 @@ export interface StressMetricsOptions {
   stressPreset: "current" | "crisis" | "war" | null;
   /** 연금계좌(IRP) 세액공제 적격성 판단에 필수 — 없으면 백엔드가 IRP를 무조건 사용 불가 처리한다. */
   age?: number;
+  /** 고객이 지금 실제로 들고 있는 자산 비중 — fetchPortfolioCalculate와 동일한 값을 넘겨
+   *  "현재 포트폴리오" 기준선을 일관되게 유지한다. 없으면 currentPortfolios의 직전
+   *  calculate 결과(그 역시 실데이터가 없으면 현금 100%)로 폴백한다. */
+  currentWeights?: CurrentWeightsInput;
 }
 
 /** CalcUnitWeights(% 단위) → 백엔드 stress-metrics weights(소수 단위) 변환 */
@@ -404,6 +413,29 @@ function mapFrontendWeightsToBackend(weights: CalcUnitWeights): Record<string, n
     gold:               weights.gold                    / 100,
     commodity:          weights.infraFund               / 100,
     dollar:             weights.overseasBond            / 100,
+  };
+}
+
+/**
+ * 고객 현재 보유 자산 비중 입력(CurrentWeightsInput, % 단위) → 백엔드 current_weights(소수 단위).
+ * 미입력 항목은 0으로 채우고, 현금은 mapFrontendWeightsToBackend가 다루지 않으므로 별도로 더한다.
+ * 아무 값도 입력되지 않았으면 undefined를 반환해 백엔드 기본 폴백(현금 100%)을 그대로 따르게 한다.
+ */
+export function mapCurrentWeightsInputToBackend(
+  input: CurrentWeightsInput,
+): Record<string, number> | undefined {
+  const hasAnyInput = Object.values(input).some(
+    (v) => typeof v === "number" && Number.isFinite(v) && v !== 0,
+  );
+  if (!hasAnyInput) return undefined;
+
+  const calcUnitWeights = Object.fromEntries(
+    CALC_UNITS.map(({ id }) => [id, input[id] ?? 0]),
+  ) as CalcUnitWeights;
+
+  return {
+    ...mapFrontendWeightsToBackend(calcUnitWeights),
+    cash: (input.cash ?? 0) / 100,
   };
 }
 
@@ -431,11 +463,14 @@ export async function fetchStressMetrics(
     ? 0
     : (opts.fxKrw - opts.liveFxKrw) / Math.max(opts.liveFxKrw, 1); // 상대 변화율
 
-  // 현재 포트폴리오 비중을 백엔드 포맷으로 변환해서 전송 — 없으면 백엔드가 cash 100% 폴백
+  // 현재 포트폴리오 비중을 백엔드 포맷으로 변환해서 전송 — 없으면 백엔드가 cash 100% 폴백.
+  // fetchPortfolioCalculate와 같은 실입력(opts.currentWeights)을 최우선으로 써서 두 엔드포인트가
+  // 같은 "현재 포트폴리오" 기준선을 보게 한다. 실입력이 없을 때만 직전 calculate 결과로 되돌아간다.
+  const realCurrentWeights = mapCurrentWeightsInputToBackend(opts.currentWeights ?? {});
   const currentPortfolio = currentPortfolios.find((p) => p.id === "current");
-  const backendWeights = currentPortfolio
-    ? mapFrontendWeightsToBackend(currentPortfolio.weights)
-    : undefined;
+  const backendWeights =
+    realCurrentWeights ??
+    (currentPortfolio ? mapFrontendWeightsToBackend(currentPortfolio.weights) : undefined);
 
   const body = {
     weights: backendWeights,
@@ -536,6 +571,8 @@ export async function fetchPortfolioStressTest(
       liquidity_need: mapLiquidity(opts.liquidity),
       // 없으면 백엔드 calculate_irp_status가 IRP를 무조건 사용 불가(0원)로 처리한다.
       age: opts.age,
+      // 없으면 백엔드가 "현재 포트폴리오"를 현금 100%로 계산한다.
+      current_weights: mapCurrentWeightsInputToBackend(opts.currentWeights ?? {}),
     },
     scenario: {
       base_interest_rate: opts.ratePct / 100,

@@ -33,6 +33,9 @@ export type CalcUnitId = (typeof CALC_UNITS)[number]["id"];
 /** 11종 비중(%) 묶음. 합계 100을 가정한다. */
 export type CalcUnitWeights = Record<CalcUnitId, number>;
 
+/** 고객 현재 보유 자산 비중 입력값(%) — 11종 계산단위 + 현금. 미입력 항목은 키 자체가 없다. */
+export type CurrentWeightsInput = Partial<Record<CalcUnitId | "cash", number>>;
+
 // ── 6분류 화면 표시 그룹 (정본 디자인의 범례 순서) ─────────────
 export const DISPLAY_GROUPS = [
   "국내주식",

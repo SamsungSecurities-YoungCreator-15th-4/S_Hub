@@ -25,6 +25,9 @@ import type {
   PortfolioTaxResponse,
   StressTaxData,
 } from "./api";
+import type { CurrentWeightsInput } from "./assetMapping";
+
+export type { CurrentWeightsInput };
 
 export interface IpsState {
   returnPct: number;
@@ -67,6 +70,10 @@ interface DashboardState {
   liveBaseLoaded: boolean;
   /** 고객의 다른 금융소득(연 이자·배당, 만원) — 종합과세 기준선 점검 입력값 */
   otherIncomeManwon: number;
+  /** 고객이 지금 실제로 들고 있는 자산 비중(%) — calculate·stress-metrics의 "현재 포트폴리오"
+   *  기준선으로 그대로 전송된다. 미입력 시 백엔드가 현금 100%로 폴백한다. */
+  currentWeightsInput: CurrentWeightsInput;
+  setCurrentWeightsInput: (patch: CurrentWeightsInput) => void;
 
   // ── STT/상담 연동 상태 ──
   /** 화면에 표시하는 상담 전사. 초기값은 mock(CONSULT_LOG). */
@@ -176,6 +183,9 @@ export const useDashboardStore = create<DashboardState>((set) => ({
   liveBase: { ratePct: SCENARIO_BASE.ratePct, fxKrw: SCENARIO_BASE.fxKrw },
   liveBaseLoaded: false,
   otherIncomeManwon: TAX_THRESHOLD.otherIncomeDefault,
+  currentWeightsInput: {},
+  setCurrentWeightsInput: (patch) =>
+    set((s) => ({ currentWeightsInput: { ...s.currentWeightsInput, ...patch } })),
 
   // 초기 포트폴리오는 mock(데모) — 출처를 fallback 으로 둬 배지로 명시한다.
   portfolios: PORTFOLIOS,
@@ -253,6 +263,7 @@ export const useDashboardStore = create<DashboardState>((set) => ({
         stressTax: null,
         taxOptimizer: null,
         insightResult: null,
+        currentWeightsInput: {},
         isStressMode: false,
         stressPreset: "current",
         scenario: { ...s.liveBase }, // 슬라이더도 live 기준으로 초기화 → 자동분석는 항상 calculate

@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import DataSourceBadge from "@/components/common/DataSourceBadge";
 import StressTestSection from "@/components/right-panel/StressTestSection";
+import CurrentPortfolioInput from "@/components/sidebar/CurrentPortfolioInput";
 import SttRecordingModal from "@/components/sidebar/SttRecordingModal";
 import { type Customer, CUSTOMERS } from "@/lib/mockData";
 import {
@@ -116,6 +117,7 @@ export default function Sidebar() {
     setAnalysisBaseline,
     consultationId,
     portfolioSource,
+    currentWeightsInput,
   } = useDashboardStore();
   const customer =
     customers.find((c) => c.id === selectedCustomerId) ?? customers[0];
@@ -271,6 +273,7 @@ export default function Sidebar() {
             liveFxKrw: liveBase.fxKrw,
             stressPreset,
             age: customer.age,
+            currentWeights: currentWeightsInput,
           },
           basePortfolios,
         );
@@ -295,6 +298,7 @@ export default function Sidebar() {
           consultationId: consultationId || undefined,
           clientId: customer.clientId,
           age: customer.age,
+          currentWeights: currentWeightsInput,
         });
         setPortfolios(result.data.portfolios, result.source, result.note);
         if (result.data.correlationHeatmap)
@@ -794,6 +798,8 @@ export default function Sidebar() {
             />
           </IpsRow>
         </Card>
+
+        <CurrentPortfolioInput />
 
         <StressTestSection />
 
