@@ -72,7 +72,10 @@ function buildAccounts(tax: StressTaxData): PdfTaxAccount[] {
     const live = liveByIndex[i];
     if (!live) return acct;
     const used = wonToManwon(live.used_capacity);
-    const remaining = wonToManwon(live.remaining_capacity);
+    // IRP 카드는 ISA와 달리 remaining_capacity가 아니라 remaining_tax_credit_capacity로 내려온다.
+    const remaining = wonToManwon(
+      i === 1 ? live.remaining_tax_credit_capacity : live.remaining_capacity,
+    );
     const limit = used != null && remaining != null ? used + remaining : acct.limit;
     return {
       ...acct,

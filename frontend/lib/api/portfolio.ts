@@ -248,6 +248,8 @@ export interface PortfolioCalcOptions {
   tax: string;
   ratePct: number;
   fxKrw: number;
+  /** 연금계좌(IRP) 세액공제 적격성 판단에 필수 — 없으면 백엔드가 IRP를 무조건 사용 불가 처리한다. */
+  age?: number;
   consultationId?: string;
   clientId?: string;
 }
@@ -297,6 +299,8 @@ export async function fetchPortfolioCalculate(
       investment_horizon_years: Math.max(1, Math.min(50, opts.timeYears)),
       tax_sensitivity: mapTax(opts.tax),
       liquidity_need: mapLiquidity(opts.liquidity),
+      // 없으면 백엔드 calculate_irp_status가 IRP를 무조건 사용 불가(0원)로 처리한다.
+      age: opts.age,
     },
     scenario: {
       base_interest_rate: opts.ratePct / 100,
@@ -382,6 +386,8 @@ export interface StressMetricsOptions {
   liveFxKrw: number;
   /** 프리셋 버튼 선택 여부: crisis → crisis_2008, war → crisis_ru_war, null → 슬라이더 */
   stressPreset: "current" | "crisis" | "war" | null;
+  /** 연금계좌(IRP) 세액공제 적격성 판단에 필수 — 없으면 백엔드가 IRP를 무조건 사용 불가 처리한다. */
+  age?: number;
 }
 
 /** CalcUnitWeights(% 단위) → 백엔드 stress-metrics weights(소수 단위) 변환 */
@@ -445,6 +451,8 @@ export async function fetchStressMetrics(
       liquidity_need: mapLiquidity(opts.liquidity),
       stress_interest_rate_shock: rateShock,
       stress_fx_shock: fxShock,
+      // 없으면 백엔드 calculate_irp_status가 IRP를 무조건 사용 불가(0원)로 처리한다.
+      age: opts.age,
     },
     scenario: scenarioKey,
   };
@@ -526,6 +534,8 @@ export async function fetchPortfolioStressTest(
       investment_horizon_years: Math.max(1, Math.min(50, opts.timeYears)),
       tax_sensitivity: mapTax(opts.tax),
       liquidity_need: mapLiquidity(opts.liquidity),
+      // 없으면 백엔드 calculate_irp_status가 IRP를 무조건 사용 불가(0원)로 처리한다.
+      age: opts.age,
     },
     scenario: {
       base_interest_rate: opts.ratePct / 100,

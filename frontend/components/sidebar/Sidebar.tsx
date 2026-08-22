@@ -270,6 +270,7 @@ export default function Sidebar() {
             liveRatePct: liveBase.ratePct,
             liveFxKrw: liveBase.fxKrw,
             stressPreset,
+            age: customer.age,
           },
           basePortfolios,
         );
@@ -293,6 +294,7 @@ export default function Sidebar() {
           fxKrw: liveBase.fxKrw,
           consultationId: consultationId || undefined,
           clientId: customer.clientId,
+          age: customer.age,
         });
         setPortfolios(result.data.portfolios, result.source, result.note);
         if (result.data.correlationHeatmap)
