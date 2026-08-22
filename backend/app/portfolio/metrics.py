@@ -666,7 +666,17 @@ def apply_return_shocks(
     selected_expected_returns: pd.Series,
     shocks: Dict[str, float],
 ) -> Tuple[pd.DataFrame, pd.Series]:
-    """자산별 연간 충격을 일별수익률과 기대수익률에 주입한다(원본 비변형)."""
+    """자산별 연간 충격을 일별수익률과 기대수익률에 주입한다(원본 비변형).
+
+    일별 드리프트는 shock를 TRADING_DAYS(고정 252)가 아니라 실제 넘겨받은
+    구간 길이(len(column))로 나눠 만든다. request.period(기본 "5y")로 여러
+    해 분량의 수익률이 들어오는 게 실제 호출 경로라, 고정 252로 나누면
+    "연간 -40%" 같은 위기 시나리오 충격이 기간 길이에 비례해 누적되어(5년
+    조회 시 -40% 충격의 MDD가 -90%에 가깝게 나옴) 조회 기간과 무관해야 할
+    충격 총량이 조회 기간에 종속되는 버그가 있었다. len(column)으로 나누면
+    조회 기간이 몇 년이든 이 자산에 주입되는 드리프트 총합이 항상 shock
+    한 번만큼만 반영된다.
+    """
     stressed_returns = selected_returns.copy()
     stressed_expected = selected_expected_returns.copy()
     for asset in stressed_returns.columns:
@@ -676,8 +686,9 @@ def apply_return_shocks(
         column = stressed_returns[asset]
         mean = float(column.mean())
         multiplier = _vol_multiplier(shock)
+        window_length = len(column)
         stressed_returns[asset] = (
-            mean + (column - mean) * multiplier + shock / TRADING_DAYS
+            mean + (column - mean) * multiplier + shock / window_length
         )
         if asset in stressed_expected.index:
             stressed_expected[asset] = float(stressed_expected[asset]) + shock
