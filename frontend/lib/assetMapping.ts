@@ -36,6 +36,29 @@ export type CalcUnitWeights = Record<CalcUnitId, number>;
 /** 고객 현재 보유 자산 비중 입력값(%) — 11종 계산단위 + 현금. 미입력 항목은 키 자체가 없다. */
 export type CurrentWeightsInput = Partial<Record<CalcUnitId | "cash", number>>;
 
+/** 입력된 비중 합계(%). 미입력 항목은 0으로 취급. */
+export function sumCurrentWeightsInput(input: CurrentWeightsInput): number {
+  return Object.values(input).reduce(
+    (acc, v) => acc + (typeof v === "number" && Number.isFinite(v) ? v : 0),
+    0,
+  );
+}
+
+/**
+ * 입력값이 계산에 써도 되는 상태인지 검증한다.
+ *
+ * 백엔드는 합계가 100이 아니어도 normalize_weights로 조용히 100%로 재조정해버려서,
+ * "화면에 보이는 합계 ≠ 실제 계산에 쓰인 비중"이 될 수 있다(추적성 위반). 아무것도
+ * 입력하지 않은 상태(합계 0)는 유효로 본다 — 그건 "아직 입력 안 함"이라 백엔드
+ * 기본값(현금 100%)으로 정직하게 폴백하는 정상 경로이기 때문이다. 값을 하나라도
+ * 입력했다면 합계가 100(오차 0.5%p 이내)이어야 유효하다.
+ */
+export function isCurrentWeightsInputValid(input: CurrentWeightsInput): boolean {
+  const total = sumCurrentWeightsInput(input);
+  if (total === 0) return true;
+  return Math.abs(total - 100) < 0.5;
+}
+
 // ── 6분류 화면 표시 그룹 (정본 디자인의 범례 순서) ─────────────
 export const DISPLAY_GROUPS = [
   "국내주식",

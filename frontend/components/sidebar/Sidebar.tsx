@@ -20,6 +20,7 @@ import DataSourceBadge from "@/components/common/DataSourceBadge";
 import StressTestSection from "@/components/right-panel/StressTestSection";
 import CurrentPortfolioInput from "@/components/sidebar/CurrentPortfolioInput";
 import SttRecordingModal from "@/components/sidebar/SttRecordingModal";
+import { isCurrentWeightsInputValid } from "@/lib/assetMapping";
 import { type Customer, CUSTOMERS } from "@/lib/mockData";
 import {
   type ConsultationSummaryItem,
@@ -249,6 +250,9 @@ export default function Sidebar() {
 
   const handleAnalyze = async () => {
     if (!customer || analyzing) return;
+    // 합계가 100%가 아닌 현재 포트폴리오 입력은 계산에 못 들어가게 막는다 — 백엔드가
+    // 조용히 100%로 재정규화하면 화면 합계와 실제 계산에 쓰인 비중이 달라진다.
+    if (!isCurrentWeightsInputValid(currentWeightsInput)) return;
 
     // stressPreset이 현재값 외 프리셋이거나 슬라이더가 live 기준값에서 벗어나면 스트레스 테스트 API 호출
     const shouldStress =
@@ -805,7 +809,7 @@ export default function Sidebar() {
 
         <Button
           size="lg"
-          disabled={analyzing}
+          disabled={analyzing || !isCurrentWeightsInputValid(currentWeightsInput)}
           onClick={() => {
             void handleAnalyze();
           }}
