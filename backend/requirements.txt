@@ -1,10 +1,10 @@
 # 실제 설치 버전으로 핀 (pip freeze 기준 직접 의존성 고정)
-fastapi==0.136.3
+fastapi==0.141.1
 uvicorn[standard]==0.52.4
 python-multipart==0.0.32
 yfinance==1.4.1
 pandas==3.0.5
-numpy==2.4.6
+numpy==2.5.2
 python-dotenv==1.2.2
 azure-cognitiveservices-speech==1.50.0
 # RAG
