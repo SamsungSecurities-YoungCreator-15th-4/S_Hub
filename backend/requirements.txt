@@ -8,7 +8,7 @@ numpy==2.4.6
 python-dotenv==1.2.2
 azure-cognitiveservices-speech==1.50.0
 # RAG
-openai==2.38.0
+openai==3.5.0
 pypdf==6.15.0
 tiktoken==0.13.0  # ingest_documents.py 청킹(cl100k_base) — openai 간접의존 아님, 직접 핀
 # DART 회사코드 적재(scripts/ingest_corp_code.py) — httpx 는 supabase/openai 간접의존이라
