@@ -1,0 +1,454 @@
+"""리포트 품질 judge — 기존 형태 검사와 6축 루브릭을 함께 실행한다.
+
+state.demo_options의 force_judge_fail 값만큼 강제로 실패시켜 judge 재작성 루프를
+시연할 수 있다. 환경변수는 이전 호출 방식과의 하위 호환용으로만 읽는다.
+N회 실패 후에는 실제 품질 게이트 결과를 따른다.
+
+기존 형태 검사는 결정론적으로 유지하고, LLM은 설명 품질 판정에만 관여하며
+수치 계산 경로에는 진입하지 않는다.
+"""
+from __future__ import annotations
+
+import json
+import os
+import re
+from datetime import date
+
+from app.judge.rubric import AXIS_NAMES, evaluate_rubric, is_verified_citation
+from app.llm.audit import with_llm_audit
+from app.observability.langsmith import annotate_current_run
+from app.rag.citations import citation_contract_issues
+from app.rag.contracts import EVIDENCE_ROLES, ROUTING_CONTRACT
+from app.state import RiskState
+
+FORCE_FAIL_ENV = "RISK_FORCE_JUDGE_FAIL"
+MANUAL_REVIEW_WARNING = "검증 미통과 — 수동검토 필요"
+
+
+def resolve_max_judge_retries(state: RiskState) -> int:
+    """run_config에 적재된 config.yaml의 judge_max_retries를 검증해 반환한다.
+
+    상한 숫자의 유일한 원천은 config/config.yaml이다. 누락·오염된 값을 임의의
+    코드 기본값으로 대체하면 문서와 실행 규칙이 갈라질 수 있으므로 즉시 실패한다.
+    """
+    run_config = state.get("run_config") or {}
+    if not isinstance(run_config, dict):
+        raise ValueError("run_config는 dict여야 합니다.")
+    value = run_config.get("judge_max_retries")
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise ValueError(
+            "config/config.yaml의 judge_max_retries는 1 이상의 정수여야 합니다."
+        )
+    return value
+
+
+class _AuditedLLM:
+    """주입된 LangChain 모델을 그대로 호출하며 실제 프롬프트만 기록한다."""
+
+    def __init__(self, llm):
+        self.llm = llm
+        self.prompts: list[object] = []
+        self.responses: list[object] = []
+
+    def invoke(self, prompt, *args, **kwargs):
+        self.prompts.append(prompt)
+        response = self.llm.invoke(prompt, *args, **kwargs)
+        self.responses.append(response)
+        return response
+
+    def __getattr__(self, name):
+        return getattr(self.llm, name)
+
+
+def _named_prompts(prompts: list[object]) -> dict[str, str]:
+    """Judge prompt 본문의 판정 축을 감사 레코드 이름으로 사용한다."""
+    named: dict[str, str] = {}
+    for index, prompt in enumerate(prompts, 1):
+        prompt_str = str(prompt)
+        match = re.search(r"판정 축:\s*([^\n]+)", prompt_str)
+        name = match.group(1).strip() if match else f"prompt_{index}"
+        if name in named:
+            name = f"{name}_{index}"
+        named[name] = prompt_str
+    return named
+
+
+def _safe_int_env(name: str, default: int = 0) -> int:
+    try:
+        return int(os.environ.get(name, str(default)))
+    except ValueError:
+        return default
+
+
+def _has_text(value) -> bool:
+    return isinstance(value, str) and bool(value.strip())
+
+
+def _verified_citations(citations: list) -> list[dict]:
+    return [citation for citation in citations if is_verified_citation(citation)]
+
+
+def _invalid_citations(citations: list) -> list[dict]:
+    return [citation for citation in citations if not is_verified_citation(citation)]
+
+
+def _citation_content_check(citations: list, *, strict: bool) -> dict:
+    """인용문·문서명·조항/주장·청크 원문이 서로 일치하는지 실패 폐쇄로 검사한다."""
+    failures: list[str] = []
+    for index, citation in enumerate(citations, 1):
+        issues = citation_contract_issues(
+            citation,
+            require_chunk_text=strict,
+        )
+        if issues:
+            failures.append(f"#{index} " + ", ".join(issues))
+    return {
+        "name": "citation_content_contract",
+        "passed": not failures,
+        "required": True,
+        "detail": (
+            f"인용 {len(citations)}건의 인용문·문서명·조항/주장·청크 일치"
+            if not failures
+            else "; ".join(failures)
+        ),
+    }
+
+
+def _rag_routing_record(run_config: dict) -> dict | None:
+    """현재 RAG 감사 계약이 활성화된 경우 latest record를 반환한다."""
+    audit = run_config.get("audit") if isinstance(run_config, dict) else None
+    llm_audit = audit.get("llm") if isinstance(audit, dict) else None
+    rag_audit = llm_audit.get("rag_cite") if isinstance(llm_audit, dict) else None
+    latest = rag_audit.get("latest") if isinstance(rag_audit, dict) else None
+    if (
+        isinstance(latest, dict)
+        and latest.get("routing_contract") == ROUTING_CONTRACT
+    ):
+        return latest
+    return None
+
+
+def _citation_routing_check(citations: list[dict], latest: dict) -> dict:
+    """인용의 역할·라우팅 사유가 해당 실행의 route 감사기록과 일치하는지 검사한다."""
+    raw_routes = latest.get("routes")
+    routes = raw_routes if isinstance(raw_routes, list) else []
+    route_by_key = {
+        (route.get("topic"), route.get("category")): route
+        for route in routes
+        if isinstance(route, dict)
+    }
+    failures: list[str] = []
+    for index, citation in enumerate(citations, 1):
+        extra = citation.get("extra")
+        extra = extra if isinstance(extra, dict) else {}
+        category = extra.get("category")
+        expected_role = EVIDENCE_ROLES.get(category)
+        route = route_by_key.get((citation.get("claim"), category))
+        if expected_role is None:
+            failures.append(f"#{index} category 오류")
+        elif extra.get("evidence_role") != expected_role:
+            failures.append(f"#{index} evidence_role 불일치")
+        if route is None:
+            failures.append(f"#{index} 활성 route 없음")
+        elif extra.get("routing_reason") != route.get("routing_reason"):
+            failures.append(f"#{index} routing_reason 불일치")
+    return {
+        "name": "citation_routing_contract",
+        "passed": not failures,
+        "required": True,
+        "detail": (
+            f"인용 {len(citations)}건의 역할·라우팅 감사 메타데이터 일치"
+            if not failures
+            else "; ".join(failures)
+        ),
+    }
+
+
+def _reference_date(state: RiskState) -> date | None:
+    run_config = state.get("run_config") or {}
+    metrics = state.get("metrics") or {}
+    values = (
+        run_config.get("as_of_date"),
+        ((metrics.get("meta") or {}).get("data_period") or {}).get("end"),
+    )
+    for value in values:
+        if not isinstance(value, str):
+            continue
+        try:
+            return date.fromisoformat(value)
+        except ValueError:
+            continue
+    return None
+
+
+def _citation_publication_check(state: RiskState, citations: list[dict]) -> dict:
+    """발행일 누락·형식과 house view 최신성을 비차단 경고로 검사한다."""
+    reference = _reference_date(state)
+    warnings: list[str] = []
+    for index, citation in enumerate(citations, 1):
+        extra = citation.get("extra")
+        extra = extra if isinstance(extra, dict) else {}
+        raw_date = extra.get("published_at")
+        try:
+            published = date.fromisoformat(raw_date) if isinstance(raw_date, str) else None
+        except ValueError:
+            published = None
+        if published is None:
+            warnings.append(f"#{index} 발행일 누락/형식 오류")
+            continue
+        if extra.get("category") != "house_view" or reference is None:
+            continue
+        age_months = (reference.year - published.year) * 12 + reference.month - published.month
+        if age_months < 0:
+            warnings.append(f"#{index} house_view 발행일이 기준일 이후")
+        elif age_months > 12:
+            warnings.append(f"#{index} house_view {age_months}개월 경과 — 최신성 중대 경고")
+        elif age_months > 6:
+            warnings.append(f"#{index} house_view {age_months}개월 경과 — 최신성 경고")
+    return {
+        "name": "citation_publication_freshness",
+        "passed": not warnings,
+        "required": False,
+        "detail": (
+            f"인용 {len(citations)}건 발행일·house_view 최신성 확인"
+            if not warnings
+            else ", ".join(warnings)
+        ),
+    }
+
+
+def _build_checks(state: RiskState) -> list[dict]:
+    """기존 7개 형태 검사를 preflight로 보존한다."""
+    run_config = state.get("run_config") or {}
+    metrics = state.get("metrics") or {}
+    explanations = state.get("explanations") or []
+    citations = state.get("citations") or []
+    approval = state.get("approval") or {}
+    meta = metrics.get("meta") or {}
+
+    explanation_texts = [
+        explanation.get("text", "")
+        for explanation in explanations
+        if isinstance(explanation, dict) and explanation.get("topic") != "재작성 반영"
+    ]
+    verified = _verified_citations(citations)
+    invalid = _invalid_citations(citations)
+    strict_citation_gate = run_config.get("strict_citation_gate") is True
+
+    checks = [
+        {
+            "name": "metrics_present",
+            "passed": bool(metrics),
+            "required": True,
+            "detail": "리스크 지표 존재",
+        },
+        {
+            "name": "computation_hash_present",
+            "passed": _has_text(meta.get("computation_hash")),
+            "required": True,
+            "detail": "재현성 computation_hash 존재",
+        },
+        {
+            "name": "explanations_present",
+            "passed": bool(explanations),
+            "required": True,
+            "detail": f"설명 {len(explanations)}건",
+        },
+        {
+            "name": "explanations_have_text",
+            "passed": bool(explanation_texts) and all(_has_text(text) for text in explanation_texts),
+            "required": True,
+            "detail": "주요 설명 문장 텍스트 존재",
+        },
+        {
+            "name": "citations_all_verified",
+            "passed": not invalid,
+            "required": True,
+            "detail": f"검증 실패/형식 오류 인용 {len(invalid)}건",
+        },
+        {
+            "name": "verified_citations_present",
+            "passed": bool(verified),
+            "required": strict_citation_gate,
+            "detail": f"인용 구조 확인: 검증 통과 인용 {len(verified)}건",
+        },
+        _citation_content_check(citations, strict=strict_citation_gate),
+        {
+            "name": "approval_locked",
+            "passed": approval.get("status") == "locked",
+            "required": False,
+            "detail": "HITL 승인 잠금 상태",
+        },
+    ]
+    routing_record = _rag_routing_record(run_config)
+    if routing_record is not None:
+        checks.extend(
+            [
+                _citation_routing_check(verified, routing_record),
+                _citation_publication_check(state, verified),
+            ]
+        )
+    return checks
+
+
+def _expected_dates(state: RiskState) -> set[str]:
+    run_config = state.get("run_config") or {}
+    metrics = state.get("metrics") or {}
+    data_period = (metrics.get("meta") or {}).get("data_period") or {}
+    return {
+        str(value)
+        for value in (run_config.get("as_of_date"), data_period.get("end"))
+        if value
+    }
+
+
+def _rubric_checks(state: RiskState, llm) -> tuple[list[dict], dict, list[str]]:
+    run_config = state.get("run_config") or {}
+    results, manual_flags = evaluate_rubric(
+        explanations=state.get("explanations") or [],
+        citations=state.get("citations") or [],
+        metrics=state.get("metrics") or {},
+        strict_citation_gate=run_config.get("strict_citation_gate") is True,
+        expected_dates=_expected_dates(state),
+        llm=llm,
+        portfolio=state.get("portfolio") or [],
+    )
+    rubric = {
+        name: {"passed": results[name][0], "reason": results[name][1]}
+        for name in AXIS_NAMES
+    }
+    checks = [
+        {
+            "name": name,
+            "passed": result[0],
+            "required": True,
+            "detail": result[1],
+        }
+        for name, result in results.items()
+    ]
+    return checks, rubric, manual_flags
+
+
+def _score(checks: list[dict]) -> float:
+    if not checks:
+        return 0.0
+    return round(sum(1 for check in checks if check["passed"]) / len(checks), 2)
+
+
+def _manual_review_flags(checks: list[dict]) -> list[str]:
+    return [
+        check["detail"]
+        for check in checks
+        if not check["passed"] and not check["required"]
+    ]
+
+
+def _failure_items(checks: list[dict]) -> list[dict]:
+    return [
+        {"axis": check["name"], "reason": check["detail"]}
+        for check in checks
+        if check["required"] and not check["passed"]
+    ]
+
+
+def _feedback(retries: int, failures: list[dict]) -> str:
+    return json.dumps(
+        {
+            "action": "rag_cite_rewrite",
+            "attempt": retries,
+            "failed_axes": failures,
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+    )
+
+
+def _get_default_llm():
+    try:
+        from app.llm.client import get_llm
+
+        return get_llm(temperature=0.0)
+    except Exception:
+        return None
+
+
+def judge_eval(state: RiskState, *, llm=None) -> dict:
+    """형태 검사와 6축 루브릭을 집계한다. llm은 테스트 주입 가능하다."""
+    retries = (state.get("judge_retries") or 0) + 1
+    demo_options = state.get("demo_options") or {}
+    force_fail_n = demo_options.get("force_judge_fail")
+    if not isinstance(force_fail_n, int) or isinstance(force_fail_n, bool):
+        force_fail_n = _safe_int_env(FORCE_FAIL_ENV)
+    judge_llm = llm if llm is not None else _get_default_llm()
+    audited_llm = _AuditedLLM(judge_llm) if judge_llm is not None else None
+
+    preflight_checks = _build_checks(state)
+    rubric_checks, rubric, rubric_manual_flags = _rubric_checks(state, audited_llm)
+    checks = preflight_checks + rubric_checks
+    score = _score(checks)
+    failures = _failure_items(checks)
+    manual_review_flags = list(
+        dict.fromkeys(_manual_review_flags(preflight_checks) + rubric_manual_flags)
+    )
+
+    if retries <= force_fail_n:
+        failures = [
+            {
+                "axis": "forced_failure",
+                "reason": f"judge 재작성 루프 시연 {retries}/{force_fail_n}",
+            }
+        ]
+
+    passed = not failures
+    if not passed and retries >= resolve_max_judge_retries(state):
+        manual_review_flags.append(MANUAL_REVIEW_WARNING)
+        manual_review_flags = list(dict.fromkeys(manual_review_flags))
+
+    reason = (
+        "필수 품질 점검 통과"
+        if passed
+        else "필수 품질 점검 실패: "
+        + "; ".join(f"{item['axis']}={item['reason']}" for item in failures)
+    )
+    feedback = "" if passed else _feedback(retries, failures)
+
+    prompt_map = _named_prompts(audited_llm.prompts if audited_llm else [])
+    audited_config = with_llm_audit(
+        state.get("run_config") or {},
+        component="judge_eval",
+        attempt=retries,
+        prompts=prompt_map,
+        llm=judge_llm,
+        responses=audited_llm.responses if audited_llm else [],
+    )
+    failed_axes = [item["axis"] for item in failures]
+    latest = audited_config["audit"]["llm"]["judge_eval"]["latest"]
+    annotate_current_run(
+        metadata={
+            "trace_id": state.get("trace_id"),
+            "failed_axes": failed_axes,
+            "judge_feedback": feedback,
+            "judge_retries": retries,
+            "judge_prompt_hash": latest["prompt_hash"]["aggregate_sha256"],
+            "model_version": latest["model_version"],
+        },
+        tags=[
+            f"judge-attempt:{retries}",
+            "judge:passed" if passed else "judge:failed",
+            *(f"failed-axis:{axis}" for axis in failed_axes),
+        ],
+    )
+
+    return {
+        "run_config": audited_config,
+        "judge_retries": retries,
+        "judge": {
+            "passed": passed,
+            "score": score if passed else min(score, 0.4) if retries <= force_fail_n else score,
+            "reason": reason,
+            "checks": checks,
+            "rubric": rubric,
+            "manual_review_flags": manual_review_flags,
+        },
+        "judge_feedback": feedback,
+    }

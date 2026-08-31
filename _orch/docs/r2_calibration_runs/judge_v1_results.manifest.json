@@ -1,0 +1,17 @@
+{
+  "code_sha": "b03560080367f0ba485a32336746c4293359687e",
+  "executed_at": "2026-08-02T12:30:22.584785+00:00",
+  "freeze_commit": "58d5e2b4fa62e37c56a1a083e83650272aa13015",
+  "input_set_hash": "2dc161f7e3de3f88d908670ada8d983a5f952e2ddc4a2a195b88206ef482819d",
+  "langsmith_run": "Orchestration_Team4",
+  "prompt_version": "v1",
+  "verifications": [
+    {
+      "item": "출처 검증 사슬(citations.py -> goldenset_loader.py -> rubric.source_validity()) 동작 동일 확인",
+      "method": "git diff 58d5e2b4fa62e37c56a1a083e83650272aa13015(freeze_commit) b03560080367f0ba485a32336746c4293359687e(v1 code_sha) -- app/rag/citations.py app/evaluation/goldenset_loader.py; source_validity() 함수 본문 직접 대조",
+      "result": "citations.py: freeze_commit→v1 사이 24줄 변경(15+9)이나 _chunk_source→chunk_source, _locator_metadata→locator_metadata 공개 API 이름 변경 + docstring 추가뿐, 호출부 전부 일관 갱신되어 동작 변화 없음(리뷰: 중현, 직접 재확인). goldenset_loader.py·source_validity() 함수 본문: freeze_commit과 diff 없음. v1은 이후 버전 비교의 기준점이며, freeze_commit과의 유일한 차이가 위 rename뿐임을 명시해 \"봉인 이후 citations.py 무변경\"으로 오독되지 않게 함.",
+      "verified_at": "2026-08-04",
+      "verified_by": "지은"
+    }
+  ]
+}

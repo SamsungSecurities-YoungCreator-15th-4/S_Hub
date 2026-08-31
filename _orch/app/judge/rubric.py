@@ -1,0 +1,552 @@
+"""설명문 품질을 판정하는 6축 루브릭.
+
+결정론 축은 순수 파이썬으로만 동작한다. 환각·위조정밀도 축은 주입된
+LangChain chat model의 ``invoke`` 인터페이스만 사용하며 SDK를 직접 import하지 않는다.
+"""
+from __future__ import annotations
+
+import json
+import math
+import re
+
+AXIS_NAMES = (
+    "source_validity",
+    "numeric_consistency",
+    "hallucination",
+    "false_precision",
+    "disclaimer",
+    "prohibited_expression",
+)
+
+PROHIBITED_TERMS = (
+    # 전역 최적성 단정: 안내서 명시("최적") + 동의어(라벨링 가이드 §2⑥ 금지어 목록)
+    "최적",
+    "최선",
+    "가장 좋은",
+    # 보장성: 기존 PROHIBITED_TERMS(라벨링 가이드 §2⑥ 금지어 목록)
+    "보장",
+    "확정",
+    "손실 없음",
+    # 단정 부사: 기존 PROHIBITED_TERMS(라벨링 가이드 §2⑥ 금지어 목록)
+    "반드시",
+    "무조건",
+    "절대",
+    "확실히",
+)
+# "최적화"(평균-분산 최적화 등 방법론 명칭)는 우월성 주장이 아니므로 금지어
+# 판정에서 제외한다 — 라벨링 가이드 §2⑥ B3. 가이드가 명시하는 방법론 명칭
+# 예외는 "최적화"뿐이므로 "최적해"·"최적점" 등 다른 형태로는 확장하지
+# 않는다 — 미문서 확장은 B4("최적" 단독 우월성 주장 fail)의 취지를 흐릴 수
+# 있다. "우월한"은 안내서 금지 목록에 없어 의도적으로 PROHIBITED_TERMS에서
+# 제외한다(가이드 §2⑥ B5).
+_TERM_SAFE_SUFFIXES: dict[str, tuple[str, ...]] = {"최적": ("화",)}
+NEGATION_MARKERS = ("않", "아니", "못", "없")
+NEGATION_WINDOW = 15
+DOUBLE_NEGATION_WINDOW = 40
+
+_DATE_RE = re.compile(r"(?<!\d)\d{4}-\d{2}-\d{2}(?!\d)")
+_NUMBER_RE = re.compile(
+    r"(?<![\w.])(?P<number>[+-]?\d[\d,]*(?:\.\d+)?)\s*"
+    r"(?P<unit>%|bp|억원|억|만원|원|거래일|일)"
+)
+_ENGINE_METRIC_CONTEXT_RE = re.compile(
+    r"(?<![A-Za-z])(?:CVaR|VaR|ES)(?![A-Za-z])|Expected\s+Shortfall|"
+    r"손실액|손실률|신뢰수준|보유기간|관측기간|관측치|포트폴리오\s*총액",
+    flags=re.IGNORECASE,
+)
+# portfolio가 있을 때만(=candidates에 실제 비중 후보가 있을 때만) "비중" 문맥을
+# 엔진 수치로 재분류한다. R2 calibration 로더는 portfolio를 넘기지 않으므로
+# (goldenset_loader.py ALLOWED_STATE_KEYS), 그 경로에서는 이 재분류가 꺼져
+# 기존 citation 경로 그대로 동작한다 — PR #181 리뷰(다경) 지적 사항.
+_PORTFOLIO_WEIGHT_CONTEXT_RE = re.compile(r"자산군?\s*비중|비중")
+_ENGINE_DATE_CONTEXT_RE = re.compile(r"기준일|산출일|데이터.{0,8}종료|관측.{0,8}종료")
+_ENGINE_METRIC_TOPICS = {"VaR 해석", "스트레스 시나리오", "기준일 및 유의사항"}
+_CLAUSE_BOUNDARY_RE = re.compile(r"[,.!?;\n]")
+_SENTENCE_BOUNDARY_RE = re.compile(r"[.!?;\n]")
+_SPACED_AN_NEGATION_RE = re.compile(r"(?:^|\s)안(?:\s|되|돼|됨|함|하)")
+_CLEAR_DOUBLE_NEGATION_PATTERNS = (
+    re.compile(
+        r"(?:않|아니|못|없)(?:는다고|다고|라고)?[\s,]*(?:오해|착각).{0,12}"
+        r"(?:안(?:\s|되|돼|됨|함|하)|않|말|마(?:십시오|세요|라|시오)|마(?=\s|[.!?]|$))"
+    ),
+    re.compile(
+        r"(?:않|아니|못|없)(?:는다고|다고|라고)?[\s,]*(?:을|할)\s*수\s*(?:없|않)"
+    ),
+    re.compile(r"(?:않|아니|못|없).{0,8}(?:것|건)(?:은|이)?[\s,]*(?:아니|않)"),
+)
+
+
+def _explanation_text(explanations: list) -> str:
+    return "\n".join(
+        str(item.get("text", "")).strip()
+        for item in explanations
+        if isinstance(item, dict)
+        and item.get("topic") != "재작성 반영"
+        and str(item.get("text", "")).strip()
+    )
+
+
+def _has_text(value) -> bool:
+    return isinstance(value, str) and bool(value.strip())
+
+
+def is_verified_citation(citation) -> bool:
+    """judge_eval의 필수 검사(citations_all_verified)와 동일한 기준.
+
+    `verified=True`뿐 아니라 quote·source·chunk_id 텍스트까지 요구한다. 이 기준을
+    두 곳에서 각자 정의하면, 한쪽만 고쳐질 때 축과 필수 검사가 서로 다른 질문에
+    답하는 문제(PR #196의 근본 원인)가 재발한다 — PR #196 리뷰(다경) 참조.
+    """
+    return (
+        isinstance(citation, dict)
+        and citation.get("verified") is True
+        and _has_text(citation.get("quote"))
+        and _has_text(citation.get("source"))
+        and _has_text(citation.get("chunk_id"))
+    )
+
+
+def source_validity(citations: list, strict: bool) -> tuple[bool, str]:
+    if not citations:
+        if strict:
+            return False, "strict citation gate에서 검증 통과 인용이 0건입니다."
+        return True, "검증 통과 인용이 0건이므로 수동검토 대상으로 통과합니다."
+    unverified = [c for c in citations if not is_verified_citation(c)]
+    if unverified:
+        return (
+            False,
+            f"인용 {len(citations)}건 중 {len(unverified)}건이 검증되지 않았습니다.",
+        )
+    return True, f"출처 정책 게이트 충족: 검증 통과 인용 {len(citations)}건"
+
+
+def _metric_numbers(value, *, key: str = "") -> set[float]:
+    numbers: set[float] = set()
+    if isinstance(value, bool):
+        return numbers
+    if isinstance(value, (int, float)) and math.isfinite(float(value)):
+        number = float(value)
+        numbers.update((number, abs(number)))
+        if abs(number) <= 1:
+            numbers.update((number * 100, abs(number) * 100))
+        if key == "confidence" and 0 < number < 1:
+            exceedance = 1 - number
+            numbers.update((1.0, round(1 / exceedance)))
+        return numbers
+    if isinstance(value, dict):
+        for child_key, child in value.items():
+            match = re.fullmatch(r"(\d+)[dD]", str(child_key))
+            if match:
+                numbers.add(float(match.group(1)))
+            numbers.update(_metric_numbers(child, key=str(child_key)))
+    elif isinstance(value, (list, tuple)):
+        for child in value:
+            numbers.update(_metric_numbers(child, key=key))
+    return numbers
+
+
+def _metric_dates(value) -> set[str]:
+    dates: set[str] = set()
+    if isinstance(value, str):
+        dates.update(_DATE_RE.findall(value))
+    elif isinstance(value, dict):
+        for child in value.values():
+            dates.update(_metric_dates(child))
+    elif isinstance(value, (list, tuple)):
+        for child in value:
+            dates.update(_metric_dates(child))
+    return dates
+
+
+def _normalized_mention(number: float, unit: str) -> float:
+    if unit in ("억원", "억"):
+        return number * 100_000_000
+    if unit == "만원":
+        return number * 10_000
+    return number
+
+
+def _mention_context(text: str, start: int, end: int) -> str:
+    """숫자 주변의 짧은 구간을 반환해 엔진 수치 문맥인지 판별한다."""
+    return text[max(0, start - 24):min(len(text), end + 16)]
+
+
+def _verified_quotes_by_topic(citations: list | None) -> dict[str, list[str]]:
+    """검증된 인용문을 claim(topic)별로 공백 정규화해 묶는다."""
+    by_topic: dict[str, list[str]] = {}
+    for citation in citations or []:
+        if not isinstance(citation, dict) or citation.get("verified") is not True:
+            continue
+        quote = citation.get("quote")
+        if not isinstance(quote, str) or not quote.strip():
+            continue
+        topic = str(citation.get("claim") or "").strip()
+        by_topic.setdefault(topic, []).append(" ".join(quote.split()))
+    return by_topic
+
+
+def _normalized_evidence_number(number: float, unit: str) -> tuple[str, float]:
+    """인용 사실 비교용으로 단위 차원과 값을 정규화한다."""
+    if unit in ("억원", "억"):
+        return "currency_krw", number * 100_000_000
+    if unit == "만원":
+        return "currency_krw", number * 10_000
+    if unit == "원":
+        return "currency_krw", number
+    if unit == "%":
+        return "percentage_point", number
+    if unit == "bp":
+        return "percentage_point", number / 100
+    if unit in ("거래일", "일"):
+        return "duration_day", number
+    raise ValueError(f"지원하지 않는 인용 수치 단위: {unit}")
+
+
+def _is_cited_fact(mention: str, topic: str, quotes_by_topic: dict[str, list[str]]) -> bool:
+    """같은 topic 인용 quote에 숫자·날짜가 실제로 존재하는지 확인한다."""
+    normalized = " ".join(mention.split())
+    quotes = quotes_by_topic.get(topic, [])
+    if not normalized:
+        return False
+    if _DATE_RE.fullmatch(normalized):
+        return any(normalized in set(_DATE_RE.findall(quote)) for quote in quotes)
+
+    match = _NUMBER_RE.fullmatch(normalized)
+    if match is None:
+        return False
+    number = float(match.group("number").replace(",", ""))
+    target_dimension, target_value = _normalized_evidence_number(number, match.group("unit"))
+    for quote in quotes:
+        for quote_match in _NUMBER_RE.finditer(quote):
+            quote_number = float(quote_match.group("number").replace(",", ""))
+            quote_dimension, quote_value = _normalized_evidence_number(
+                quote_number,
+                quote_match.group("unit"),
+            )
+            if quote_dimension == target_dimension and math.isclose(
+                quote_value,
+                target_value,
+                rel_tol=1e-9,
+                abs_tol=1e-9,
+            ):
+                return True
+    return False
+
+
+def numeric_consistency(
+    explanations: list,
+    metrics: dict,
+    expected_dates: set[str] | None = None,
+    citations: list | None = None,
+    portfolio: list | None = None,
+) -> tuple[bool, str]:
+    candidates = _metric_numbers(metrics) | _metric_numbers(portfolio or [])
+    dates = _metric_dates(metrics) | (expected_dates or set())
+    quotes_by_topic = _verified_quotes_by_topic(citations)
+    mismatches: list[str] = []
+    engine_metric_count = 0
+    evidence_fact_count = 0
+
+    if portfolio:
+        weight_items = [
+            item
+            for item in portfolio
+            if isinstance(item, dict)
+            and isinstance(item.get("weight"), (int, float))
+            and not isinstance(item.get("weight"), bool)
+        ]
+        weight_sum = sum(float(item["weight"]) for item in weight_items)
+        # 가이드 §2②-B1: 99.9%~100.1%는 비중 표기 자릿수 반올림으로 설명되는
+        # 범위라 pass, 그 밖은 재량 없이 fail(F1)한다.
+        if not math.isclose(weight_sum, 1.0, abs_tol=0.001):
+            detail = f"자산군 비중 합계가 100%가 아님 ({weight_sum * 100:.1f}%)"
+            if len(weight_items) != len(portfolio):
+                detail += (
+                    f" — portfolio {len(portfolio)}건 중 유효한 weight를 가진 "
+                    f"{len(weight_items)}건만 합산함(데이터 결함 가능성)"
+                )
+            mismatches.append(detail)
+
+    for explanation in explanations:
+        if not isinstance(explanation, dict) or explanation.get("topic") == "재작성 반영":
+            continue
+        topic = str(explanation.get("topic") or "").strip()
+        text = str(explanation.get("text") or "").strip()
+        if not text:
+            continue
+
+        for match in _DATE_RE.finditer(text):
+            date = match.group(0)
+            context = _mention_context(text, match.start(), match.end())
+            is_engine_date = (
+                topic == "기준일 및 유의사항"
+                or _ENGINE_DATE_CONTEXT_RE.search(context)
+            )
+            if is_engine_date:
+                if date in dates:
+                    engine_metric_count += 1
+                else:
+                    mismatches.append(f"기준 데이터에 없는 날짜 {date}")
+            elif _is_cited_fact(date, topic, quotes_by_topic):
+                evidence_fact_count += 1
+            else:
+                mismatches.append(f"날짜 {date}가 같은 topic의 검증 인용에 없음")
+
+        text_without_dates = _DATE_RE.sub("", text)
+        for match in _NUMBER_RE.finditer(text_without_dates):
+            raw = match.group("number")
+            unit = match.group("unit") or ""
+            mention = match.group(0).strip()
+            number = float(raw.replace(",", ""))
+            normalized = _normalized_mention(number, unit)
+            context = _mention_context(
+                text_without_dates,
+                match.start(),
+                match.end(),
+            )
+            is_engine_metric = (
+                topic in _ENGINE_METRIC_TOPICS
+                or _ENGINE_METRIC_CONTEXT_RE.search(context)
+                or (bool(portfolio) and _PORTFOLIO_WEIGHT_CONTEXT_RE.search(context))
+            )
+            if is_engine_metric:
+                metric_match = any(
+                    math.isclose(normalized, candidate, rel_tol=1e-6, abs_tol=1e-6)
+                    for candidate in candidates
+                )
+                if metric_match:
+                    engine_metric_count += 1
+                else:
+                    mismatches.append(f"설명 수치 {raw}{unit}가 metrics에 없음")
+            elif _is_cited_fact(mention, topic, quotes_by_topic):
+                evidence_fact_count += 1
+            else:
+                mismatches.append(f"설명 수치 {raw}{unit}가 같은 topic의 검증 인용에 없음")
+
+    if mismatches:
+        return False, "; ".join(mismatches)
+    return (
+        True,
+        "설명문의 엔진 수치·기준일은 metrics와 일치하고 인용 사실은 검증 인용과 "
+        f"일치합니다. (engine_metric={engine_metric_count}, evidence_fact={evidence_fact_count})",
+    )
+
+
+def _response_text(response) -> str:
+    content = getattr(response, "content", response)
+    return content if isinstance(content, str) else str(content)
+
+
+def _parse_llm_result(raw: str) -> tuple[bool, str]:
+    match = re.search(r"\{.*\}", raw, flags=re.DOTALL)
+    if not match:
+        return False, "LLM Judge 응답에 JSON 객체가 없습니다."
+    try:
+        payload = json.loads(match.group(0))
+    except json.JSONDecodeError:
+        return False, "LLM Judge 응답 JSON을 해석할 수 없습니다."
+    if not isinstance(payload.get("passed"), bool):
+        return False, "LLM Judge 응답의 passed가 bool이 아닙니다."
+    reason = str(payload.get("reason") or "사유 미제공")
+    return payload["passed"], reason
+
+
+def _run_llm_axis(llm, *, axis: str, instruction: str, payload: dict) -> tuple[bool, str]:
+    if llm is None:
+        return False, f"{axis} 판정을 위한 LLM Judge를 구성하지 못했습니다."
+    prompt = (
+        "너는 리스크 리포트의 품질 심사자다. 제공된 자료 밖의 지식을 사용하지 마라.\n"
+        f"판정 축: {axis}\n판정 규칙: {instruction}\n"
+        '반드시 {"passed": true 또는 false, "reason": "구체적 사유"} JSON만 출력하라.\n'
+        "입력:\n" + json.dumps(payload, ensure_ascii=False, default=str)
+    )
+    try:
+        return _parse_llm_result(_response_text(llm.invoke(prompt)))
+    except Exception as exc:
+        return False, f"LLM Judge 호출 실패: {type(exc).__name__}: {exc}"
+
+
+def hallucination(
+    explanations: list,
+    citations: list,
+    llm,
+    expected_dates: set[str] | None = None,
+) -> tuple[bool, str]:
+    evidence = []
+    for citation in citations:
+        if not isinstance(citation, dict) or citation.get("verified") is not True:
+            continue
+        extra = citation.get("extra")
+        if not isinstance(extra, dict):
+            extra = {}
+        evidence.append(
+            {
+                "claim": citation.get("claim", ""),
+                "quote": citation.get("quote", ""),
+                "source": citation.get("source", ""),
+                "chunk_id": citation.get("chunk_id", ""),
+                "chunk_text": extra.get("chunk_text", ""),
+            }
+        )
+    return _run_llm_axis(
+        llm,
+        axis="hallucination",
+        instruction=(
+            "설명문의 실질적 주장 중 인용 원문이 존재하지 않는 주장 또는 해당 "
+            "청크 원문으로 뒷받침되지 않는 주장이 하나라도 있으면 fail한다. 단, "
+            "deterministic_context의 expected_dates에 있는 기준일, 투자 권유·수익 "
+            "보장이 아니라는 의무 면책문, 검증 가능한 일반 시장 원리 서술(특정 "
+            "기관·상품·이벤트를 지목하지 않는 일반적 시장 메커니즘 설명에 한정), "
+            "입력 수치에 대한 해석 서술은 외부 사실 주장이 아니므로 인용 부재만으로 "
+            "fail하지 않는다. 단, 입력에 없는 종목·상품·기관·뉴스·이벤트를 사실처럼 "
+            "서술한 경우는 통념상 그럴듯하거나 일반적으로 알려진 내용처럼 보이더라도 "
+            "예외 없이 반드시 fail한다. 실존 기관명이 입력에 없는데 단순 언급된 것은 "
+            "괜찮지만, 그 기관의 발표·전망·정책을 사실처럼 서술하면 반드시 fail한다."
+        ),
+        payload={
+            "explanations": _explanation_text(explanations),
+            "citations": evidence,
+            "deterministic_context": {
+                "expected_dates": sorted(expected_dates or set()),
+            },
+        },
+    )
+
+
+def false_precision(explanations: list, llm) -> tuple[bool, str]:
+    return _run_llm_axis(
+        llm,
+        axis="false_precision",
+        instruction=(
+            "확률·손실을 근거 없이 정밀하게 단정하면 fail한다. 신뢰수준과 보유기간을 "
+            "명시한 VaR, 또는 약·추정·범위·신뢰구간 표현은 허용한다. 신뢰수준(confidence)과 "
+            "신뢰구간 수준(ci_level)은 서로 다른 개념이다. 설명문이 같은 수치를 "
+            "confidence와 ci_level 두 이름으로 번갈아 지칭하거나, 두 개념을 명시적으로 "
+            "동일시하는 서술이 있는 경우에만 fail한다. 두 개념이 각각 별도의 수치로 "
+            "명확히 언급되어 서로 인접해 등장하는 것만으로는 뒤바뀐 것으로 보지 않는다. "
+            "단, 신뢰수준(confidence)을 수치로 명시하는 것은 확률 단정이 아니라 VaR "
+            "파라미터이므로 fail하지 않는다. 설명문의 수치가 metrics의 계산값(VaR·CVaR·"
+            "손실액 등)을 그대로 인용한 것이면, 자릿수가 길거나 소수점이 정밀하다는 "
+            "이유만으로 fail하지 않는다. 단, 리포트 어딘가에 신뢰구간 수치 또는 "
+            "불확실성 문구(예: \"실제 결과와 다를 수 있습니다\") 중 하나 이상이 있어야 "
+            "하는 요건은 이 예외와 별개로 계속 충족해야 한다. 스트레스 손익처럼 "
+            "\"(가상 설정)\" 표기가 있는 가정값, "
+            "불확실성 문구만 있고 CI 수치가 없는 경우, VaR과 CVaR 중 한쪽에만 "
+            "신뢰구간을 제시한 경우는 이 규칙만으로 fail하지 않는다."
+        ),
+        payload={"explanations": _explanation_text(explanations)},
+    )
+
+
+def disclaimer(
+    explanations: list,
+    expected_dates: set[str] | None = None,
+) -> tuple[bool, str]:
+    text = _explanation_text(explanations)
+    dates = set(_DATE_RE.findall(text))
+    expected = expected_dates or set()
+    date_ok = bool(dates & expected) if expected else bool(dates)
+    # E1(비권유): 투자 권유·수익 보장이 아님을 명시적으로 부정한다.
+    e1_patterns = (
+        r"투자\s*권유.{0,12}(?:아니|않)",
+        r"보장.{0,15}(?:않|아니|못|없)",
+    )
+    # E3(책임 소재): 최종 판단·책임이 고객에게 귀속됨을 명시한다. 불확실성
+    # 고지("실제 결과와 다를 수 있다")는 위조정밀도 P2가 담당하므로 이
+    # 축에서는 E1·E3 어느 쪽으로도 세지 않는다 — 라벨링 가이드 §2⑤ 참조.
+    e3_patterns = (
+        r"책임.{0,20}(?:고객|본인|투자자).{0,15}(?:있|귀속)",
+        r"(?:고객|본인|투자자).{0,15}책임.{0,20}(?:판단|결정|있|귀속)",
+    )
+    e1_ok = any(re.search(pattern, text) for pattern in e1_patterns)
+    e3_ok = any(re.search(pattern, text) for pattern in e3_patterns)
+    missing: list[str] = []
+    if not date_ok:
+        missing.append("state와 일치하는 기준일")
+    if not e1_ok:
+        missing.append("투자 권유가 아니라는 비권유 고지(E1)")
+    if not e3_ok:
+        missing.append("최종 판단·책임 소재 고지(E3)")
+    if missing:
+        return False, "누락: " + ", ".join(missing)
+    return True, "기준일과 면책 문구(E1·E3)가 존재합니다."
+
+
+def _scan_prohibited(explanations: list) -> tuple[list[str], list[str]]:
+    violations: list[str] = []
+    ambiguous: list[str] = []
+    text = _explanation_text(explanations)
+    for term in PROHIBITED_TERMS:
+        safe_suffixes = _TERM_SAFE_SUFFIXES.get(term, ())
+        for match in re.finditer(re.escape(term), text):
+            if any(
+                text[match.end() : match.end() + len(suffix)] == suffix
+                for suffix in safe_suffixes
+            ):
+                continue
+            context = text[match.end() : match.end() + NEGATION_WINDOW]
+            extended_context = text[match.end() : match.end() + DOUBLE_NEGATION_WINDOW]
+            context = _CLAUSE_BOUNDARY_RE.split(context, maxsplit=1)[0]
+            extended_context = _SENTENCE_BOUNDARY_RE.split(extended_context, maxsplit=1)[0]
+            negations = [marker for marker in NEGATION_MARKERS if marker in context]
+            if _SPACED_AN_NEGATION_RE.search(context):
+                negations.append("안")
+            clear_double_negation = any(
+                pattern.search(extended_context)
+                for pattern in _CLEAR_DOUBLE_NEGATION_PATTERNS
+            )
+            if clear_double_negation:
+                violations.append(
+                    f"{term} 뒤 명시적 이중부정: {extended_context.strip()[:40]}"
+                )
+            elif not negations:
+                violations.append(f"{term}({context.strip()[:20]})")
+            elif len(negations) > 1:
+                ambiguous.append(f"{term} 뒤 이중부정 가능성: {context.strip()[:20]}")
+    return violations, ambiguous
+
+
+def prohibited_expression(explanations: list) -> tuple[bool, str]:
+    violations, ambiguous = _scan_prohibited(explanations)
+    if violations:
+        return False, "금지 표현의 긍정적 사용: " + ", ".join(violations)
+    if ambiguous:
+        return True, "자동 실패 대신 수동검토: " + "; ".join(ambiguous)
+    return True, "금지 표현이 없거나 명시적으로 부정되었습니다."
+
+
+def prohibited_manual_flags(explanations: list) -> list[str]:
+    _, ambiguous = _scan_prohibited(explanations)
+    return ["금지 표현 문맥 수동검토: " + item for item in ambiguous]
+
+
+def evaluate_rubric(
+    *,
+    explanations: list,
+    citations: list,
+    metrics: dict,
+    strict_citation_gate: bool,
+    expected_dates: set[str],
+    llm,
+    portfolio: list | None = None,
+) -> tuple[dict[str, tuple[bool, str]], list[str]]:
+    results = {
+        "source_validity": source_validity(citations, strict_citation_gate),
+        "numeric_consistency": numeric_consistency(
+            explanations,
+            metrics,
+            expected_dates,
+            citations,
+            portfolio,
+        ),
+        "hallucination": hallucination(
+            explanations,
+            citations,
+            llm,
+            expected_dates,
+        ),
+        "false_precision": false_precision(explanations, llm),
+        "disclaimer": disclaimer(explanations, expected_dates),
+        "prohibited_expression": prohibited_expression(explanations),
+    }
+    return results, prohibited_manual_flags(explanations)
