@@ -24,7 +24,7 @@
 | 대상 | 근거 |
 | --- | --- |
 | `config_hash` | `sha256_of_dict(run_config)` — 설정 파일에서만 유래 |
-| `computation_hash` | `app/engine/metrics.py` — 수익률·가중치·파라미터 payload, seed 고정 |
+| `computation_hash` | `engine/engine/metrics.py` — 수익률·가중치·파라미터 payload, seed 고정 |
 | `approval_hash` | HITL 승인 입력의 결정론 해시 |
 | `metrics` 전체 | 순수 numpy 계산 계층 |
 | `explanations` 전체 | 고정 골격 + metrics 값 조립 (LLM 생성 아님) |

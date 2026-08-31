@@ -29,16 +29,16 @@ python scripts/run_graph.py --auto-approve --offline \
 
 - 출력 루트는 `--evidence-bundle`에 인자를 주지 않으면 `evidence/`다 — `scripts/run_graph.py:127` (DEFAULT_EVIDENCE_ROOT).
 - 재시도 상한 숫자는 이 문서에 적지 않는다. 유일한 원천은 `config/config.yaml`의 `judge_max_retries`이고
-  코드는 `app/nodes/judge_eval.py:28` (resolve_max_judge_retries)로만 읽는다.
+  코드는 `engine/nodes/judge_eval.py:28` (resolve_max_judge_retries)로만 읽는다.
 - 강제 실패 횟수는 `demo_options.force_judge_fail`로 들어간다 — `scripts/run_graph.py:155` (force_judge_fail).
 
-**감사자가 보는 것**: 번들 디렉터리 안의 파일 전체. 목록의 원천은 `app/evidence/schema.py:50` (BUNDLE_FILENAMES)이며,
+**감사자가 보는 것**: 번들 디렉터리 안의 파일 전체. 목록의 원천은 `engine/evidence/schema.py:50` (BUNDLE_FILENAMES)이며,
 이 문서는 종수를 숫자로 적지 않는다 — 파일이 늘면 문서가 상수와 갈라진다.
 성공 번들이든 차단 번들이든 **`BUNDLE_FILENAMES`가 전부 생성된다** — 차단 사례도 제출물이다.
 
 ### 1.1 `submitted.json`은 번들 안에 없다 — 만들 때 같이 만들어 둔다
 
-**번들에는 state 덤프가 들어 있지 않다.** `BUNDLE_FILENAMES`(`app/evidence/schema.py:50`)에 없기 때문이다.
+**번들에는 state 덤프가 들어 있지 않다.** `BUNDLE_FILENAMES`(`engine/evidence/schema.py:50`)에 없기 때문이다.
 §3.4의 `submitted.json`은 현장에서 번들을 열어 꺼내는 파일이 아니라 **번들을 만들 때 `--dump-state`로
 함께 만들어 보관해 둔 파일**이다 — `scripts/run_graph.py:261` (dump_state).
 이 절차 없이 현장에서 `replay_verify.py submitted.json …`을 치면 파일이 없어 **종료 코드 `2`로 끝난다**(§3.4).
@@ -119,7 +119,7 @@ python -c "import json;print(json.load(open('submitted.json'))['demo_options'])"
 
 ### 2.3 ⑥ 구간 — `available:false`가 나왔을 때 말할 것
 
-표기 규약의 원천은 `app/evidence/schema.py:53` (unavailable)이고, `summary.md`에서는 `없음 (사유)` 형태로 풀려 나온다.
+표기 규약의 원천은 `engine/evidence/schema.py:53` (unavailable)이고, `summary.md`에서는 `없음 (사유)` 형태로 풀려 나온다.
 
 | 화면에 뜨는 것 | 말할 것 | 근거 |
 | --- | --- | --- |
@@ -149,9 +149,9 @@ python -c "import json;print(json.load(open('submitted.json'))['demo_options'])"
 
 ### 2.4 ⑤ 구간 — 지목 번들별 심화 파일
 
-- **성공 번들** → `judge_rationale.json`: `rubric` 6축의 `passed`/`reason`, 각 축에 `axis_en`·`axis_ko` 병기. 6축 명칭 SSOT는 `app/judge/axes.py`.
+- **성공 번들** → `judge_rationale.json`: `rubric` 6축의 `passed`/`reason`, 각 축에 `axis_en`·`axis_ko` 병기. 6축 명칭 SSOT는 `engine/judge/axes.py`.
 - **차단 번들** → `hard_stop_record.json`: `blocked`·`blocked_derived_from`·`manual_review_gate` 12키·`source_paths`.
-  `decision_hash`는 `app/nodes/manual_review_gate.py:147` (decision_hash)가 만든다. 계약 표는 `docs/hard_stop_contract.md` §6.
+  `decision_hash`는 `engine/nodes/manual_review_gate.py:147` (decision_hash)가 만든다. 계약 표는 `docs/hard_stop_contract.md` §6.
 - 어느 쪽이든 `source_paths`를 짚어 **번들의 모든 값이 원본 state 키로 되짚힌다**는 것을 보인다.
 
 ---
@@ -246,7 +246,7 @@ python scripts/replay_verify.py submitted.json replay.json
 
 인자는 state 덤프 2개뿐이다 — `scripts/replay_verify.py:160` (left). 무엇을 대조할지는 이
 스크립트가 정하지 않는다. `docs/reproducibility_scope.md` §2·§2.1·§3의 선언을
-`app/evidence/replay_scope.py:38` (GUARANTEED)가 옮겨 적고, 그 대조는 테스트가 고정한다.
+`engine/evidence/replay_scope.py:38` (GUARANTEED)가 옮겨 적고, 그 대조는 테스트가 고정한다.
 
 출력은 §2 무조건 보장 · §2.1 조건부 · §3 재현 대상 아님을 **한 화면에** 낸다.
 §3은 대조하지 않되 함께 보인다 — 감사자가 차이를 먼저 발견하기 전에 밝히는 것이
@@ -272,7 +272,7 @@ python scripts/replay_verify.py submitted.json replay.json
 자체가 무너진다.
 
 `canonical_for_replay`도 쓰지 않는다. `trace_id`만 걷어내므로
-(`app/evidence/state_dump.py:159` (canonical_for_replay)) 전체 비교는 §3 제외 대상 때문에
+(`engine/evidence/state_dump.py:159` (canonical_for_replay)) 전체 비교는 §3 제외 대상 때문에
 실패하는 것이 정상이다.
 
 ### 3.5 차단 번들 재실행이 시연하는 것 — 두 요구를 구분한다
@@ -294,7 +294,7 @@ python scripts/replay_verify.py submitted.json replay.json
 **이 구분을 놓치면 발표에서 사실과 다른 주장을 하게 된다.**
 
 `--force-judge-fail N`은 judge의 실제 판정 결과를 **덮어쓴다**. 6축이 전부 통과했더라도
-`failed_axes=["forced_failure"]`로 강제 실패시킨다 — `app/nodes/judge_eval.py:394` (force_fail_n).
+`failed_axes=["forced_failure"]`로 강제 실패시킨다 — `engine/nodes/judge_eval.py:394` (force_fail_n).
 `reproducibility_scope.md` §4.2의 측정 조건에도 `failed_axes=["forced_failure"]`가 그대로 적혀 있다.
 
 따라서 차단 번들 라이브 재실행이 보이는 것은:
@@ -364,7 +364,7 @@ python scripts/magi_vote.py \
   (`docs/evidence_bundle_schema.md` §4.8).
 - **이 원본은 제출물이 아니다.** `records[].human_rationale`에 사람 라벨 원문이 들어 있어,
   제출물에 넣으면 답안지가 증거물로 새어 나간다. 번들에는 집계값만 스트립되어 실린다
-  (`app/evidence/schema.py`의 `CALIBRATION_MISMATCH_EXCLUSION_REASON`). `out/`은 gitignore 대상이다.
+  (`engine/evidence/schema.py`의 `CALIBRATION_MISMATCH_EXCLUSION_REASON`). `out/`은 gitignore 대상이다.
 
 **같은 입력 2회 실행 대조도 여기서 만든다.** 번들 하나는 실행 1회분이라
 `replay_diff.json`이 `status: single_run_only`로 나간다(`docs/evidence_bundle_schema.md` §8.3).
@@ -382,7 +382,7 @@ python scripts/replay_verify.py \
 - **`--evidence-bundle`·`--calibration`은 걸지 않는다.** 4번째 번들이 필요하지 않고, 두 플래그는
   `demo_options`·`config_hash` 어디에도 들어가지 않아 "같은 입력"이 그대로 성립한다.
 - 종료 코드 `0`이 아니면 **같은 입력에 결과가 갈린 것**이라 제출보다 원인이 먼저다.
-  대조 범위의 원천은 `app/evidence/replay_scope.py`이고 선언은 `docs/reproducibility_scope.md`다.
+  대조 범위의 원천은 `engine/evidence/replay_scope.py`이고 선언은 `docs/reproducibility_scope.md`다.
 
 종료 코드로 판단한다.
 
@@ -411,7 +411,7 @@ python scripts/replay_verify.py \
 #### 제출물 구성과 대조 절차 — MAGI 산출물은 번들 밖에 있다
 
 번들은 **실행 1회분** 증거라 3건에 걸친 측정을 담지 않는다(구성의 원천은
-`app/evidence/schema.py:50` (BUNDLE_FILENAMES)). 그래서 서류철과 **나란히** 낸다.
+`engine/evidence/schema.py:50` (BUNDLE_FILENAMES)). 그래서 서류철과 **나란히** 낸다.
 
 ```
 제출물
@@ -428,7 +428,7 @@ python scripts/replay_verify.py \
 재현 대조의 2회차도 같다 — `success_1_replay.json` → `success_1_replay_state.json`.
 
 **뒤의 셋이 번들 밖에 있는 이유는 같다** — 번들 구성의 원천은 `BUNDLE_FILENAMES`
-(`app/evidence/schema.py:50`) 하나뿐이고, 셋 다 실행 **1회분을 넘는** 측정이라 그 목록에
+(`engine/evidence/schema.py:50`) 하나뿐이고, 셋 다 실행 **1회분을 넘는** 측정이라 그 목록에
 들어갈 자리가 없다. MAGI는 3후보×3회, 재현 대조는 2회 실행이다. 번들을 늘리는 대신
 나란히 낸다.
 
@@ -448,7 +448,7 @@ print(sha256_of_dict(canonical_for_replay(json.load(open('<덤프 경로>')))))
 ```
 
 **파일 `sha256sum`으로는 맞지 않는다.** 하네스가 `canonical_for_replay`로 `trace_id`를
-걷어낸 사본을 해시하기 때문이다 — `app/evidence/state_dump.py:159` (canonical_for_replay).
+걷어낸 사본을 해시하기 때문이다 — `engine/evidence/state_dump.py:159` (canonical_for_replay).
 관측용 재호출이 제출 번들의 트레이스에 섞이지 않게 하려는 것이고, 그 이유는
 `scripts/magi_vote.py:194` (load_state_cases)에 적혀 있다.
 
@@ -476,7 +476,7 @@ RAG 검색·rag_cite·judge_eval은 실제 Azure를 호출한다 (`reproducibili
 | # | 겨냥 | 질문 | 근거 위치 |
 | --- | --- | --- | --- |
 | 1 | 무효 조건 ① | judge가 정답 라벨을 미리 본 것 아닌가 | `goldenset/judge_inputs/README.md` · `tests/test_goldenset_judge_inputs.py` · `docs/symphony_proof_plan.md` §2 R1 |
-| 2 | 무효 조건 ② | 실패했는데 확정된 리포트가 있나 | `docs/hard_stop_contract.md` §6 · 번들 `hard_stop_record.json` · `app/nodes/assemble_report.py:369` (report_is_exportable) |
+| 2 | 무효 조건 ② | 실패했는데 확정된 리포트가 있나 | `docs/hard_stop_contract.md` §6 · 번들 `hard_stop_record.json` · `engine/nodes/assemble_report.py:369` (report_is_exportable) |
 | 3 | 무효 조건 ③ | 같은 입력인데 결과가 다르면 | `docs/reproducibility_scope.md` §2 · §2.1 · §3 |
 | 4 | 무효 조건 ④ | 이 서류철을 사람이 조립한 것 아닌가 | `docs/evidence_bundle_schema.md` §1 · §2 · `manifest.generated_by` |
 | 5 | 평가 포인트 1 | 라벨 기준이 사람마다 다르지 않나 | `goldenset/labeling-guide.md` · `goldenset/reports/agreement_before.md` |
@@ -485,12 +485,12 @@ RAG 검색·rag_cite·judge_eval은 실제 Azure를 호출한다 (`reproducibili
 | 8 | 평가 포인트 4 | 명령 몇 번으로 만들어지나 | `docs/evidence_bundle_schema.md` §2 · `scripts/run_graph.py:66` (generate_evidence_bundle) |
 | 9 | 평가 포인트 5 | 재현 지문이 왜 3개뿐인가 | `docs/reproducibility_scope.md` §3 「제외 대상에 대한 원칙」 |
 | 10 | 인용 검증 | 인용문이 실제 원문에 있는지 어떻게 아나 | `docs/hard_stop_contract.md` §5 · 번들 `citation_verification.json` |
-| 11 | 재시도 상한 | 재시도는 몇 번까지이고 그 숫자는 어디 있나 | `docs/hard_stop_contract.md` §2 · `app/nodes/judge_eval.py:28` (resolve_max_judge_retries) |
+| 11 | 재시도 상한 | 재시도는 몇 번까지이고 그 숫자는 어디 있나 | `docs/hard_stop_contract.md` §2 · `engine/nodes/judge_eval.py:28` (resolve_max_judge_retries) |
 | 12 | 차단 지문 | 차단 지문이 실행마다 같나 | `docs/reproducibility_scope.md` §4.2 · `docs/evidence_bundle_schema.md` §4.5 |
 | 13 | 누락 표기 | "없음"으로 나온 칸은 안 채운 것 아닌가 | `docs/evidence_bundle_schema.md` §5 · §8 |
 | 14 | 탈락 인용 | 떨어진 인용은 어디에 남나 | `docs/hard_stop_contract.md` §5 「탈락 인용 기록」 · `scripts/make_evidence_bundle.py:249` (_rejected_citations) |
-| 15 | 시연 범위 | 방금 차단된 건 judge가 결함을 잡은 건가 | 이 문서 §3.5 · `app/nodes/judge_eval.py:394` (force_fail_n) · R2 판별 증거는 `scripts/judge_runner.py` + `docs/evidence_bundle_schema.md` §4.8 |
-| 16 | 재현 해시 검증 | R2 사례집 채점에서 `computation_hash_present`가 전부 통과한 건 무슨 뜻인가 | `app/evaluation/goldenset_loader.py:190` (_synthesize_hash) · `docs/reproducibility_scope.md` §2 |
+| 15 | 시연 범위 | 방금 차단된 건 judge가 결함을 잡은 건가 | 이 문서 §3.5 · `engine/nodes/judge_eval.py:394` (force_fail_n) · R2 판별 증거는 `scripts/judge_runner.py` + `docs/evidence_bundle_schema.md` §4.8 |
+| 16 | 재현 해시 검증 | R2 사례집 채점에서 `computation_hash_present`가 전부 통과한 건 무슨 뜻인가 | `engine/evaluation/goldenset_loader.py:190` (_synthesize_hash) · `docs/reproducibility_scope.md` §2 |
 
 ---
 
@@ -507,7 +507,7 @@ RAG 검색·rag_cite·judge_eval은 실제 Azure를 호출한다 (`reproducibili
 
 `--offline`이어도 RAG·judge는 Azure를 호출하므로(§4의 마지막 줄) **재실행 자체가 성립하지 않는다.**
 네트워크가 없으면 인용이 0건이 되고, `config/config.yaml`의 `strict_citation_gate`가 켜져 있으면 출처 축이 실패해
-정상적으로 차단된다 — `app/judge/rubric.py:109` (source_validity). 결함이 아니라 설계된 fail-closed 동작이지만,
+정상적으로 차단된다 — `engine/judge/rubric.py:109` (source_validity). 결함이 아니라 설계된 fail-closed 동작이지만,
 **재현 데모로는 쓸 수 없다.**
 
 대응 — 제출된 번들 파일만으로 되는 **오프라인 무결성 검증 2종**으로 전환한다. 둘 다 네트워크가 필요 없다.
@@ -542,7 +542,7 @@ manifest가 바뀌고, bundle_hash가 바뀐다 (`docs/evidence_bundle_schema.md
 - **140초 시점의 대응**: 중단했다는 사실을 **먼저 말하고**, §6.2의 오프라인 무결성 검증 2종과 제출 번들에
   이미 들어 있는 `decision_hash`로 전환한다. 라이브 재실행 대신 제출물로 답하는 것이며, §6.1의 마지막 항목과 같은 경로다.
 - **차단의 재현을 `decision_hash`로 갈음할 때** — `reproducibility_scope.md` §4.2가 추적 off/on 4회 실행 전부 동일함을 기록하고 있고, `trace_id`가 갈린 실행 쌍에서도 같았다. 성공 경로로 시작하기로 정한 경우에도 이 근거를 쓴다.
-- UI까지 묻거든 `ui/report_export.py:18` (pdf_export_state)를 연다. `report_is_exportable`이 `false`면 PDF 저장 버튼이 비활성이고, 안내문이 "Judge 미통과 또는 수동검토 대기"로 분기한다.
+- UI까지 묻거든 `console/report_export.py:18` (pdf_export_state)를 연다. `report_is_exportable`이 `false`면 PDF 저장 버튼이 비활성이고, 안내문이 "Judge 미통과 또는 수동검토 대기"로 분기한다.
 
 ---
 

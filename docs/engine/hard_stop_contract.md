@@ -85,7 +85,7 @@ provenance 지문 대조에서 실패한다.
 
 | 구분 | 내용 |
 |---|---|
-| 생산자 | `app/nodes/rag_cite.py` (`rag_cite`) |
+| 생산자 | `engine/nodes/rag_cite.py` (`rag_cite`) |
 | 소비자 | R4 증거 번들 — `citation_verification.json`의 `rejected_citations` |
 | 재시도 규칙 | **누적**(덮어쓰기 아님). 시도별 기록을 `attempt` 오름차순으로 보존 |
 

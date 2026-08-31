@@ -18,6 +18,9 @@ from scripts.calibration_report import _resolve_mode
 
 ROOT = Path(__file__).resolve().parents[1]
 
+# 통합 레포에서 엔진 문서는 대시보드 문서와 섞이지 않도록 `docs/engine/` 아래 둔다.
+DOCS = ROOT / "docs" / "engine"
+
 
 def test_calibration_report_resolves_only_ssot_modes():
     cases = (
@@ -52,9 +55,9 @@ def test_only_langsmith_validated_modes_are_official_evidence():
 
 def test_contract_documents_list_every_calibration_mode():
     paths = (
-        ROOT / "docs" / "evidence_bundle_schema.md",
-        ROOT / "docs" / "symphony_proof_plan.md",
-        ROOT / "docs" / "audit_demo_runbook.md",
+        DOCS / "evidence_bundle_schema.md",
+        DOCS / "symphony_proof_plan.md",
+        DOCS / "audit_demo_runbook.md",
     )
     for path in paths:
         text = path.read_text(encoding="utf-8")

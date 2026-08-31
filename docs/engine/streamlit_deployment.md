@@ -4,11 +4,11 @@
 
 - Repository: `SamsungSecurities-YoungCreator-15th-4/Orchestration`
 - Branch: `main`
-- Entrypoint: `ui/app.py`
+- Entrypoint: `console/app.py`
 - Python: `3.11` (CI 검증 버전과 일치)
 
 Community Cloud는 저장소 루트에서 앱을 실행하므로, 루트의 `requirements.txt`와
-`ui/app.py` 조합을 사용한다. Python 버전은 최초 배포의 **Advanced settings**에서
+`console/app.py` 조합을 사용한다. Python 버전은 최초 배포의 **Advanced settings**에서
 선택하며, 배포 후에는 앱을 삭제·재배포해야 바꿀 수 있으므로 3.11로 고정한다.
 
 ## 1. RAG 인덱스 공급 준비

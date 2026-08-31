@@ -81,7 +81,7 @@ goldenset/
 
 **설계 시 반영할 점**
 
-- **축 이름 SSOT 필요.** 가이드는 한글(`"수치 정합"`)을 글자 그대로 쓰라 하고 우리 코드는 영문(`numeric_consistency`)이다. 띄어쓰기 하나 어긋나면 R2 집계가 조용히 깨진다 → `app/judge/axes.py`에 매핑을 고정하고 `rubric.py`의 `AXIS_NAMES`와 값 집합이 같은지 테스트
+- **축 이름 SSOT 필요.** 가이드는 한글(`"수치 정합"`)을 글자 그대로 쓰라 하고 우리 코드는 영문(`numeric_consistency`)이다. 띄어쓰기 하나 어긋나면 R2 집계가 조용히 깨진다 → `engine/judge/axes.py`에 매핑을 고정하고 `rubric.py`의 `AXIS_NAMES`와 값 집합이 같은지 테스트
 - 본문 초안은 LLM 사용 가능(가이드 §5 허용). 단 **사용 사실을 사례에 표기**하고, `label`·`fail_axes`·`rationale`은 반드시 사람이 부여
 - 본문은 자기완결적이어야 한다 — judge가 판정에 쓸 입력 수치와 인용 원문이 사례 안에 있어야 함 (견본 §1·§4 구성 참조)
 
@@ -94,7 +94,7 @@ goldenset/
 - [x] 2인 독립 라벨 일치율이 `initial_agreement`에 기록됨 — 20건 전부, 사람 간 일치율 18/20
 - [x] 전 사례에 합성·가상 데이터 명시, LLM 초안 사용 사례에 표기 — 누락 0건
 
-**산출**: `goldenset/**`, `app/judge/axes.py`, `tests/test_goldenset_schema.py`·`tests/test_goldenset_integrity.py`
+**산출**: `goldenset/**`, `engine/judge/axes.py`, `tests/test_goldenset_schema.py`·`tests/test_goldenset_integrity.py`
 
 **완료** — 라벨 확정 후 `v1-freeze`(`58d5e2b`)로 동결. 사례 본문은 `goldenset/case_hashes.json`으로 고정되며, R2 v1~v7 전 라운드가 같은 `freeze_commit`·`input_set_hash`를 기록한다. 산출 경위는 `goldenset/reports/agreement_before.md`.
 
@@ -108,7 +108,7 @@ goldenset/
 
 사례집은 리포트 md 전문인데 `judge_eval(state)`는 `RiskState`를 먹는다. 이 사이를 잇는 변환기가 이번 과제 코드의 심장이다.
 
-> **소유권 확정** — R3가 `goldenset/tools/export_judge_inputs.py`로 R1 원본에서 정답 메타데이터를 제거하고, R2 실행 담당(다경)은 `goldenset/judge_inputs/`만 읽는 **로더**를 `scripts/judge_runner.py`에 연결한다. R2는 정답이 든 `goldenset/cases/`를 열거나 파싱하지 않는다. 계획서 초안의 `app/goldenset/adapter.py`는 이 러너와 중복이므로 만들지 않는다.
+> **소유권 확정** — R3가 `goldenset/tools/export_judge_inputs.py`로 R1 원본에서 정답 메타데이터를 제거하고, R2 실행 담당(다경)은 `goldenset/judge_inputs/`만 읽는 **로더**를 `scripts/judge_runner.py`에 연결한다. R2는 정답이 든 `goldenset/cases/`를 열거나 파싱하지 않는다. 계획서 초안의 `engine/goldenset/adapter.py`는 이 러너와 중복이므로 만들지 않는다.
 
 ```python
 # 다경의 러너 안에 들어갈 로더 (아래는 변환 규칙)
@@ -156,7 +156,7 @@ mode는 `dev_mock`·`offline_rehearsal`·`official`·`official_code_change`·
 
 **judge 개선 — 범위를 먼저 정해야 한다**
 
-judge 프롬프트는 `rubric.py:359`에 문자열로 박혀 있다 → `app/judge/prompts/v1.py`·`v2.py`로 분리하고 `--prompt-version`으로 선택.
+judge 프롬프트는 `rubric.py:359`에 문자열로 박혀 있다 → `engine/judge/prompts/v1.py`·`v2.py`로 분리하고 `--prompt-version`으로 선택.
 
 단, 우리 6축 중 **결정론 4축은 프롬프트가 아니라 코드**다(LLM은 환각·위조정밀도 2축뿐). 캘리브레이션에서 나올 미탐 중 상당수는 프롬프트만 고쳐서는 안 잡힌다. 예를 들어 `PROHIBITED_TERMS`에 과제가 지목한 '최적'이 없고, `source_validity`는 `verified=True`가 1건이라도 있으면 통과시킨다.
 
@@ -236,8 +236,8 @@ quote가 청크 원문에 존재하는지와 source·locator가 청크 provenanc
 - [x] 인용문·문서명·조항·청크 일치 검증과 탈락 이력 누적
 - [x] 규칙별 1:1 테스트 및 속성 테스트 3건 이상
 
-**산출**: `docs/hard_stop_contract.md` · `app/nodes/manual_review_gate.py` ·
-`app/graph.py` · `tests/test_hard_stop_contract.py`
+**산출**: `docs/hard_stop_contract.md` · `engine/nodes/manual_review_gate.py` ·
+`engine/graph.py` · `tests/test_hard_stop_contract.py`
 
 ---
 
@@ -265,7 +265,7 @@ evidence/<run_id>/
 └── bundle_hash.txt       번들 루트 해시
 ```
 
-> 위는 계획 시점 스케치이며 **실제 목록의 SSOT는 `app/evidence/schema.py`의
+> 위는 계획 시점 스케치이며 **실제 목록의 SSOT는 `engine/evidence/schema.py`의
 > `BUNDLE_FILENAMES`**다. 계약 상세는
 > [`docs/evidence_bundle_schema.md`](evidence_bundle_schema.md)를 따른다.
 
@@ -416,10 +416,10 @@ LLM 2축이 유일한 약점이다. **재현 데모는 `--offline` 또는 캐시
 
 - [x] '최적' · 근거 없는 "확률 OO%" · 출처 없는 숫자 → pass 10건에 0건
       — `final_labels.yaml`의 pass 10건 본문 스캔 결과 적발 0건. `최적`이 등장하는 곳은
-      금지어 목록(`app/judge/rubric.py`)과 **의도적 결함 사례**뿐이다.
+      금지어 목록(`engine/judge/rubric.py`)과 **의도적 결함 사례**뿐이다.
 - [x] 새 기능·새 화면 없음 (검증 레이어만)
-      — 8월 `ui/` 변경은 기존 분석 화면에 감사 번들 다운로드와 Hard Stop 시연 옵션을
-      **노출**한 것이고 새 화면은 없다. 신규 파일은 `ui/evidence_export.py` 1개이며
+      — 8월 `console/` 변경은 기존 분석 화면에 감사 번들 다운로드와 Hard Stop 시연 옵션을
+      **노출**한 것이고 새 화면은 없다. 신규 파일은 `console/evidence_export.py` 1개이며
       리포트 생성 9노드는 손대지 않았다. R3의 `manual_review_gate`는 과제가 요구한
       검증 레이어 노드다.
 - [x] 발표 기술스택 = 실제 사용 스택 (`AGENTS.md` 표 기준)
@@ -442,13 +442,13 @@ python scripts/replay_verify.py <제출 state> <재실행 state>
 
 | 대상 | 경로 |
 |---|---|
-| 6축 루브릭 · `AXIS_NAMES` | `app/judge/rubric.py:12` |
-| 금지어 목록 (R2 개선 후보) | `app/judge/rubric.py:21` |
-| `source_validity` (R2 개선 후보) | `app/judge/rubric.py:65` |
-| judge LLM 프롬프트 (v1/v2 분리) | `app/judge/rubric.py:359` |
-| Hard Stop 라우팅 | `app/graph.py:30` (`route_after_judge`) |
-| 재시도 상한 SSOT | `config/config.yaml: judge_max_retries` · `app/nodes/judge_eval.py: resolve_max_judge_retries()` |
-| 미확정 상태·차단 기록 | `app/nodes/manual_review_gate.py` |
-| 리포트 조립 · governance | `app/nodes/assemble_report.py:285` |
+| 6축 루브릭 · `AXIS_NAMES` | `engine/judge/rubric.py:12` |
+| 금지어 목록 (R2 개선 후보) | `engine/judge/rubric.py:21` |
+| `source_validity` (R2 개선 후보) | `engine/judge/rubric.py:65` |
+| judge LLM 프롬프트 (v1/v2 분리) | `engine/judge/rubric.py:359` |
+| Hard Stop 라우팅 | `engine/graph.py:30` (`route_after_judge`) |
+| 재시도 상한 SSOT | `config/config.yaml: judge_max_retries` · `engine/nodes/judge_eval.py: resolve_max_judge_retries()` |
+| 미확정 상태·차단 기록 | `engine/nodes/manual_review_gate.py` |
+| 리포트 조립 · governance | `engine/nodes/assemble_report.py:285` |
 | LangSmith 등록 (패턴 복사) | `scripts/register_judge_dataset.py` |
 | 실행 CLI (R4 훅 추가) | `scripts/run_graph.py` |

@@ -41,7 +41,10 @@ from engine.evidence.replay_scope import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
-SCOPE_DOC = ROOT / "docs" / "reproducibility_scope.md"
+
+# 통합 레포에서 엔진 문서는 대시보드 문서와 섞이지 않도록 `docs/engine/` 아래 둔다.
+DOCS = ROOT / "docs" / "engine"
+SCOPE_DOC = DOCS / "reproducibility_scope.md"
 
 SECTION_HEADINGS = {
     "guaranteed": "## 2. 재현 보장 대상",

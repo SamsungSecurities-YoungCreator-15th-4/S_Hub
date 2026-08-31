@@ -19,6 +19,9 @@ import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
+
+# 통합 레포에서 엔진 문서는 대시보드 문서와 섞이지 않도록 `docs/engine/` 아래 둔다.
+DOCS = ROOT / "docs" / "engine"
 CONFIG_PATH = ROOT / "config" / "config.yaml"
 
 # judge 재시도 상한을 서술하는(또는 서술할 수 있는) 문서 목록.
@@ -37,8 +40,8 @@ RETRY_DOCS = (
     "AGENTS.md",
     "CLAUDE.md",
     "README.md",
-    "docs/hard_stop_contract.md",
-    "docs/audit_demo_runbook.md",
+    "docs/engine/hard_stop_contract.md",
+    "docs/engine/audit_demo_runbook.md",
 )
 
 # "judge ... N회/N번/N차례" 형태만 잡는다. conflict 재추출 상한(1회)이나
@@ -119,7 +122,7 @@ def test_hard_stop_doc_states_no_fallback():
     코드(resolve_max_judge_retries)는 값이 없거나 오염되면 즉시 ValueError를
     낸다. 문서에 "기본값으로 대체"류 서술이 남아 있으면 실제 동작과 갈라진다.
     """
-    text = (ROOT / "docs" / "hard_stop_contract.md").read_text(encoding="utf-8")
+    text = (DOCS / "hard_stop_contract.md").read_text(encoding="utf-8")
     assert "코드 기본값으로 대체하지 않고 즉시 실패한다" in text, (
         "hard_stop_contract.md에 폴백 부재(설정 부재 시 실행 거부) 서술이 없습니다."
     )
@@ -154,7 +157,7 @@ def test_agents_corpus_count_matches_manifest():
 
 
 def test_reproducibility_scope_does_not_guarantee_llm_judge_axes():
-    text = (ROOT / "docs" / "reproducibility_scope.md").read_text(encoding="utf-8")
+    text = (DOCS / "reproducibility_scope.md").read_text(encoding="utf-8")
     unconditional, conditional = text.split("### 2.1", maxsplit=1)
 
     assert "judge 6축" not in unconditional.lower()

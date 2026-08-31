@@ -44,7 +44,7 @@ from pathlib import Path, PurePath, PurePosixPath, PureWindowsPath
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-DOCS_DIR = ROOT / "docs"
+DOCS_DIR = ROOT / "docs" / "engine"
 
 # 파일 탐색에서 제외할 디렉터리. 산출물·가상환경·평가 사례집을 뒤지지 않는다.
 SKIP_DIRS = frozenset(
