@@ -1,0 +1,128 @@
+# ─────────────────────────────────────────────────────────────
+# S.Hub 통합 .gitignore
+#   대시보드(frontend/·backend/) 규칙 = 구 supervisor
+#   엔진(backend/engine/·console/·goldenset/·corpus/) 규칙 = 구 orchestration
+# ─────────────────────────────────────────────────────────────
+
+# ══ 대시보드 (구 supervisor) ══
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# ---------- Runtime data (서버 캐시, 환율 히스토리 등) ----------
+backend/.cache/
+# ---------- Node / Next.js (frontend) ----------
+# 모노레포 구조이므로 루트 기준이 아닌 임의 깊이에서 매칭되도록 한다.
+node_modules/
+.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+# testing
+coverage/
+# next.js
+.next/
+out/
+# production build
+build/
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+# vercel
+.vercel
+# ---------- Python (backend) ----------
+__pycache__/
+*.pyc
+venv/
+.venv/
+*.egg-info/
+.pytest_cache/
+# RAG 데이터·인덱스 (용량 큰 파일)
+# PDF는 용량이 커서 git 제외 (드라이브/슬랙으로 공유), 하위 폴더까지 매칭
+backend/data/**/*.pdf
+backend/data/*.docx
+backend/faiss_index/
+*.index
+# ---------- 고객/상담 민감 데이터 (PII 유출 방지) ----------
+# 실제 VVIP 상담 전사·음성 등은 추적 금지. .txt/.json/음성 파일은 무시한다.
+# 이미 커밋된 STT 테스트 샘플은 추적 상태가 유지되며 영향받지 않는다.
+backend/data/*.txt
+backend/data/*.json
+backend/app/stt/.env
+backend/app/stt/audio/
+backend/app/stt/output/
+# 공유용 더미/샘플은 파일명에 "sample" 을 넣으면 예외로 추적된다 (실데이터엔 절대 사용 금지).
+# 그 외 의도적 추가는 `git add -f <파일>` 로 강제 추가.
+!**/*sample*
+# ---------- 환경 변수 ----------
+# .env 류는 모두 무시하되, 템플릿인 .env.example만 추적한다.
+.env
+.env.*
+!.env.example
+backend/.env
+# ---------- OS / Editor ----------
+.DS_Store
+*.pem
+.idea/
+# .vscode/는 일단 무시한다. 팀이 공유 설정(권장 익스텐션·디버그 설정 등)을 도입하면
+# 아래 .vscode/ 줄을 제거하거나, 추적할 파일만 별도로 화이트리스트(!.vscode/extensions.json 등) 처리한다.
+.vscode/
+# ---------- AI 코딩 도구 ----------
+# Claude Code
+.claude/
+# MCP 서버 설정(개인 로컬 설정). project_ref만 담기지만 팀 공유 대신 각자 관리한다.
+.mcp.json
+# ---------- STT 개발 관련 ----------
+*.wav
+*.mp3
+
+# ══ 엔진 (구 orchestration) ══
+# 환경/비밀
+.streamlit/secrets.toml
+# 파이썬
+*.pyo
+# 데이터 산출물
+# data/returns_real.*(yfinance 파생 실데이터)는 Yahoo Finance 재배포 제약 때문에
+# git에 커밋하지 않는다. R7 현장 시연 오프라인 대응은 발표 전 1회 실행으로
+# 로컬 캐시를 미리 만들어두는 방식으로 처리한다(VVIP_PB_Advisor와 동일 패턴).
+data/*.parquet
+data/*.csv
+data/*.meta.json
+data/chroma/
+data/rag-index-artifacts/
+data/rag-index-cache/
+# RAG 코퍼스 원문 PDF — 저작권상 로컬 전용, git 미포함 (구조·매니페스트만 추적)
+/corpus/**/*.pdf
+!/corpus/**/.gitkeep
+# judge 실행·기록 러너 산출물 — 실행마다 생기는 로컬 리허설/결과 파일이라
+# 커밋하지 않는다(`/out/`은 로컬 작업 공간).
+/out/
+judge_v*_results.json
+judge_v*_results.manifest.json
+# 공식 v1~v6 실행 결과는 감사·재현 근거라 예외로 추적한다. 위치를 goldenset/ 밖에
+# 두는 것은 R2 실행 담당이 정답 사례집·라벨 대조 산출물을 실수로도 열지 않도록
+# 물리적으로 분리하기 위함이다.
+!/docs/r2_calibration_runs/judge_v*_results.json
+!/docs/r2_calibration_runs/judge_v*_results.manifest.json
+# 에디터/OS
+.claude/*
+!.claude/settings.json
+# goldenset/dist 는 goldenset/tools/make_blind.py 가 생성하는 배포 패키지다.
+# 내용이 전부 cases_blind/ · corpus/chunks.json · labels/ 답안지의 사본이라
+# 정답 사본이 여러 곳에 흩어지지 않도록 추적하지 않는다. 필요하면 재생성한다.
+/goldenset/dist/
+# MAGI 표본 목록(scripts/magi_vote.py)은 사람 라벨에서 파생된 값이다 — 어느 사례가
+# 어느 축에서 fail인지가 목록 자체로 드러나므로 커밋하지 않는다. 코드·PR에는
+# 소금값을 섞은 sha256 커밋값만 남기고(MAGI_TARGETS_SHA256), 목록 원본은 R1
+# 소유자가 보관해 실행자에게 전달한다.
+/goldenset/.sealed/magi_targets.json
+# evidence/ 는 scripts/run_graph.py --evidence-bundle 이 만드는 실행 산출물이다
+# (DEFAULT_EVIDENCE_ROOT). 실행마다 run-YYYYMMDD-NNN 이 쌓이고 LangSmith URL·
+# trace_id 같은 실행 식별자가 들어가므로 추적하지 않는다. 감사 제출본은
+# 레포가 아니라 제출 경로로 따로 전달한다.
+/evidence/

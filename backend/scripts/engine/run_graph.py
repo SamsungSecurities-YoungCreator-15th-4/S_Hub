@@ -1,0 +1,297 @@
+"""CLI 진입점 — 그래프 실행/HITL 재개/분기·루프 시연.
+
+사용 예:
+  python scripts/run_graph.py --auto-approve
+  python scripts/run_graph.py --auto-approve --force-judge-fail 2
+  python scripts/run_graph.py --auto-approve --with-conflict
+"""
+import argparse
+import json
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+THREAD_ID = "demo-thread-001"
+DEFAULT_EVIDENCE_ROOT = Path("evidence")
+RUN_ID_PREFIX = "run"
+DEPLOYMENT_VALIDATION_RAW_INPUT = (
+    "고객은 사업체 운영자금과 은퇴자금을 함께 관리하고 있으며 투자기간은 10년이다. "
+    "목표수익률은 연 5%이고 중간 수준의 유동성을 원한다. 금융소득 종합과세와 "
+    "이자·배당소득의 세후 유동성 영향을 확인하고, 고금리·강달러 충격에서 "
+    "제안 포트폴리오의 하방 위험과 대응 방향을 점검해 달라."
+)
+
+
+def _print_header(title: str) -> None:
+    print(f"\n{'=' * 60}\n{title}\n{'=' * 60}")
+
+
+def _stream_and_collect(graph, payload, invocation, order: list[str]) -> None:
+    """그래프를 스트리밍 실행하며 노드 실행 순서를 기록."""
+    from engine.observability.langsmith import tracing_scope
+
+    with tracing_scope(invocation):
+        for update in graph.stream(payload, invocation.config, stream_mode="updates"):
+            for node_name in update:
+                if node_name == "__interrupt__":
+                    continue
+                order.append(node_name)
+                print(f"  ▶ 노드 실행: {node_name}")
+
+
+def allocate_run_id(root: Path, today: str) -> str:
+    """`run-YYYYMMDD-NNN` — 사람이 지정하지 않아도 충돌 없이 자동 부여한다.
+
+    같은 날 재실행하면 기존 번들을 덮어쓰지 않고 다음 일련번호를 잡는다.
+    """
+    prefix = f"{RUN_ID_PREFIX}-{today}-"
+    used = set()
+    if root.is_dir():
+        for child in root.iterdir():
+            if child.is_dir() and child.name.startswith(prefix):
+                suffix = child.name[len(prefix):]
+                if suffix.isdigit():
+                    used.add(int(suffix))
+    sequence = 1
+    while sequence in used:
+        sequence += 1
+    return f"{prefix}{sequence:03d}"
+
+
+def generate_evidence_bundle(final: dict, root: Path, calibration: object = None) -> Path:
+    """그래프 종료 직후 증거 번들을 in-process로 생성한다.
+
+    subprocess로 다시 부르지 않는 이유: 명령과 번들 사이에 사람이 파일을 옮기거나
+    경로를 지정하는 단계가 생기면 "명령 한 번이면 자동 생성"이 성립하지 않는다.
+
+    `calibration`은 R2 리포트다. 없으면 번들의 calibration 파일이 available:false로
+    나가고, 파일 자체는 그대로 만들어진다.
+    """
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from make_evidence_bundle import make_bundle
+
+    # 한 번만 읽는다. 두 번 호출하면 자정 경계에서 generated_at과 run_id의
+    # 날짜가 갈린다(generated_at=08-01인데 run_id는 …20260731).
+    now = datetime.now(timezone.utc)
+    generated_at = now.isoformat(timespec="seconds")
+    run_id = allocate_run_id(root, now.strftime("%Y%m%d"))
+    out_dir = make_bundle(
+        final,
+        root / run_id,
+        run_id=run_id,
+        generated_at=generated_at,
+        calibration=calibration,
+    )
+
+    from engine.evidence.schema import BUNDLE_FILENAMES
+
+    missing = [name for name in BUNDLE_FILENAMES if not (out_dir / name).is_file()]
+    if missing:
+        # 번들 없이 성공 종료하면 서류철이 비어 있는 채로 제출된다.
+        raise SystemExit(f"증거 번들 생성 실패 — 누락 파일: {', '.join(missing)}")
+    return out_dir
+
+
+def main() -> None:
+    load_dotenv(ROOT / ".env")
+    parser = argparse.ArgumentParser(description="리스크 리포트 그래프 실행")
+    parser.add_argument("--auto-approve", action="store_true",
+                        help="승인 게이트에서 자동 승인 후 재개")
+    parser.add_argument("--force-judge-fail", type=int, default=0, metavar="N",
+                        help="judge를 N회 강제 실패시켜 재작성 루프 시연")
+    parser.add_argument("--with-conflict", action="store_true",
+                        help="유동성 요구를 과대 설정해 충돌 분기 시연")
+    parser.add_argument("--offline", action="store_true",
+                        help="외부 API 없이 결정론 IPS·더미 시장데이터로 실행")
+    parser.add_argument(
+        "--validate-deployment",
+        action="store_true",
+        help="4개 RAG category·Judge·LangSmith를 포함한 실제 배포 계약 검증",
+    )
+    parser.add_argument(
+        "--dump-state",
+        type=Path,
+        default=None,
+        metavar="PATH",
+        help="최종 state를 결정론적 JSON으로 저장 (증거 번들 입력)",
+    )
+    parser.add_argument(
+        "--evidence-bundle",
+        nargs="?",
+        type=Path,
+        const=DEFAULT_EVIDENCE_ROOT,
+        default=None,
+        metavar="DIR",
+        help=(
+            "실행 종료 후 감사 증거 번들을 자동 생성 "
+            f"(기본 출력 루트: {DEFAULT_EVIDENCE_ROOT})"
+        ),
+    )
+    parser.add_argument(
+        "--calibration",
+        type=Path,
+        default=None,
+        metavar="PATH",
+        help=(
+            "번들에 실을 R2 calibration 리포트 JSON "
+            "(scripts/calibration_report.py --out 산출물). 없으면 available:false로 나간다"
+        ),
+    )
+    args = parser.parse_args()
+
+    from engine.graph import build_graph
+    from engine.observability.langsmith import merge_observability, prepare_trace_invocation
+
+    graph = build_graph()
+    config = {"configurable": {"thread_id": THREAD_ID}}
+    order: list[str] = []
+    initial_state = {
+        "demo_options": {
+            "force_judge_fail": args.force_judge_fail,
+            "force_conflict": args.with_conflict,
+            "offline": args.offline,
+        }
+    }
+    if args.validate_deployment:
+        if args.offline:
+            parser.error("--validate-deployment는 --offline과 함께 사용할 수 없습니다.")
+        initial_state["raw_input"] = DEPLOYMENT_VALIDATION_RAW_INPUT
+    invocation = prepare_trace_invocation(config, phase="input")
+    initial_state["run_config"] = {"observability": invocation.observability}
+    if invocation.trace_id:
+        initial_state["trace_id"] = invocation.trace_id
+    config = invocation.config
+
+    _print_header("1) 그래프 실행 시작")
+    _stream_and_collect(graph, initial_state, invocation, order)
+
+    snapshot = graph.get_state(config)
+    if snapshot.next and "approval_gate" in snapshot.next:
+        _print_header("2) 승인 대기 (HITL 인터럽트)")
+        conflicts = snapshot.values.get("conflicts", [])
+        print("  상태: approval_gate 직전에서 정지")
+        print(f"  미해결 충돌: {len(conflicts)}건")
+        for c in conflicts:
+            print(f"    - {c['detail']}")
+
+        if not args.auto_approve:
+            print("\n  --auto-approve 미지정: 승인 대기 상태로 종료합니다.")
+            return
+
+        blocking = [c for c in conflicts if c.get("severity") == "block"]
+        if blocking:
+            rules = ", ".join(c.get("rule", "unknown") for c in blocking)
+            raise SystemExit(f"자동 승인 불가: block 충돌({rules})을 먼저 해소하세요.")
+        has_review = any(c.get("severity") == "review" for c in conflicts)
+
+        resume_invocation = prepare_trace_invocation(
+            config,
+            phase="analysis",
+            trace_id=snapshot.values.get("trace_id"),
+        )
+        resume_run_config = dict(snapshot.values.get("run_config") or {})
+        resume_run_config["observability"] = merge_observability(
+            resume_run_config.get("observability"),
+            resume_invocation.observability,
+        )
+        checkpoint_config = {
+            "configurable": resume_invocation.config["configurable"],
+        }
+        graph.update_state(
+            checkpoint_config,
+            {
+                "run_config": resume_run_config,
+                "approval": {
+                    "status": "reviewed",
+                    "decision": "exception_approved" if has_review else "approved",
+                    "approver": "cli-auto",
+                    "note": "CLI 자동 승인",
+                    "exception_reason": (
+                        "시연 목적의 리스크 계산에 한해 예외 승인하며 거래 승인이 아님"
+                        if has_review
+                        else ""
+                    ),
+                }
+            },
+        )
+        print("  ✔ 자동 승인 주입 → 그래프 재개")
+        _stream_and_collect(graph, None, resume_invocation, order)
+        config = resume_invocation.config
+
+    final = graph.get_state(config).values
+
+    _print_header("3) 노드 실행 순서")
+    print("  " + " → ".join(order))
+
+    _print_header("4) 분기/루프 발생 내역")
+    n_extract = order.count("extract_ips")
+    n_rag = order.count("rag_cite")
+    print(f"  충돌 재추출(분기 ①): {n_extract - 1}회 (extract_ips 총 {n_extract}회 실행)")
+    print("  HITL 인터럽트(②): approval_gate 직전 정지 1회 발생")
+    print(f"  judge 재작성 루프(분기 ③): {n_rag - 1}회 (judge_retries={final.get('judge_retries')})")
+
+    _print_header("5) 최종 요약")
+    print("  [metrics]")
+    print(json.dumps(final.get("metrics", {}), ensure_ascii=False, indent=2))
+    print("\n  [judge]")
+    print(json.dumps(final.get("judge", {}), ensure_ascii=False, indent=2))
+    print("\n  [report — reproducibility]")
+    print(json.dumps(final.get("report", {}).get("reproducibility", {}), ensure_ascii=False, indent=2))
+    print("\n  [report — governance]")
+    print(json.dumps(final.get("report", {}).get("governance", {}), ensure_ascii=False, indent=2))
+    print(f"\n  trace_id: {final.get('trace_id')}")
+    _report = final.get("report", {}) or {}
+    print(f"  report title: {_report.get('title')}")
+    print(f"  report status: {_report.get('status')} ({_report.get('status_label')})")
+    if _report.get("finalized") is not True:
+        print(
+            "  ⚠ judge 미통과 — 리포트는 확정되지 않았습니다(수동검토 대기). "
+            "사람 검토 전에는 고객 제공·최종 판단 근거로 사용하지 않습니다."
+        )
+
+    if args.dump_state:
+        from engine.evidence.state_dump import dump_state
+
+        _print_header("6) 최종 state 덤프")
+        dumped = dump_state(final, args.dump_state)
+        print(f"  저장: {dumped}")
+
+    if args.evidence_bundle:
+        # 정상 확정·수동검토 차단 양쪽 모두에서 생성한다. 차단 사례도 제출물이다.
+        _print_header("7) 증거 번들 생성")
+        sys.path.insert(0, str(ROOT / "scripts"))
+        from make_evidence_bundle import _load_calibration
+
+        bundle_dir = generate_evidence_bundle(
+            final,
+            args.evidence_bundle,
+            _load_calibration(args.calibration),
+        )
+        print(f"  생성: {bundle_dir}")
+        for name in sorted(child.name for child in bundle_dir.iterdir()):
+            print(f"    - {name}")
+        from engine.evidence.schema import BUNDLE_HASH_FILENAME
+
+        print(f"  bundle_hash: {(bundle_dir / BUNDLE_HASH_FILENAME).read_text().strip()}")
+
+    if args.validate_deployment:
+        from engine.deployment_validation import (
+            format_deployment_checks,
+            validate_deployment_state,
+        )
+
+        _print_header("6) 배포 검증")
+        checks = validate_deployment_state(final, order)
+        print(format_deployment_checks(checks))
+        failures = [check.name for check in checks if not check.passed]
+        if failures:
+            raise SystemExit("배포 검증 실패: " + ", ".join(failures))
+
+
+if __name__ == "__main__":
+    main()

@@ -1,9 +1,0 @@
-{
-  "code_sha": "d5166e55b3f991e6520a4516ca4075d3fe4625ba",
-  "executed_at": "2026-08-04T06:35:45.894005+00:00",
-  "freeze_commit": "58d5e2b4fa62e37c56a1a083e83650272aa13015",
-  "input_set_hash": "2dc161f7e3de3f88d908670ada8d983a5f952e2ddc4a2a195b88206ef482819d",
-  "langsmith_run": "Orchestration_Team4",
-  "prompt_version": "v7",
-  "verifications": []
-}
