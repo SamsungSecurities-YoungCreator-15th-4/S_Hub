@@ -1,0 +1,3 @@
+# 엔진 계열 lint 설정 — backend/engine/ruff.toml 을 그대로 따른다.
+# (ruff는 파일에서 가장 가까운 ruff.toml만 적용하므로, 엔진 계열 디렉토리마다 명시한다.)
+extend = "../engine/ruff.toml"

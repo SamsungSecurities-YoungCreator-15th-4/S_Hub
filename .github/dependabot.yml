@@ -1,0 +1,68 @@
+# 통합 레포는 런타임이 셋(엔진 pip / 대시보드 백엔드 pip / 프론트 npm)이라
+# 원본 오케스트레이션의 `directory: "/"` 하나만 가져오면 대시보드가 감시 사각지대에 남는다.
+# 세 곳을 모두 등록하고, S_Hub 는 develop 없이 main 단일 브랜치이므로 target-branch 도 맞춘다.
+version: 2
+updates:
+  # 엔진(심포니) — 루트 requirements.txt
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Seoul"
+    target-branch: "main"
+    open-pull-requests-limit: 5
+    groups:
+      langstack:
+        patterns:
+          - "langchain*"
+          - "langgraph*"
+          - "langsmith"
+    # Dependabot에는 pip 프리릴리스 전역 제외 옵션이 없어 알려진 RC를 명시하고,
+    # 향후 프리릴리스 고정은 release preflight와 CI에서 차단한다.
+    ignore:
+      - dependency-name: "langgraph"
+        versions:
+          - "1.0.10rc1"
+    commit-message:
+      prefix: "chore(deps)"
+
+  # 대시보드(슈퍼바이저) 백엔드 — backend/requirements.txt
+  - package-ecosystem: "pip"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Seoul"
+    target-branch: "main"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+
+  # 대시보드(슈퍼바이저) 프론트 — frontend/package.json (pnpm)
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Seoul"
+    target-branch: "main"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+
+  # CI 액션 핀 — 공급망 관점에서 pip/npm 과 동급으로 본다.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Seoul"
+    target-branch: "main"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"

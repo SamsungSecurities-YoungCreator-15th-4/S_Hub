@@ -1,0 +1,15 @@
+# 엔진(구 orchestration) 전용 lint 설정.
+#
+# 루트 ruff.toml(대시보드 기준: select=["E","F"], line-length=100)을 엔진에 그대로
+# 적용하면 E501(line-too-long) 189건이 코드 변경 없이 새로 발생한다. 엔진은 통합 전까지
+# 좁은 룰셋으로 관리돼 왔으므로, 규칙 이력을 유지하기 위해 엔진 디렉토리에 설정을 둔다.
+#
+# ruff는 각 파일에서 가장 가까운 ruff.toml을 적용하므로, 이 파일은 backend/engine/ 이하에만
+# 적용되고 backend/app/(대시보드)에는 영향을 주지 않는다.
+#
+# 규칙을 루트와 통일하는 변경은 E501 189건 정리와 함께 별도 PR에서 논의한다.
+target-version = "py310"
+
+[lint]
+# ruff 0.15까지의 기본값(E4·E7·E9·F)을 그대로 명시한 것이다.
+select = ["E4", "E7", "E9", "F"]
