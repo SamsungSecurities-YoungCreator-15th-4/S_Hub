@@ -15,7 +15,7 @@ from pathlib import Path
 from scripts import magi_vote
 from engine.judge.rubric import AXIS_NAMES
 from engine.utils.hashing import sha256_of_dict
-from scripts.magi_vote import (
+from scripts.engine.magi_vote import (
     DETERMINISTIC_AXES,
     EXIT_DETERMINISTIC_DRIFT,
     EXIT_OK,
@@ -356,7 +356,7 @@ def test_run_case_records_three_independent_votes(scripted_judge):
 
 def test_header_records_sampling_condition_and_null_result_phrasing():
     """흔들림 0을 '흔들림 없음'으로 일반화하지 않도록 조건이 산출물에 남는다."""
-    from scripts.magi_vote import build_header
+    from scripts.engine.magi_vote import build_header
 
     header = build_header(
         [_record_with_llm_votes([True, True, True])],
@@ -381,7 +381,7 @@ def test_header_records_axis_purity_limit():
 
     어느 사례가 어느 축인지는 적지 않는다 — 그것이 곧 사람 라벨이다.
     """
-    from scripts.magi_vote import build_header
+    from scripts.engine.magi_vote import build_header
 
     header = build_header(
         [_record_with_llm_votes([True, False, True])],
@@ -401,7 +401,7 @@ def test_header_records_axis_purity_limit():
 
 def test_control_group_is_labelled():
     assert run_case.__doc__  # 문서화된 공개 함수
-    from scripts.magi_vote import aggregate_case
+    from scripts.engine.magi_vote import aggregate_case
 
     record = _record_with_llm_votes([True, True, True])
     record["case_id"] = FAKE_CONTROL[0]

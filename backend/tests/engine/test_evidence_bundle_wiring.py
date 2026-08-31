@@ -221,7 +221,7 @@ def test_rejected_citation_flows_from_node_to_bundle(tmp_path: Path):
     실리면 안 되고, citation_verification.json에는 사유와 함께 실려야 한다.
     """
     from make_evidence_bundle import make_bundle
-    from tests.test_rag_cite_node import _FakeLLM, _FakeRetriever
+    from tests.engine.test_rag_cite_node import _FakeLLM, _FakeRetriever
 
     from engine.nodes.rag_cite import rag_cite
 
@@ -256,7 +256,7 @@ def _run_rag_attempts(attempts: int) -> dict:
 
     LangGraph가 노드 반환값을 state에 병합하는 것과 같게, 반환 키를 state에 덮어쓴다.
     """
-    from tests.test_rag_cite_node import _FakeLLM, _FakeRetriever
+    from tests.engine.test_rag_cite_node import _FakeLLM, _FakeRetriever
 
     from engine.nodes.rag_cite import rag_cite
 
@@ -293,7 +293,7 @@ def test_rewrite_loop_preserves_every_attempt_rejections():
 
 def test_same_attempt_rerun_does_not_duplicate_rejections():
     """체크포인트 재생으로 같은 시도가 두 번 실행돼도 기록이 중복되면 안 된다."""
-    from tests.test_rag_cite_node import _FakeLLM, _FakeRetriever
+    from tests.engine.test_rag_cite_node import _FakeLLM, _FakeRetriever
 
     from engine.nodes.rag_cite import rag_cite
 

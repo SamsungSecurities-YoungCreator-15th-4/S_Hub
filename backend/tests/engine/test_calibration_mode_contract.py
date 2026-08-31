@@ -14,7 +14,7 @@ from engine.evaluation.calibration_modes import (
     OFFICIAL_CALIBRATION_MODES,
     calibration_mode_issue,
 )
-from scripts.calibration_report import _resolve_mode
+from scripts.engine.calibration_report import _resolve_mode
 
 ROOT = Path(__file__).resolve().parents[1]
 

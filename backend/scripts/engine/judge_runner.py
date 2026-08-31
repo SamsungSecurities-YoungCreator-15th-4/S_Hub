@@ -285,7 +285,7 @@ def _load_ec_cases() -> list[dict]:
     register_judge_dataset.py와 동일하게 tests의 단일 팩토리를 재사용한다. R1
     정답 사례집이 오면 이 로더만 교체하고 record_cases는 그대로 쓴다.
     """
-    from tests.test_judge_eval_evalset import DETERMINISTIC_CASE_IDS, build_eval_case
+    from tests.engine.test_judge_eval_evalset import DETERMINISTIC_CASE_IDS, build_eval_case
 
     return [
         {"case_id": case_id, "state": build_eval_case(case_id)["state"]}
@@ -355,7 +355,7 @@ def _langsmith_project() -> str | None:
 
 def _offline_llm():
     """EC 오프라인 리허설용 fake LLM(테스트와 동일 동작)."""
-    from tests.test_judge_eval_evalset import _PassingLLM
+    from tests.engine.test_judge_eval_evalset import _PassingLLM
 
     return _PassingLLM()
 

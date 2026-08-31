@@ -13,13 +13,13 @@ import json
 import pytest
 
 from engine.evaluation.calibration_schema import normalize_judge_result
-from scripts.judge_runner import (
+from scripts.engine.judge_runner import (
     case_content_sha256,
     record_case,
     record_cases,
     write_results,
 )
-from tests.test_judge_eval_evalset import (
+from tests.engine.test_judge_eval_evalset import (
     DETERMINISTIC_CASE_IDS,
     _PassingLLM,
     build_eval_case,
@@ -178,7 +178,7 @@ def test_run_manifest_has_auto_fields_and_empty_verifications(tmp_path):
 
     verifications는 사람이 사후에 손으로 채우는 자리라 러너는 비워만 둔다(계약).
     """
-    from scripts.judge_runner import manifest_path_for, write_run_manifest
+    from scripts.engine.judge_runner import manifest_path_for, write_run_manifest
 
     out = tmp_path / "judge_v1_results.json"
     manifest_out = write_run_manifest(

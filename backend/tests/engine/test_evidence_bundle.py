@@ -48,7 +48,7 @@ from engine.evaluation.calibration_modes import (
 )
 from engine.judge.axes import AXIS_EN_TO_KO, KOREAN_AXIS_NAMES, to_en
 from engine.utils.hashing import sha256_of_file
-from scripts.make_evidence_bundle import make_bundle
+from scripts.engine.make_evidence_bundle import make_bundle
 
 ROOT = Path(__file__).resolve().parents[1]
 GENERATED_AT = "2026-07-30T00:00:00+00:00"
@@ -884,6 +884,6 @@ def test_bundle_adapter_tracks_calibration_report_schema_version():
     처음부터 박아둔다"고 적은 그 대조다. 생산자가 버전을 올리면 이 테스트가
     어댑터도 함께 손보게 만든다.
     """
-    from scripts.calibration_report import SCHEMA_VERSION
+    from scripts.engine.calibration_report import SCHEMA_VERSION
 
     assert CALIBRATION_REPORT_SCHEMA_VERSION == SCHEMA_VERSION

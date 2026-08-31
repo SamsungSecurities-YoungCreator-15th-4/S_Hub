@@ -5,7 +5,7 @@ import json
 from types import SimpleNamespace
 from uuid import UUID
 
-from scripts.register_judge_dataset import (
+from scripts.engine.register_judge_dataset import (
     DATASET_NAME,
     _summary_accuracy,
     build_dataset_examples,

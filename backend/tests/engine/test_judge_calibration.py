@@ -1153,7 +1153,7 @@ def test_build_judge_result_accepts_real_judge_eval_output(monkeypatch):
         },
     )
     from engine.nodes.judge_eval import judge_eval
-    from tests.test_judge_eval_evalset import _PassingLLM, build_eval_case
+    from tests.engine.test_judge_eval_evalset import _PassingLLM, build_eval_case
 
     case = build_eval_case("EC-01")
     judge_output = judge_eval(case["state"], llm=_PassingLLM())
@@ -1194,7 +1194,7 @@ def test_build_judge_result_accepts_real_judge_eval_failure_output(monkeypatch):
         },
     )
     from engine.nodes.judge_eval import judge_eval
-    from tests.test_judge_eval_evalset import _PassingLLM, build_eval_case
+    from tests.engine.test_judge_eval_evalset import _PassingLLM, build_eval_case
 
     case = build_eval_case("EC-04")
     judge_output = judge_eval(case["state"], llm=_PassingLLM())
@@ -1234,7 +1234,7 @@ def test_build_judge_result_extracts_strict_citation_gate_true_from_real_judge_e
         },
     )
     from engine.nodes.judge_eval import judge_eval
-    from tests.test_judge_eval_evalset import _PassingLLM, build_eval_case
+    from tests.engine.test_judge_eval_evalset import _PassingLLM, build_eval_case
 
     case = build_eval_case("EC-03")
     judge_output = judge_eval(case["state"], llm=_PassingLLM())

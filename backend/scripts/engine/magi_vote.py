@@ -56,7 +56,7 @@ from engine.utils.hashing import sha256_of_dict  # noqa: E402
 # R2 러너와 **같은 로더·같은 LLM 팩토리**를 쓴다. 여기서 별도 경로를 만들면 측정된
 # 흔들림이 judge의 것인지 하네스의 것인지 구분할 수 없다. 비공개 이름을 가져오는
 # 것은 그 동일성이 이 하네스의 전제이기 때문이며, 의도적인 재사용이다.
-from scripts.judge_runner import (  # noqa: E402
+from scripts.engine.judge_runner import (  # noqa: E402
     _load_r1_cases,
     _prompt_hash,
     _real_llm,
@@ -876,7 +876,7 @@ def main() -> None:
 
 def _offline_llm():
     """배선 리허설용 fake LLM(judge_runner --offline과 동일한 것)."""
-    from tests.test_judge_eval_evalset import _PassingLLM  # noqa: PLC0415
+    from tests.engine.test_judge_eval_evalset import _PassingLLM  # noqa: PLC0415
 
     return _PassingLLM()
 

@@ -6,9 +6,9 @@ from __future__ import annotations
 
 import pytest
 
-from scripts.judge_runner import record_cases
-from scripts.verify_judge_results import verify_results
-from tests.test_judge_eval_evalset import (
+from scripts.engine.judge_runner import record_cases
+from scripts.engine.verify_judge_results import verify_results
+from tests.engine.test_judge_eval_evalset import (
     DETERMINISTIC_CASE_IDS,
     _PassingLLM,
     build_eval_case,
