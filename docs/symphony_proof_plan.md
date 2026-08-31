@@ -165,14 +165,34 @@ judge 프롬프트는 `rubric.py:359`에 문자열로 박혀 있다 → `app/jud
 > **(B) LLM 2축 프롬프트만 개선** — 가볍지만 결정론 축 미탐은 끝까지 남음
 > **(C) 최소 수정 + 한계 공개** — 치명적인 것만 고치고 나머지는 "알지만 안 고쳤다 + 이유"로 발표
 
+> **결정 기록 (해소됨) — (A)와 (C)를 함께 택했다.**
+> 결정론 축은 코드로 고쳤고(v4 면책·금지표현, v7 `source_validity` 사각지대),
+> LLM 2축은 프롬프트로 조정했다(v2·v3·v5·v6). 고치지 않은 것은 숨기지 않고
+> `goldenset/reports/r2_calibration/README.md`의 「알려진 한계」에 원인과 함께 적었다
+> — 수치정합 관계 검사 F2·F3·F4·F6·F7 미구현, F1은 구현했으나 두 경로 모두에서
+> 미관측, F5는 이 실행 형태에서 발생 불가. 최종 v7 일치율 16/20.
+
 **완료 기준 (DoD)**
 
 - [ ] 로더가 견본 3건(GS-EX-01~03)에서 먼저 검증됨 → 20건 확장
-- [ ] 로더가 frontmatter 라벨을 state에 넣지 않음을 테스트로 증명 (R1은 `case-format.md` §0으로 경계 명시)
-- [ ] 일치율·미탐·오탐·혼동행렬·축별 일치율이 수치로 출력됨
-- [ ] **오답 3건 이상** 원인 분석 (사례ID·사람라벨·judge판정·원인가설·수정내용)
-- [ ] 프롬프트/루브릭 v1→v2 후 **같은 20건**으로 재측정, 전/후 비교표
-- [ ] LangSmith에 실행 기록이 남고 실측 수치를 제출
+      — **미충족.** 견본 단계를 거치지 않고 `case_001`~`case_020` 20건에 바로 붙였다.
+      로더 테스트(`tests/test_goldenset_loader.py`)도 20건을 대상으로 한다. 계획한 단계적
+      확장을 건너뛴 것이며, 20건 검증 자체는 `test_loads_all_twenty_cases` 외 9건이 담당한다.
+- [x] 로더가 frontmatter 라벨을 state에 넣지 않음을 테스트로 증명 (R1은 `case-format.md` §0으로 경계 명시)
+      — `ALLOWED_STATE_KEYS`(metrics·explanations·citations) + `test_state_uses_allowlist_only`
+      ·`test_no_answer_fields_anywhere_in_state`
+- [x] 일치율·미탐·오탐·혼동행렬·축별 일치율이 수치로 출력됨
+      — `v*_report_summary.json`의 `derived`·`confusion_matrix`·`per_axis`
+- [x] **오답 3건 이상** 원인 분석 (사례ID·사람라벨·judge판정·원인가설·수정내용)
+      — 원인가설·수정내용은 `goldenset/reports/r2_calibration/README.md`에 3건 이상
+      (v2 오탐 급증→v3 경계 보강 · v4 면책/금지표현 코드 수정 · v7 `source_validity`
+      사각지대 수정). **사례ID·사람라벨은 라벨 방화벽 때문에 커밋하지 않는다** —
+      `human_rationale`가 답안지라 번들·레포에 싣지 않고 제외 사유를
+      `mismatch_detail_excluded`에 명시한다.
+- [x] 프롬프트/루브릭 v1→v2 후 **같은 20건**으로 재측정, 전/후 비교표
+      — v1~v7 전 라운드 `evalset_hash` 동일(`70a75abc…`), 비교표는 `*_compare_summary.json`
+- [x] LangSmith에 실행 기록이 남고 실측 수치를 제출
+      — `docs/r2_calibration_runs/*.manifest.json`의 `langsmith_run`, 전 라운드 20/20
 
 **산출**: `goldenset/case-format.md`(R1 제공) · 무라벨 입력본 `goldenset/judge_inputs/` · 다경의 `scripts/judge_runner.py`(실행) + `scripts/calibration_report.py`(집계)
 
@@ -257,10 +277,16 @@ evidence/<run_id>/
 
 **완료 기준 (DoD)**
 
-- [ ] 명령 1회로 번들 생성, 수작업 단계 0건
-- [ ] `manifest.generated_by`에 스크립트 경로 + git sha 자동 기록
-- [ ] 성공 번들과 차단 번들이 각각 정상 생성됨
+- [x] 명령 1회로 번들 생성, 수작업 단계 0건
+      — `run_graph.py --evidence-bundle --dump-state` 1회. 제출 번들 3건 모두 이 경로로 생성
+- [x] `manifest.generated_by`에 스크립트 경로 + git sha 자동 기록
+      — 제출 번들 3건 전부 `git_sha=6112cb4`(동결 커밋)로 재확인
+- [x] 성공 번들과 차단 번들이 각각 정상 생성됨
+      — 성공 2 · 차단 1, `bundle_hash`와 `manifest.files` 전건 해시 재계산 일치
 - [ ] `summary.md`만 보고 30초 안에 상태 파악 가능
+      — **미충족(측정 안 함).** 머리말 7줄 형식은 갖췄으나(`audit_demo_runbook.md` §2.1),
+      30초 안에 읽히는지는 사람이 재야 하고 아직 타이머로 재지 않았다. 런북 §2 배분은
+      이 구간에 60초를 잡아 두었다 — 배분안이지 실측이 아니다(런북 §7 첫 항목).
 
 **산출**: `scripts/make_evidence_bundle.py`, `evidence/**`, `docs/evidence_bundle_schema.md`
 
@@ -301,10 +327,17 @@ LLM 2축이 유일한 약점이다. **재현 데모는 `--offline` 또는 캐시
 
 **완료 기준 (DoD)**
 
-- [ ] `replay_verify.py`가 2회 실행 해시 일치를 출력
-- [ ] 재현 대상 범위가 문서로 **미리** 선언됨
-- [ ] 번들 3건(성공 2 · 차단 1) 실물 존재
+- [x] `replay_verify.py`가 2회 실행 해시 일치를 출력
+      — 제출물 `replay_verification.txt`. 재현 보장 대상 8건 전부 일치, 두 실행의
+      `trace_id`가 달라 별개 실행임도 확인
+- [x] 재현 대상 범위가 문서로 **미리** 선언됨
+      — `docs/reproducibility_scope.md`. 범위 변경은 재실행 검증보다 먼저 한다(§9)
+- [x] 번들 3건(성공 2 · 차단 1) 실물 존재
+      — 제출 완료. `trace_id`가 state 덤프 3쌍과 모두 맞물림
 - [ ] 리허설에서 5분/3분을 **실측 타이머로** 통과
+      — **미충족.** 기계가 재는 값(재실행 시간·대조 시간)은 확인했으나
+      **사람이 말하는 시간을 아직 타이머로 재지 않았다.** 상세는
+      `audit_demo_runbook.md` §7·§7.1 마지막 문단.
 
 **산출**: `scripts/replay_verify.py`, `docs/reproducibility_scope.md`, 번들 3건, 발표 대본
 
@@ -357,18 +390,51 @@ LLM 2축이 유일한 약점이다. **재현 데모는 `--offline` 또는 캐시
 
 ## 5. 제출 전 최종 확인
 
+> **확인 시점: 동결 커밋 `6112cb4` · 2026-08-05.** 아래는 제출물 실물과 코드를 대조한
+> 결과다. 이 절의 체크는 "했다고 생각한다"가 아니라 **그 자리에서 파일을 열어 확인한 것**만
+> 켠다. 검증 명령은 §5.1.
+
 **무효 조건 4개 — 말이 아니라 코드/파일로**
 
-- [ ] ① judge가 정답 라벨을 만들지 않았다 — 로더가 라벨을 state에 넣지 않음을 테스트로 증명, `labelers`에 사람 이니셜
-- [ ] ② hard stop 있다 — 미통과 시 `report.finalized is False` / `status: pending_manual_review`, 속성 테스트가 보장, 차단 번들 실물 존재
-- [ ] ③ 재현 성공 — 해시 일치, 재현 범위를 **미리** 선언
-- [ ] ④ 번들 자동 생성 — `manifest.generated_by`, 수작업 0단계
+- [x] ① judge가 정답 라벨을 만들지 않았다 — 로더가 라벨을 state에 넣지 않음을 테스트로 증명, `labelers`에 사람 이니셜
+      — `ALLOWED_STATE_KEYS` 3키 + 코드 레벨 재확인(`goldenset_loader.py`),
+      `tests/test_goldenset_integrity.py` 31 passed, `final_labels.yaml`의
+      `labelers: ["중현", "준호"]`(출제자 승민은 라벨러에서 배제). 제출물 9건 JSON 키
+      스캔에서도 라벨 유출 0건.
+- [x] ② hard stop 있다 — 미통과 시 `report.finalized is False` / `status: pending_manual_review`, 속성 테스트가 보장, 차단 번들 실물 존재
+      — `blocked_state.json` 실측: `status=pending_manual_review` · `finalized=False` ·
+      `export_allowed=False` · `confirmation_allowed=False`. 속성 테스트 3건 실재
+      (`test_property_*`, `docs/hard_stop_contract.md` §7 표).
+- [x] ③ 재현 성공 — 해시 일치, 재현 범위를 **미리** 선언
+      — 재현 보장 대상 8건 전부 일치(`replay_verification.txt`), 범위 선언은
+      `docs/reproducibility_scope.md`.
+- [x] ④ 번들 자동 생성 — `manifest.generated_by`, 수작업 0단계
+      — 3건 전부 `generated_by.git_sha=6112cb4`, `bundle_hash == sha256(manifest.json)`
+      재계산 일치.
 
 **금지·경계 — 우리 pass 사례 10건 본문에도 그대로 적용됨에 유의**
 
-- [ ] '최적' · 근거 없는 "확률 OO%" · 출처 없는 숫자 → pass 10건에 0건
-- [ ] 새 기능·새 화면 없음 (검증 레이어만)
-- [ ] 발표 기술스택 = 실제 사용 스택 (`AGENTS.md` 표 기준)
+- [x] '최적' · 근거 없는 "확률 OO%" · 출처 없는 숫자 → pass 10건에 0건
+      — `final_labels.yaml`의 pass 10건 본문 스캔 결과 적발 0건. `최적`이 등장하는 곳은
+      금지어 목록(`app/judge/rubric.py`)과 **의도적 결함 사례**뿐이다.
+- [x] 새 기능·새 화면 없음 (검증 레이어만)
+      — 8월 `ui/` 변경은 기존 분석 화면에 감사 번들 다운로드와 Hard Stop 시연 옵션을
+      **노출**한 것이고 새 화면은 없다. 신규 파일은 `ui/evidence_export.py` 1개이며
+      리포트 생성 9노드는 손대지 않았다. R3의 `manual_review_gate`는 과제가 요구한
+      검증 레이어 노드다.
+- [x] 발표 기술스택 = 실제 사용 스택 (`AGENTS.md` 표 기준)
+      — 발표자료 기술스택 7행을 `requirements.txt`와 실제 import로 전건 대조 완료.
+      `AGENTS.md` 표의 RAG 검색 계층 누락은 #204에서 보강했다.
+
+### 5.1 재확인 명령
+
+레포만 있으면 아래로 위 항목 대부분이 재현된다. 네트워크·LLM 호출 없다.
+
+```bash
+pytest                                   # 977 passed / 20 skipped 기준
+ruff check .
+python scripts/replay_verify.py <제출 state> <재실행 state>
+```
 
 ---
 
