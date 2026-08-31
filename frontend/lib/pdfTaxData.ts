@@ -65,14 +65,23 @@ function buildAccounts(tax: StressTaxData): PdfTaxAccount[] {
   const ac = tax.account_cards;
   if (!ac) return TAX_EFFECT.accounts;
 
-  // mock accounts 순서: [0] ISA, [1] 연금저축+IRP, [2] 일반계좌
-  const liveByIndex = [ac.isa, ac.irp, ac.taxable_account];
+  // mock 배열 순서가 아니라 계좌 이름으로 매칭 — TAX_EFFECT.accounts 순서가 바뀌어도
+  // 조용히 틀리지 않는다. IRP 카드는 ISA와 달리 remaining_capacity가 아니라
+  // remaining_tax_credit_capacity로 내려온다.
+  const liveByName: Record<string, { used?: number | null; remaining?: number | null }> = {
+    ISA: { used: ac.isa?.used_capacity, remaining: ac.isa?.remaining_capacity },
+    "연금저축 + IRP": { used: ac.irp?.used_capacity, remaining: ac.irp?.remaining_tax_credit_capacity },
+    일반계좌: {
+      used: ac.taxable_account?.used_capacity,
+      remaining: ac.taxable_account?.remaining_capacity,
+    },
+  };
 
-  return TAX_EFFECT.accounts.map((acct, i) => {
-    const live = liveByIndex[i];
+  return TAX_EFFECT.accounts.map((acct) => {
+    const live = liveByName[acct.name];
     if (!live) return acct;
-    const used = wonToManwon(live.used_capacity);
-    const remaining = wonToManwon(live.remaining_capacity);
+    const used = wonToManwon(live.used);
+    const remaining = wonToManwon(live.remaining);
     const limit = used != null && remaining != null ? used + remaining : acct.limit;
     return {
       ...acct,

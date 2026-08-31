@@ -155,7 +155,8 @@ export default function TaxSection() {
     : 2000;
 
   const irpLiveUsed = toFiniteNumber(taxSource?.account_cards?.irp?.used_capacity);
-  const irpLiveRemaining = toFiniteNumber(taxSource?.account_cards?.irp?.remaining_capacity);
+  // 백엔드 IRP 카드는 ISA와 달리 remaining_capacity가 아니라 remaining_tax_credit_capacity로 내려온다.
+  const irpLiveRemaining = toFiniteNumber(taxSource?.account_cards?.irp?.remaining_tax_credit_capacity);
   const pensionUsedManwon = irpLiveUsed != null ? Math.round(irpLiveUsed / 10000) : (customer?.pensionUsedManwon ?? null);
   const pensionLimitManwon = (irpLiveUsed != null && irpLiveRemaining != null)
     ? Math.round((irpLiveUsed + irpLiveRemaining) / 10000)

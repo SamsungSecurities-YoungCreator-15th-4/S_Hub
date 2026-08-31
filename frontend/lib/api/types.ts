@@ -593,7 +593,8 @@ export interface StressTaxAccountCard {
   status_label?: string | null;
   description?: string | null;
   used_capacity?: number | null;        // 원
-  remaining_capacity?: number | null;   // 원
+  remaining_capacity?: number | null;   // 원 (ISA 카드가 사용하는 키)
+  remaining_tax_credit_capacity?: number | null;  // 원 (IRP 카드가 사용하는 키 — remaining_capacity와 다름)
   [key: string]: unknown;
 }
 
