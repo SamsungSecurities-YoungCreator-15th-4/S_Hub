@@ -118,7 +118,12 @@ def test_expected_return_shift_matches_weighted_shock():
 
 
 def test_apply_return_shocks_preserves_drift_and_expands_vol():
-    """주입 공식 r' = mean + (r-mean)*vm + s/252 의 평균·분산 변화를 직접 검증."""
+    """주입 공식 r' = mean + (r-mean)*vm + s/len(구간) 의 평균·분산 변화를 직접 검증.
+
+    나누는 값은 고정 252(TRADING_DAYS)가 아니라 실제 넘겨받은 구간 길이다 —
+    period(기본 5년)로 여러 해 분량이 들어와도 충격 총량이 항상 shock 한
+    번만큼만 반영되도록 하기 위함(아래 test_shock_total_drift_independent_of_window_length 참고).
+    """
     returns = _synthetic_returns()
     selected = returns[["overseas_growth"]]
     selected_expected = _expected_returns(returns).reindex(["overseas_growth"])
@@ -130,14 +135,41 @@ def test_apply_return_shocks_preserves_drift_and_expands_vol():
     col0 = selected["overseas_growth"]
     col1 = stressed["overseas_growth"]
 
-    # 평균은 원평균 + s/252 만큼 이동
-    assert col1.mean() == pytest.approx(col0.mean() + s / TRADING_DAYS, abs=1e-12)
+    # 평균은 원평균 + s/len(구간) 만큼 이동 (여기서는 600일 구간)
+    assert col1.mean() == pytest.approx(col0.mean() + s / len(col0), abs=1e-12)
     # 표준편차는 vol_mult(|s|=0.12 → 1+2*0.12=1.24)배 확대
     assert col1.std() == pytest.approx(col0.std() * 1.24, rel=1e-9)
     # 기대수익률 시리즈에는 s 그대로 가산
     assert stressed_expected["overseas_growth"] == pytest.approx(
         selected_expected["overseas_growth"] + s, abs=1e-12
     )
+
+
+def test_shock_total_injected_drift_independent_of_window_length():
+    """자산에 주입되는 드리프트 총합(Σ(stressed-원본))이 조회 기간 길이와 무관하게
+    항상 shock 한 번이어야 한다.
+
+    회귀 테스트: shock/TRADING_DAYS(고정 252)로 나누던 예전 공식은 period가
+    길수록(5년 조회 시 약 1260거래일) 총 주입 드리프트가 shock × (구간길이/252)
+    로 부풀려졌다 — 예를 들어 5년 조회에서 "연간 -40%" 위기 충격이 누적
+    드리프트 -40%×5 ≈ -200%로 반영되어, MDD가 실제 위기보다 훨씬 크게
+    (-90%대) 나오는 원인이었다. len(column)으로 나누면 매일 shock/n씩 n일
+    누적되어 합이 정확히 shock가 되므로, 조회 기간이 몇 년이든 총 주입
+    드리프트가 항상 shock 그대로여야 한다.
+    """
+    s = -0.40
+    for n in (252, 252 * 5, 252 * 10):
+        rng = np.random.default_rng(1)
+        returns = pd.DataFrame({"domestic_equity": rng.normal(0.0004, 0.011, n)})
+        expected = returns.mean() * TRADING_DAYS
+        stressed, _ = apply_return_shocks(returns, expected, {"domestic_equity": s})
+        total_injected_drift = float(
+            (stressed["domestic_equity"] - returns["domestic_equity"]).sum()
+        )
+        assert total_injected_drift == pytest.approx(s, abs=1e-9), (
+            f"n={n}일 구간에서 총 주입 드리프트가 shock({s})와 달라짐: "
+            f"{total_injected_drift}"
+        )
 
 
 def test_derive_asset_shocks_matches_sensitivities():

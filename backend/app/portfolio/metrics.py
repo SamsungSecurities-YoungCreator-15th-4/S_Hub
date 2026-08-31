@@ -666,7 +666,28 @@ def apply_return_shocks(
     selected_expected_returns: pd.Series,
     shocks: Dict[str, float],
 ) -> Tuple[pd.DataFrame, pd.Series]:
-    """자산별 연간 충격을 일별수익률과 기대수익률에 주입한다(원본 비변형)."""
+    """자산별 연간 충격을 일별수익률과 기대수익률에 주입한다(원본 비변형).
+
+    일별 드리프트는 shock를 TRADING_DAYS(고정 252)가 아니라 실제 넘겨받은
+    구간 길이(column.count())로 나눠 만든다. request.period(기본 "5y")로 여러
+    해 분량의 수익률이 들어오는 게 실제 호출 경로라, 고정 252로 나누면
+    "연간 -40%" 같은 위기 시나리오 충격이 기간 길이에 비례해 누적되어(5년
+    조회 시 -40% 충격의 MDD가 -90%에 가깝게 나옴) 조회 기간과 무관해야 할
+    충격 총량이 조회 기간에 종속되는 버그가 있었다. column.count()로 나누면
+    조회 기간이 몇 년이든 이 자산에 주입되는 드리프트 총합이 항상 shock
+    한 번만큼만 반영된다(단순수익률 합산이라 실현 복리효과는 이보다 작다 —
+    예: shock=-0.40을 n일에 걸쳐 매일 더하면 총합은 -0.40이지만 실현
+    누적곱은 (1+shock/n)^n − 1 ≈ -32.99%이며 n에는 거의 무관하다. "총
+    주입 드리프트가 shock 한 번만큼"이라는 이 함수의 불변식은 합산 기준이지
+    복리 기준이 아니다).
+
+    len()이 아니라 count()를 쓰는 이유: mean()은 NaN을 자동으로 건너뛰는데
+    len()은 NaN도 그대로 센다. 두 스케일이 어긋나면 NaN이 섞인 구간에서
+    충격이 의도보다 과소 주입된다(예: 1000행 중 500행이 NaN이면 총 주입이
+    -0.40이 아니라 -0.20이 됨). 상류 calculate_daily_returns가 이미
+    dropna(how="any")로 NaN을 제거해 실제 경로에서는 발생하지 않지만, 이
+    함수는 portfolio_logic에서 재노출되는 공개 헬퍼라 방어적으로 맞춰둔다.
+    """
     stressed_returns = selected_returns.copy()
     stressed_expected = selected_expected_returns.copy()
     for asset in stressed_returns.columns:
@@ -674,10 +695,13 @@ def apply_return_shocks(
         if shock == 0.0:
             continue
         column = stressed_returns[asset]
+        window_length = int(column.count())
+        if window_length == 0:
+            continue
         mean = float(column.mean())
         multiplier = _vol_multiplier(shock)
         stressed_returns[asset] = (
-            mean + (column - mean) * multiplier + shock / TRADING_DAYS
+            mean + (column - mean) * multiplier + shock / window_length
         )
         if asset in stressed_expected.index:
             stressed_expected[asset] = float(stressed_expected[asset]) + shock
