@@ -12,7 +12,7 @@ import json
 import re
 from pathlib import Path
 
-from scripts import magi_vote
+from scripts.engine import magi_vote
 from engine.judge.rubric import AXIS_NAMES
 from engine.utils.hashing import sha256_of_dict
 from scripts.engine.magi_vote import (

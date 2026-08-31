@@ -46,8 +46,8 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install ruff
-      # engine/ 은 ci-engine.yml 이 담당한다(린트 규칙 이력이 달라 별도로 둔다).
-      - run: ruff check app tests scripts --exclude tests/engine --exclude scripts/engine
+      # engine 계열은 리포 루트에 있고 ci-engine.yml 이 담당한다.
+      - run: ruff check app tests scripts
 
   frontend-build:
     name: Frontend Build (next build)
