@@ -1,56 +1,54 @@
-# 통합 레포는 런타임이 셋(엔진 pip / 대시보드 백엔드 pip / 프론트 npm)이라
-# 원본 오케스트레이션의 `directory: "/"` 하나만 가져오면 대시보드가 감시 사각지대에 남는다.
-# 세 곳을 모두 등록하고, S_Hub 는 develop 없이 main 단일 브랜치이므로 target-branch 도 맞춘다.
+# pip 블록은 `directory: "/"` 하나로 둔다.
+# 실측: 이 블록이 루트 requirements.txt 와 backend/requirements.txt 를 **둘 다** 스캔한다.
+# (2026-08-31 첫 실행에서 확인 — `/backend` 블록을 따로 두었더니 같은 업데이트가 두 번 열렸다)
+#
+# target-branch 는 두지 않는다. main 이 이미 기본 브랜치라 불필요하고,
+# 이 옵션을 켜면 보안 업데이트 PR 생성 방식이 달라진다.
+#
+# 주기는 monthly 다 — 정기 버전 업데이트는 발표 준비에 방해가 되지 않을 만큼만 받는다.
+# 실제 취약점(Dependabot security update)은 이 주기와 무관하게 즉시 열리므로
+# 주기를 낮춰도 보안 커버리지는 그대로다.
+#
+# major 업그레이드는 자동으로 열지 않는다. 판단이 필요한 변경이라 사람이 시점을 고른다.
+# (첫 실행에서 openai 2→3, typescript 5→6, actions 4→7 이 한꺼번에 열렸다)
 version: 2
 updates:
-  # 엔진(심포니) — 루트 requirements.txt
+  # 파이썬 — 루트 requirements.txt(엔진) + backend/requirements.txt(대시보드)
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: "monthly"
       time: "09:00"
       timezone: "Asia/Seoul"
-    target-branch: "main"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 2
     groups:
       langstack:
         patterns:
           - "langchain*"
           - "langgraph*"
           - "langsmith"
-    # Dependabot에는 pip 프리릴리스 전역 제외 옵션이 없어 알려진 RC를 명시하고,
-    # 향후 프리릴리스 고정은 release preflight와 CI에서 차단한다.
     ignore:
+      # Dependabot에는 pip 프리릴리스 전역 제외 옵션이 없어 알려진 RC를 명시하고,
+      # 향후 프리릴리스 고정은 release preflight와 CI에서 차단한다.
       - dependency-name: "langgraph"
         versions:
           - "1.0.10rc1"
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     commit-message:
       prefix: "chore(deps)"
 
-  # 대시보드(슈퍼바이저) 백엔드 — backend/requirements.txt
-  - package-ecosystem: "pip"
-    directory: "/backend"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "09:00"
-      timezone: "Asia/Seoul"
-    target-branch: "main"
-    open-pull-requests-limit: 5
-    commit-message:
-      prefix: "chore(deps)"
-
-  # 대시보드(슈퍼바이저) 프론트 — frontend/package.json (pnpm)
+  # 대시보드 프론트 — frontend/package.json (pnpm)
   - package-ecosystem: "npm"
     directory: "/frontend"
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: "monthly"
       time: "09:00"
       timezone: "Asia/Seoul"
-    target-branch: "main"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 2
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     commit-message:
       prefix: "chore(deps)"
 
@@ -58,11 +56,12 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: "monthly"
       time: "09:00"
       timezone: "Asia/Seoul"
-    target-branch: "main"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 2
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     commit-message:
       prefix: "chore(deps)"
