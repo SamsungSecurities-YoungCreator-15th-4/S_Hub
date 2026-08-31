@@ -98,8 +98,8 @@ def test_tampered_body_hash_is_rejected():
 
 def test_runner_records_all_r1_cases_offline():
     """러너가 R1 사례 전부를 judge에 돌려 JudgeResult를 생산한다(배선 검증)."""
-    from scripts.engine.judge_runner import _load_r1_cases, record_cases
-    from tests.engine.test_judge_eval_evalset import _PassingLLM
+    from scripts.judge_runner import _load_r1_cases, record_cases
+    from tests.test_judge_eval_evalset import _PassingLLM
 
     cases = _load_r1_cases()
     assert len(cases) == 20
@@ -114,7 +114,7 @@ def test_runner_records_all_r1_cases_offline():
 
 def test_wrap_state_sets_as_of_date_from_case():
     """러너 스캐폴딩이 사례 기준일을 run_config.as_of_date로 승격한다(option A)."""
-    from scripts.engine.judge_runner import _wrap_state
+    from scripts.judge_runner import _wrap_state
 
     parsed = {
         "metrics": {"meta": {"data_period": {"end": "2026-07-24"}}},

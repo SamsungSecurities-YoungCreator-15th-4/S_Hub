@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-import scripts.engine.calibration_report as calibration_report  # noqa: E402
+import scripts.calibration_report as calibration_report  # noqa: E402
 
 from engine.judge.axes import to_ko  # noqa: E402
 from engine.judge.rubric import AXIS_NAMES  # noqa: E402

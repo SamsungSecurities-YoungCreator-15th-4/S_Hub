@@ -3,7 +3,7 @@ from pathlib import Path
 
 import yaml
 
-from scripts.engine.preflight_release import prerelease_requirement_pins
+from scripts.preflight_release import prerelease_requirement_pins
 
 ROOT = Path(__file__).resolve().parents[1]
 

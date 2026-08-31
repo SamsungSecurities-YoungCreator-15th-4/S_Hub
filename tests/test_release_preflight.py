@@ -5,7 +5,7 @@ from types import ModuleType, SimpleNamespace
 
 import pytest
 
-from scripts.engine.preflight_release import (
+from scripts.preflight_release import (
     EXPECTED_PDF_COUNTS,
     OFFLINE_ENV_KEYS,
     REQUIRED_GITIGNORE_PATTERNS,

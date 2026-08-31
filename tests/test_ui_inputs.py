@@ -20,7 +20,7 @@ def _prepared_rag_index(monkeypatch):
 
 def test_start_page_renders_before_main_inputs():
     """새 세션은 시작 화면만 보이고, 본 입력 화면은 아직 렌더링되지 않는다."""
-    app = AppTest.from_file("ui/app.py").run(timeout=20)
+    app = AppTest.from_file("console/app.py").run(timeout=20)
 
     assert not app.exception
     markdown = "\n".join(element.value for element in app.markdown)
@@ -32,7 +32,7 @@ def test_start_page_renders_before_main_inputs():
 
 
 def test_start_button_moves_to_main_inputs():
-    app = AppTest.from_file("ui/app.py").run(timeout=20)
+    app = AppTest.from_file("console/app.py").run(timeout=20)
 
     app.button(key="symphony_start").click().run(timeout=20)
 
@@ -43,7 +43,7 @@ def test_start_button_moves_to_main_inputs():
 
 
 def test_client_and_portfolio_inputs_render_without_exception():
-    app = AppTest.from_file("ui/app.py")
+    app = AppTest.from_file("console/app.py")
     app.session_state["symphony_started"] = True
 
     app.run(timeout=20)
@@ -88,7 +88,7 @@ def test_client_and_portfolio_inputs_render_without_exception():
 
 
 def test_pb_approval_hides_candidates_and_authorization_hint():
-    app = AppTest.from_file("ui/app.py")
+    app = AppTest.from_file("console/app.py")
     app.session_state["pending_state"] = {
         "ips": {"Unique": "고금리·강달러 충격"},
         "portfolio": [],
@@ -106,7 +106,7 @@ def test_pb_approval_hides_candidates_and_authorization_hint():
 
 
 def test_pb_approval_handles_malformed_conflicts_without_exposing_none():
-    app = AppTest.from_file("ui/app.py")
+    app = AppTest.from_file("console/app.py")
     app.session_state["pending_state"] = {
         "ips": {"Unique": "고금리·강달러 충격"},
         "portfolio": [],
@@ -136,7 +136,7 @@ def test_pb_approval_handles_malformed_conflicts_without_exposing_none():
 
 
 def test_pb_approval_preserves_single_conflict_dict():
-    app = AppTest.from_file("ui/app.py")
+    app = AppTest.from_file("console/app.py")
     app.session_state["pending_state"] = {
         "ips": {"Unique": "고금리·강달러 충격"},
         "portfolio": [],
@@ -162,7 +162,7 @@ def test_pb_approval_preserves_single_conflict_dict():
 
 
 def test_report_renders_four_role_based_rag_sections():
-    app = AppTest.from_file("ui/app.py")
+    app = AppTest.from_file("console/app.py")
     app.session_state["scroll_report_to_top"] = True
     app.session_state["report"] = {
         "title": "테스트 리스크 리포트",
@@ -214,7 +214,7 @@ def test_report_renders_four_role_based_rag_sections():
 
 
 def test_report_deduplicates_warnings_and_renders_stress_evidence_without_basis():
-    app = AppTest.from_file("ui/app.py")
+    app = AppTest.from_file("console/app.py")
     house_citations = [
         {
             "claim": "자산시장 참고",

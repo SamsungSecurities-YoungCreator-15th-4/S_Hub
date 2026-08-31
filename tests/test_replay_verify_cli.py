@@ -17,13 +17,13 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from scripts.engine.replay_verify import (
+from scripts.replay_verify import (
     EXIT_INPUT_ERROR,
     EXIT_MATCH,
     EXIT_MISMATCH,
     EXIT_NOTHING_TO_COMPARE,
 )
-from tests.engine.test_replay_scope import _blocked_dump, _passing_dump
+from tests.test_replay_scope import _blocked_dump, _passing_dump
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "replay_verify.py"

@@ -43,7 +43,7 @@ jobs:
       # 버전을 고정하지 않으면 ruff 신규 릴리스의 기본 룰셋 변경만으로도
       # 코드 변경 없이 CI가 실패한다. 적용 규칙은 ruff.toml에 명시한다.
       - run: pip install ruff==0.15.15
-      - run: ruff check engine tests/engine scripts/engine console
+      - run: ruff check engine tests scripts console
 
   test:
     name: Test (pytest + graph smoke)
@@ -55,6 +55,6 @@ jobs:
           python-version: "3.11"
           cache: pip
       - run: pip install -r backend/requirements.txt
-      - run: pytest tests/engine
+      - run: pytest tests
       # 외부 API 키·네트워크 없이 그래프가 완주하는지 스모크 테스트
-      - run: python scripts/engine/run_graph.py --auto-approve --offline
+      - run: python scripts/run_graph.py --auto-approve --offline

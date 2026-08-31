@@ -89,7 +89,7 @@ def test_evidence_zip_contains_complete_r4_contract_for_blocked_state():
 
 
 def test_blocked_ui_disables_pdf_but_exposes_manual_review_and_evidence_bundle():
-    app = AppTest.from_file("ui/app.py")
+    app = AppTest.from_file("console/app.py")
     app.session_state["report"] = _blocked_report()
     app.session_state["evidence_download"] = EvidenceDownload(
         filename="symphony-evidence-ui-test.zip",

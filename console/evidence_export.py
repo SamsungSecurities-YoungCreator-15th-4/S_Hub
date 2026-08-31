@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from engine.evidence.schema import BUNDLE_FILENAMES, BUNDLE_HASH_FILENAME
-from scripts.engine.make_evidence_bundle import make_bundle
+from scripts.make_evidence_bundle import make_bundle
 
 
 @dataclass(frozen=True)

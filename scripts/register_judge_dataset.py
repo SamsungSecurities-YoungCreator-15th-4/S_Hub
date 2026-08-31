@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from engine.nodes.judge_eval import judge_eval  # noqa: E402
-from tests.engine.test_judge_eval_evalset import (  # noqa: E402
+from tests.test_judge_eval_evalset import (  # noqa: E402
     ALL_CASE_IDS,
     DETERMINISTIC_CASE_IDS,
     LLM_CASE_IDS,

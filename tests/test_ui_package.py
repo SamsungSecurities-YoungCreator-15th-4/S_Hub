@@ -15,7 +15,7 @@ def test_project_ui_package_wins_over_external_package(tmp_path):
     """동명 외부 패키지가 있어도 프로젝트의 ui.rag_evidence를 가져온다."""
 
     external_root = tmp_path / "external"
-    external_ui = external_root / "ui"
+    external_ui = external_root / "console"
     external_ui.mkdir(parents=True)
     (external_ui / "__init__.py").write_text(
         'raise RuntimeError("external ui package imported")\n',
@@ -29,9 +29,9 @@ def test_project_ui_package_wins_over_external_package(tmp_path):
             sys.executable,
             "-c",
             (
-                "import ui; "
-                "from ui.rag_evidence import RAG_EVIDENCE_SECTIONS; "
-                "print(ui.__file__); "
+                "import console; "
+                "from console.rag_evidence import RAG_EVIDENCE_SECTIONS; "
+                "print(console.__file__); "
                 "assert len(RAG_EVIDENCE_SECTIONS) == 4"
             ),
         ],
@@ -43,4 +43,4 @@ def test_project_ui_package_wins_over_external_package(tmp_path):
     )
 
     assert result.returncode == 0, result.stderr
-    assert Path(result.stdout.strip()).resolve() == (ROOT / "ui" / "__init__.py").resolve()
+    assert Path(result.stdout.strip()).resolve() == (ROOT / "console" / "__init__.py").resolve()
