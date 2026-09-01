@@ -20,10 +20,10 @@ export const DEMO_SESSION_COOKIE = "s_hub_demo_session";
 /** 쿠키 값은 존재 여부만 의미가 있다 — proxy 는 값을 검사하지 않는다. */
 const DEMO_SESSION_VALUE = "1";
 
-/** 시연 중 타이핑을 없애기 위해 로그인 입력란에 미리 채워 두는 계정. */
+/** 발표 중 타이핑을 없애기 위해 로그인 입력란에 미리 채워 두는 계정. */
 export const DEMO_ACCOUNT = {
-  id: "demo@s-hub.dev",
-  password: "demo1234",
+  id: "pb.kim@samsung.com",
+  password: "pb-100482",
 } as const;
 
 /**
