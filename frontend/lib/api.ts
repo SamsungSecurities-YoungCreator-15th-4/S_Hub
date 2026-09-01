@@ -14,6 +14,14 @@ import type {
   StressScenario,
 } from "./types";
 import { getSupabase } from "./supabaseClient";
+import { IS_DEMO } from "./demo/flag";
+import {
+  DEMO_HISTORICAL_CRISES,
+  DEMO_MACRO_INDICATORS,
+  DEMO_PORTFOLIO_PROPOSALS,
+  DEMO_STRESSED_PORTFOLIOS,
+  DEMO_STRESS_SCENARIOS,
+} from "./demo/fixtures/market";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
@@ -140,21 +148,25 @@ async function getMarketJson<T>(path: string): Promise<T> {
 
 // force=true면 백엔드 5분 캐시를 무시하고 강제 재조회 (새로고침 버튼용)
 export function fetchMacroIndicators(force = false): Promise<MacroIndicators> {
+  if (IS_DEMO) return Promise.resolve(DEMO_MACRO_INDICATORS);
   return getMarketJson<MacroIndicators>(
     `/api/macro-indicators${force ? "?force=true" : ""}`,
   );
 }
 
 export function fetchPortfolios(): Promise<PortfolioProposal[]> {
+  if (IS_DEMO) return Promise.resolve(DEMO_PORTFOLIO_PROPOSALS);
   return getMarketJson<PortfolioProposal[]>("/api/portfolios");
 }
 
 export function fetchStressScenarios(): Promise<StressScenario[]> {
+  if (IS_DEMO) return Promise.resolve(DEMO_STRESS_SCENARIOS);
   return getMarketJson<StressScenario[]>("/api/stress-scenarios");
 }
 
 // 과거 주요 경제 위기(2008·2020·2022) 재현 시 포트폴리오별 예상 손실률(P&L)
 export function fetchHistoricalCrises(): Promise<HistoricalCrisis[]> {
+  if (IS_DEMO) return Promise.resolve(DEMO_HISTORICAL_CRISES);
   return getMarketJson<HistoricalCrisis[]>("/api/historical-crises");
 }
 
@@ -180,6 +192,8 @@ export function fetchStressedPortfolios(
   otherFinancialIncome = 0,
   tax: TaxAccountInputs = {},
 ): Promise<StressedPortfolio[]> {
+  if (IS_DEMO) return Promise.resolve(DEMO_STRESSED_PORTFOLIOS);
+
   const params = new URLSearchParams({
     base_rate_delta_bp: String(baseRateDeltaBp),
     krw_usd_delta: String(krwUsdDelta),

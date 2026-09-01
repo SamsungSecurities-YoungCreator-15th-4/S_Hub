@@ -9,7 +9,9 @@
  */
 
 import { ApiError, apiGet, apiPost } from "@/lib/api";
-import { type ApiResult, empty, fallback, live } from "./result";
+import { type ApiResult, demo, empty, fallback, live } from "./result";
+import { IS_DEMO } from "@/lib/demo/flag";
+import { demoClientList, demoCreatedClient } from "@/lib/demo/fixtures/api";
 
 export interface CreatedClient {
   clientId: string; // DB UUID. fallback 시엔 빈 문자열(미저장).
@@ -54,6 +56,8 @@ export async function createClient(
   name: string,
   aumEokwon: number,
 ): Promise<CreateClientResult> {
+  if (IS_DEMO) return demoCreatedClient(name, aumEokwon);
+
   try {
     const res = await apiPost<ClientCreateResponseRaw>("/clients", {
       name,
@@ -118,6 +122,9 @@ export async function saveDashboardSnapshot(
     dashboard_result: Record<string, unknown>;
   },
 ): Promise<void> {
+  // 데모 모드는 DB에 쓰지 않는다. 호출부가 fire-and-forget 이라 조용히 반환한다.
+  if (IS_DEMO) return;
+
   try {
     await apiPost<DashboardSnapshotResult>(
       `/clients/${encodeURIComponent(clientId)}/dashboard-snapshot`,
@@ -144,6 +151,9 @@ export async function getPreviousDashboard(
   clientId: string,
   opts?: { consultationId?: string },
 ): Promise<ApiResult<DashboardSnapshotResult | null>> {
+  // 복원할 이전 스냅샷이 없는 상태로 시연을 시작한다(항상 같은 첫 화면).
+  if (IS_DEMO) return demo(null);
+
   try {
     // 특정 회차 복원 시 그 회차의 스냅샷을 요청한다(백엔드: consultation_id = 그 회차).
     // current_consultation_id(현재 회차 제외)와 의미가 다르므로 파라미터명을 바꾸지 말 것.
@@ -167,6 +177,8 @@ export async function getPreviousDashboard(
 }
 
 export async function listClients(): Promise<ApiResult<ListedClient[]>> {
+  if (IS_DEMO) return demo(demoClientList());
+
   try {
     const res = await apiGet<ClientListResponseRaw>("/clients");
     return live(

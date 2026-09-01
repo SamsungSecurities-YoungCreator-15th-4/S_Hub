@@ -1,10 +1,11 @@
-import { Inbox, Wifi } from "lucide-react";
+import { Inbox, MonitorPlay, Wifi } from "lucide-react";
 import type { DataSource } from "@/lib/api";
 
 /**
  * 데이터 출처 배지 — 화면 값이 실데이터인지 데모(폴백)인지 명시한다.
  * 우리 거버넌스: 폴백 값을 실데이터인 척 보여주지 않는다.
  *  - live    : 실데이터(보통 배지 생략)
+ *  - demo    : 시연 모드 고정 데이터 — 선택한 것이므로 사고(fallback)와 구분해 표시한다
  *  - empty   : 정상 빈결과(데이터 없음)
  *  - fallback: 호출 실패 → 데모 데이터 표시 중 ⚠️
  */
@@ -19,12 +20,19 @@ export default function DataSourceBadge({
 }) {
   if (source === "live" || source === "fallback") return null;
 
-  // source === "fallback"은 위에서 null 반환 → 여기서는 "empty"만 도달
-  const { Icon, label, cls } = {
-    Icon: Inbox,
-    label: "데이터 없음",
-    cls: "border-muted-foreground/15 bg-muted/30 text-muted-foreground/60",
-  };
+  // 위에서 live·fallback 은 null → 여기 도달하는 값은 "demo" 와 "empty" 둘뿐이다.
+  const { Icon, label, cls } =
+    source === "demo"
+      ? {
+          Icon: MonitorPlay,
+          label: "시연 고정 데이터",
+          cls: "border-sky-200 bg-sky-50 text-sky-700",
+        }
+      : {
+          Icon: Inbox,
+          label: "데이터 없음",
+          cls: "border-muted-foreground/15 bg-muted/30 text-muted-foreground/60",
+        };
 
   return (
     <span

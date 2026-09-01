@@ -17,6 +17,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import DataSourceBadge from "@/components/common/DataSourceBadge";
+import { isTrusted } from "@/lib/api/result";
 import StressTestSection from "@/components/right-panel/StressTestSection";
 import CurrentPortfolioInput from "@/components/sidebar/CurrentPortfolioInput";
 import SttRecordingModal from "@/components/sidebar/SttRecordingModal";
@@ -169,7 +170,7 @@ export default function Sidebar() {
       // DB 스냅샷 복원 시도: clientId가 있는 고객만 (신규 미저장 고객 제외)
       if (customer.clientId) {
         const dashRes = await getPreviousDashboard(customer.clientId);
-        if (dashRes.source === "live" && dashRes.data) {
+        if (isTrusted(dashRes.source) && dashRes.data) {
           const dr = dashRes.data
             .dashboard_result as unknown as PortfolioCalcData;
           if (dr.portfolios?.length) {
@@ -190,7 +191,7 @@ export default function Sidebar() {
                 useDashboardStore.getState().selectedCustomerId !== customer.id
               )
                 return;
-              if (detail.source === "live") {
+              if (isTrusted(detail.source)) {
                 setConsultationId(detail.data.consultationId);
                 if (Object.keys(detail.data.ips).length > 0)
                   setIps(detail.data.ips);
@@ -236,7 +237,7 @@ export default function Sidebar() {
     let cancelled = false;
     async function hydrateClients() {
       const result = await listClients();
-      if (cancelled || result.source !== "live" || result.data.length === 0) {
+      if (cancelled || !isTrusted(result.source) || result.data.length === 0) {
         return;
       }
       setCustomers(result.data.map(toDashboardCustomer));
@@ -312,7 +313,7 @@ export default function Sidebar() {
         setTaxOptimizer(result.data.taxOptimizer);
         // 첫 라이브 분석 결과를 스냅샷으로 저장 (백엔드가 consultation_id 기준
         // first-write-wins로 중복 방지 → 회차당 첫 분석만 보존됨).
-        if (customer.clientId && consultationId && result.source === "live") {
+        if (customer.clientId && consultationId && isTrusted(result.source)) {
           void saveDashboardSnapshot(customer.clientId, {
             consultation_id: consultationId,
             calculation_session_id: result.data.calculationSessionId,
@@ -399,7 +400,7 @@ export default function Sidebar() {
     setConsultationId(res.data.consultationId);
     // 추출된 IPS 값만 조율기에 반영(없는 값은 기존 유지).
     if (Object.keys(res.data.ips).length > 0) setIps(res.data.ips);
-    if (res.source === "live") {
+    if (isTrusted(res.source)) {
       setSttStatus("done");
       clearCustomerNew(customer.id); // 상담 확보 → 더 이상 신규(빈) 상태 아님
     } else {
@@ -419,7 +420,7 @@ export default function Sidebar() {
     setHistoryLoading(true);
     const res = await listConsultations(customer.clientId);
     setPastList(res.data);
-    if (res.source !== "live")
+    if (!isTrusted(res.source))
       setHistoryError(res.note ?? "불러오지 못했습니다.");
     setHistoryLoading(false);
   };
@@ -434,7 +435,7 @@ export default function Sidebar() {
       setLoadingId(null);
       return;
     }
-    if (res.source === "live") {
+    if (isTrusted(res.source)) {
       setTranscript(res.data.transcript, "live");
       setConsultationId(res.data.consultationId);
       clearCustomerNew(customer.id); // 과거 상담 확보 → 더 이상 신규(빈) 상태 아님
@@ -443,7 +444,7 @@ export default function Sidebar() {
       const dashRes = await getPreviousDashboard(customer.clientId, {
         consultationId,
       });
-      if (dashRes.source === "live" && dashRes.data) {
+      if (isTrusted(dashRes.source) && dashRes.data) {
         const dr = dashRes.data
           .dashboard_result as unknown as PortfolioCalcData;
         if (dr.portfolios?.length) {

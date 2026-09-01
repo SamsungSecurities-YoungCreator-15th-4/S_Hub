@@ -8,6 +8,7 @@ import type {
   TranscriptItem,
 } from "@/lib/api/types";
 import type { IpsPatch } from "@/lib/api/stt";
+import { IS_DEMO } from "@/lib/demo/flag";
 
 export type SttRealtimeStatus =
   | "idle"
@@ -122,6 +123,16 @@ export function useSttRealtime() {
       setStatus("connecting");
       setErrorMsg(null);
       isActiveRef.current = true;
+
+      // 실시간 녹음은 백엔드 WebSocket + Supabase 세션이 둘 다 필요해 데모 모드에서
+      // 성립하지 않는다. getSupabase() 가 던지기 전에 여기서 안내하고 끊는다.
+      // (시연은 파일 업로드 경로를 쓴다 — 그쪽은 고정 상담으로 분기돼 있다.)
+      if (IS_DEMO) {
+        setErrorMsg("시연 모드에서는 실시간 녹음을 사용할 수 없습니다. 파일 업로드를 이용해 주세요.");
+        setStatus("error");
+        isActiveRef.current = false;
+        return;
+      }
 
       try {
         // 1) 로그인 세션 확인 — 토큰이 없으면 백엔드 WS 가 즉시 1008 로 끊으므로,

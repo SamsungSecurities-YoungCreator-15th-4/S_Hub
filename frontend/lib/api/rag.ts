@@ -7,9 +7,10 @@
  */
 
 import { ApiError, apiPost } from "@/lib/api";
-import { INSIGHT } from "@/lib/mockData";
+import { IS_DEMO } from "@/lib/demo/flag";
+import { demoInsight } from "@/lib/demo/fixtures/api";
 import { NIL_UUID } from "./constants";
-import { type ApiResult, empty, fallback, live } from "./result";
+import { type ApiResult, demo, empty, fallback, live } from "./result";
 import type { RagInsightRequest, RagInsightResponse } from "./types";
 
 export interface InsightCitation {
@@ -31,11 +32,7 @@ export interface InsightData {
 
 /** mock INSIGHT → UI 데이터(폴백 표시용). */
 function mockInsight(): InsightData {
-  return {
-    answer: INSIGHT.defaultAnswer,
-    summary: INSIGHT.defaultAnswer.split("\n\n")[0] ?? INSIGHT.defaultAnswer,
-    citations: INSIGHT.sources.map((s) => ({ title: s.title, date: s.date })),
-  };
+  return demoInsight();
 }
 
 function mapResponse(res: RagInsightResponse): InsightData {
@@ -74,6 +71,8 @@ export async function fetchRagInsight(
   query: string,
   options: FetchInsightOptions = {},
 ): Promise<ApiResult<InsightData>> {
+  if (IS_DEMO) return demo({ ...demoInsight(), question: query });
+
   const body: RagInsightRequest = {
     // consultation_id 는 백엔드 필수(UUID)이나 존재검증은 라우터 TODO 상태.
     // STT 로 확보한 실 consultation_id 가 있으면 그것을, 없으면 placeholder 를 보낸다.

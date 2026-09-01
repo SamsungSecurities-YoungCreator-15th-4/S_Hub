@@ -13,7 +13,9 @@
 import { ApiError, apiPost } from "@/lib/api";
 import { TAX_EFFECT } from "@/lib/mockData";
 import { NIL_UUID } from "./constants";
-import { type ApiResult, fallback, live } from "./result";
+import { type ApiResult, demo, fallback, live } from "./result";
+import { IS_DEMO } from "@/lib/demo/flag";
+import { demoTaxSummary } from "@/lib/demo/fixtures/api";
 import type {
   TaxCalculationResult,
   TaxInsightRequest,
@@ -73,6 +75,9 @@ export async function fetchTaxInsight(
   taxResult: TaxCalculationResult,
   consultationId?: string,
 ): Promise<ApiResult<TaxInsightData>> {
+  if (IS_DEMO)
+    return demo(demoTaxSummary(taxResult.portfolio_name ?? "선택 포트폴리오"));
+
   const body: TaxInsightRequest = {
     consultation_id: consultationId || NIL_UUID,
     tax_result: taxResult,

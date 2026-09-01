@@ -9,12 +9,10 @@
  */
 
 import { ApiError, apiPostForm } from "@/lib/api";
-import {
-  type ConsultMessage,
-  CONSULT_LOG,
-  IPS_DEFAULT,
-} from "@/lib/mockData";
-import { type ApiResult, fallback, live } from "./result";
+import { type ConsultMessage } from "@/lib/mockData";
+import { type ApiResult, demo, fallback, live } from "./result";
+import { IS_DEMO } from "@/lib/demo/flag";
+import { demoConsultation } from "@/lib/demo/fixtures/api";
 import type { ConsultationResponse, IpsJson, TranscriptItem } from "./types";
 
 /**
@@ -95,28 +93,16 @@ export function mapIps(ips: IpsJson | null | undefined): IpsPatch {
 }
 
 function mockConsultation(): SttConsultationData {
-  return {
-    consultationId: "",
-    transcript: CONSULT_LOG,
-    ips: {
-      goal: IPS_DEFAULT.goal,
-      returnPct: IPS_DEFAULT.returnPct,
-      risk: IPS_DEFAULT.risk,
-      timeYears: IPS_DEFAULT.timeYears,
-      tax: IPS_DEFAULT.tax,
-      liquidity: IPS_DEFAULT.liquidity,
-      legal: IPS_DEFAULT.legal,
-      unique: IPS_DEFAULT.unique,
-    },
-    transcriptTitle: "데모 상담 기록",
-    consultationDate: "",
-  };
+  return demoConsultation();
 }
+
 
 export async function uploadSttConsultation(
   clientId: string,
   file: File,
 ): Promise<ApiResult<SttConsultationData>> {
+  if (IS_DEMO) return demo(demoConsultation());
+
   const form = new FormData();
   form.append("client_id", clientId);
   form.append("audio_file", file);
