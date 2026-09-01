@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 import { getSupabase } from "@/lib/supabaseClient";
+import { IS_DEMO } from "@/lib/demo/flag";
 
 function FloatInput({
   id,
@@ -68,6 +69,16 @@ export default function LoginPage() {
     e.preventDefault();
     setError(null);
     setSubmitting(true);
+
+    // 데모 모드: Supabase 를 부르지 않고 그대로 통과시킨다.
+    // getSupabase() 는 env 가 없으면 throw 하는데 이 핸들러에는 try/catch 가 없어,
+    // 그냥 두면 setSubmitting(false) 가 실행되지 않아 버튼이 영영 잠긴다.
+    if (IS_DEMO) {
+      setSubmitting(false);
+      router.push("/");
+      return;
+    }
+
     // ID 입력란을 이메일로 사용한다(Supabase Auth 는 이메일+비밀번호).
     const { error: signInError } = await getSupabase().auth.signInWithPassword({
       email: id.trim(),
