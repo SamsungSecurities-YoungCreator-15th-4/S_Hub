@@ -139,6 +139,27 @@ def test_schedule_is_not_noisy():
     assert not noisy, f"알림이 잦은 블록: {noisy}"
 
 
+def test_version_updates_are_paused_until_the_demo():
+    """9/11 발표까지 정기 버전 업데이트 일시정지 (limit 0).
+
+    monthly + limit 2 로도 멈추지 않았다. Dependabot 은 주기뿐 아니라
+    **매니페스트가 바뀔 때마다** 다시 돌고, 닫거나 머지한 PR 만큼 슬롯이 비면
+    곧바로 다음 것을 연다. 밀린 구버전이 많아 되먹임이 계속됐다(하루 27건).
+
+    limit 0 은 정기 버전 업데이트만 끈다 — 실제 취약점은 레포 설정의
+    security update 가 담당하므로 보안 커버리지는 그대로다.
+
+    발표 후 이 테스트와 함께 limit 을 2 로 되돌린다.
+    """
+    running = [
+        (update["package-ecosystem"], update["directory"], update["open-pull-requests-limit"])
+        for update in _config()["updates"]
+        if update["open-pull-requests-limit"] != 0
+    ]
+
+    assert not running, f"일시정지가 풀린 블록: {running}"
+
+
 def test_langstack_is_frozen_until_after_the_demo():
     """LangStack 동결 — 발표 후 실호출 대조와 함께 풀 것.
 
