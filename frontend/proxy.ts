@@ -15,6 +15,7 @@
  */
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { IS_DEMO } from "@/lib/demo/flag";
 
 // 인증 없이 접근 가능한 공개 경로(로그인 화면). 무한 리다이렉트 방지에도 쓴다.
 const PUBLIC_PATHS = ["/login"];
@@ -43,6 +44,14 @@ function redirectTo(
 
 export async function proxy(request: NextRequest): Promise<NextResponse> {
   const { pathname } = request.nextUrl;
+
+  // 데모 모드: 라우트 보호를 통째로 끈다.
+  //
+  // 아래 fail-closed 분기가 시연을 정면으로 막는다 — Supabase env 가 없으면
+  // /login 을 뺀 모든 경로가 리다이렉트되므로, 클라이언트의 AuthGuard 는
+  // 실행될 기회조차 없다. 미들웨어는 서버(엣지)에서 먼저 돌기 때문이다.
+  // 데모 배포에는 Supabase 키를 넣지 않으므로 여기서 먼저 빠져나가야 한다.
+  if (IS_DEMO) return NextResponse.next({ request });
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
