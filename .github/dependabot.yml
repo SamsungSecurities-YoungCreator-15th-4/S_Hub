@@ -5,6 +5,22 @@
 # target-branch 는 두지 않는다. main 이 이미 기본 브랜치라 불필요하고,
 # 이 옵션을 켜면 보안 업데이트 PR 생성 방식이 달라진다.
 #
+# ⏸️ 2026-09-01 ~ 9/11 발표까지 정기 버전 업데이트를 일시정지한다
+#    (open-pull-requests-limit: 0).
+#
+#    왜 monthly + limit 2 로도 안 멈췄나 —
+#    Dependabot 은 주기뿐 아니라 **매니페스트가 바뀔 때마다** 다시 돈다.
+#    의존성 PR 을 머지하면 requirements.txt / package.json 이 바뀌므로 재실행되고,
+#    동시에 닫거나 머지한 PR 만큼 슬롯이 비어 곧바로 다음 것들을 연다.
+#    밀린 구버전이 많아 이 되먹임이 계속됐다(하루 만에 27건).
+#
+#    limit 0 은 정기 버전 업데이트만 끈다. **실제 취약점(Dependabot security
+#    update)은 이 설정과 무관하게 계속 열린다** — 레포 설정의
+#    dependabot_security_updates 가 담당하며 dependabot.yml 을 보지 않는다.
+#    즉 보안 커버리지는 그대로다.
+#
+#    발표 후 아래 limit 을 2 로 되돌린다.
+#
 # 주기는 monthly 다 — 정기 버전 업데이트는 발표 준비에 방해가 되지 않을 만큼만 받는다.
 # 실제 취약점(Dependabot security update)은 이 주기와 무관하게 즉시 열리므로
 # 주기를 낮춰도 보안 커버리지는 그대로다.
@@ -20,7 +36,7 @@ updates:
       interval: "monthly"
       time: "09:00"
       timezone: "Asia/Seoul"
-    open-pull-requests-limit: 2
+    open-pull-requests-limit: 0
     groups:
       langstack:
         patterns:
@@ -54,7 +70,7 @@ updates:
       interval: "monthly"
       time: "09:00"
       timezone: "Asia/Seoul"
-    open-pull-requests-limit: 2
+    open-pull-requests-limit: 0
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
@@ -68,7 +84,7 @@ updates:
       interval: "monthly"
       time: "09:00"
       timezone: "Asia/Seoul"
-    open-pull-requests-limit: 2
+    open-pull-requests-limit: 0
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
