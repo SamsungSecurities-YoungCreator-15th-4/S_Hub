@@ -2,7 +2,7 @@
 fastapi==0.141.1
 uvicorn[standard]==0.52.4
 python-multipart==0.0.32
-yfinance==1.4.1
+yfinance==1.7.0
 pandas==3.0.5
 numpy==2.4.6
 python-dotenv==1.2.2
