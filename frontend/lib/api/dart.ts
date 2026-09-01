@@ -8,7 +8,9 @@
  */
 
 import { ApiError, apiPost } from "@/lib/api";
-import { type ApiResult, empty, live } from "./result";
+import { type ApiResult, demo, empty, live } from "./result";
+import { IS_DEMO } from "@/lib/demo/flag";
+import { demoInsight } from "@/lib/demo/fixtures/api";
 import type { InsightCitation, InsightData } from "./rag";
 import type { DartInsightRequest, DartInsightResponse } from "./types";
 
@@ -129,6 +131,8 @@ function mapResponse(res: DartInsightResponse): InsightData {
 export async function fetchDartInsight(
   corpName: string,
 ): Promise<ApiResult<InsightData>> {
+  if (IS_DEMO) return demo({ ...demoInsight(), question: corpName });
+
   const name = corpName.trim();
   if (!name) {
     return empty<InsightData>(

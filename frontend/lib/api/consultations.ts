@@ -7,7 +7,9 @@
  */
 
 import { ApiError, apiGet } from "@/lib/api";
-import { type ApiResult, empty, live } from "./result";
+import { type ApiResult, demo, empty, live } from "./result";
+import { IS_DEMO } from "@/lib/demo/flag";
+import { demoConsultation, demoConsultationList } from "@/lib/demo/fixtures/api";
 import {
   type IpsPatch,
   type SttConsultationData,
@@ -32,6 +34,8 @@ export interface ConsultationSummaryItem {
 export async function listConsultations(
   clientId: string,
 ): Promise<ApiResult<ConsultationSummaryItem[]>> {
+  if (IS_DEMO) return demo(demoConsultationList());
+
   try {
     const res = await apiGet<ConsultationListResponse>(
       `/consultations?client_id=${encodeURIComponent(clientId)}`,
@@ -56,6 +60,8 @@ export async function loadConsultationDetail(
   clientId: string,
   consultationId: string,
 ): Promise<ApiResult<SttConsultationData>> {
+  if (IS_DEMO) return demo(demoConsultation());
+
   const params = new URLSearchParams({
     client_id: clientId,
     consultation_id: consultationId,

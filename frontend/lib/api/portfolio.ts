@@ -8,7 +8,13 @@
 import { ApiError, apiPost } from "@/lib/api";
 import { PORTFOLIOS, type BacktestPoint, type Portfolio, type PortfolioMetrics } from "@/lib/mockData";
 import { CALC_UNITS, type CalcUnitWeights, type CurrentWeightsInput } from "@/lib/assetMapping";
-import { type ApiResult, fallback, live } from "./result";
+import { type ApiResult, demo, fallback, live } from "./result";
+import { IS_DEMO } from "@/lib/demo/flag";
+import {
+  demoPortfolioCalc,
+  demoStressMetrics,
+  demoStressTestPortfolios,
+} from "@/lib/demo/fixtures/api";
 import type { CorrelationHeatmapResponse, PortfolioTaxResponse, StressTaxData, StressTaxGauge, TaxWaterfallResponse } from "./types";
 
 // ── 백엔드 응답 타입 ───────────────────────────────────────────
@@ -289,6 +295,8 @@ function extractPortfolioTax(
 export async function fetchPortfolioCalculate(
   opts: PortfolioCalcOptions,
 ): Promise<ApiResult<PortfolioCalcData>> {
+  if (IS_DEMO) return demo(demoPortfolioCalc());
+
   const body = {
     client_id: opts.clientId ?? null,
     consultation_id: opts.consultationId ?? null,
@@ -448,6 +456,8 @@ export async function fetchStressMetrics(
   opts: StressMetricsOptions,
   currentPortfolios: Portfolio[],
 ): Promise<StressMetricsResult> {
+  if (IS_DEMO) return demoStressMetrics(currentPortfolios);
+
   const scenarioKey =
     opts.stressPreset === "crisis"
       ? ("crisis_2008" as const)
@@ -557,6 +567,8 @@ export async function fetchStressMetrics(
 export async function fetchPortfolioStressTest(
   opts: PortfolioCalcOptions,
 ): Promise<Portfolio[]> {
+  if (IS_DEMO) return demoStressTestPortfolios();
+
   const body = {
     client_id: opts.clientId ?? null,
     consultation_id: opts.consultationId ?? null,
