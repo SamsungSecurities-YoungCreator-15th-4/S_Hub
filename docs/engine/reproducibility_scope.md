@@ -147,6 +147,42 @@
 
 측정 조건: `--auto-approve --offline --force-judge-fail 3`, `as_of_date=2026-07-03`, `policy_version=2026-08-01.v1`, `computation_hash=41c27a5c…3b120b08`, `failed_axes=["forced_failure"]`.
 
+### 4.3 통합 레포 머지 이후 재확인 (2026-09-01, 커밋 `b7286fe`)
+
+pydantic 2.13.5·yfinance 1.7.0 머지 이후 §4.2의 기준선이 유지되는지 확인한 기록이다.
+**결론부터: §4.2의 기준선 `dd776bff…`는 유지된다.** 아래 측정에서 나온 다른 값은
+기준선을 대체하지 않는다 — 측정 환경이 §4.2와 다르기 때문이다.
+
+측정 환경: Python 3.10.21(CI와 동일한 마이너), 루트 `requirements.txt` 핀 그대로
+(pydantic 2.13.5 · numpy 2.2.6 · scipy 1.15.3 · yfinance 1.7.0 · langgraph 1.2.10).
+조건은 §4.2와 같다 — `--auto-approve --offline --force-judge-fail 3`,
+`as_of_date=2026-07-03`, `policy_version=2026-08-01.v1`. 3회 반복했다.
+
+| 대상 | §4.2 (2026-08-02) | 이번 측정 (3회) |
+| --- | --- | --- |
+| `computation_hash` | `41c27a5c…3b120b08` | **동일** (`41c27a5c…3b120b08`) |
+| `trace_id` (추적 off) | `run-89c73320a15a` | **동일** |
+| `decision_hash` | `dd776bff…c675227` | 3회 모두 `b9572518…c5d696f6` (상이) |
+| `failed_axes` | `["forced_failure"]` | 5건 (아래 참조) |
+
+**머지가 깨뜨린 것은 없다.** 머지가 건드릴 수 있었던 결정론 수치 계층은
+`computation_hash`가 §4.2와 **바이트 단위로 같다**. `decision_hash`도 3회 실행에서
+전부 일치해 결정론 자체는 유지된다.
+
+**값이 갈린 이유는 해시 입력인 `failed_axes`가 달라서다.** §2.1이 밝힌 대로
+`decision_hash`는 `failed_axes`가 바뀌면 의도적으로 달라진다. 이번 측정기는
+Azure OpenAI 키도, 로컬 RAG 코퍼스·인덱스도 없는 환경이라 4축이 추가로 실패했다.
+
+| 추가 실패 축 | judge가 남긴 사유 | 원인 |
+| --- | --- | --- |
+| `false_precision` · `hallucination` | "판정을 위한 LLM Judge를 구성하지 못했습니다" | Azure OpenAI 키 없음 |
+| `source_validity` · `verified_citations_present` | "strict citation gate에서 검증 통과 인용이 0건입니다" | 로컬 코퍼스·Chroma 인덱스 없음 (`corpus/**/*.pdf`는 저작권상 gitignore) |
+
+즉 `b9572518…`은 **"키도 코퍼스도 없는 환경"이라는 다른 조건의 관측값**이며,
+§4.2 기준선의 재현 실패가 아니다. 기준선을 갱신하려면 §4.2와 같은 환경
+(Azure 키 + 로컬 코퍼스 인덱스)에서 `failed_axes=["forced_failure"]`가 재현되는
+상태로 다시 측정해야 한다. **그 재측정은 아직 하지 않았다.**
+
 ---
 
 ## 5. 변동 원인 — 3단계로 좁힘
