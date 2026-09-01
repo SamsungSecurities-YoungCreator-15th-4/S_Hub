@@ -137,3 +137,20 @@ def test_schedule_is_not_noisy():
     ]
 
     assert not noisy, f"알림이 잦은 블록: {noisy}"
+
+
+def test_langstack_is_frozen_until_after_the_demo():
+    """LangStack 동결 — 발표 후 실호출 대조와 함께 풀 것.
+
+    이 4개는 IPS 추출·RAG 인용·Judge 를 전부 지나가는데, CI 의 그래프 스모크는
+    `--offline` 이라 LLM 실호출 경로를 검증하지 못한다. CI 초록이 안전을 뜻하지
+    않는 유일한 묶음이라, PR 을 닫는 것만으로는 부족하고 설정으로 막아야 한다.
+    """
+    ignored = {
+        rule["dependency-name"]
+        for rule in _pip_update_config()["ignore"]
+    }
+
+    assert {"langchain*", "langgraph*", "langsmith"} <= ignored, (
+        f"LangStack 동결이 풀렸습니다. 남은 ignore: {sorted(ignored)}"
+    )

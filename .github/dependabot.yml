@@ -33,6 +33,15 @@ updates:
       - dependency-name: "langgraph"
         versions:
           - "1.0.10rc1"
+      # LangStack 동결 (9/11 발표까지).
+      # 이 4개는 IPS 추출·RAG 인용·Judge 세 노드를 전부 지나간다. 그런데 CI 의
+      # 그래프 스모크는 `--offline` 이라 LLM 실호출 경로를 검증하지 못한다.
+      # 즉 CI 초록이 "안전하다"를 뜻하지 않는 유일한 묶음이다.
+      # PR 을 닫기만 하면 Dependabot 이 다음 주기에 같은 것을 다시 연다.
+      # 발표 후 실호출 대조와 함께 올릴 때 이 블록을 지운다.
+      - dependency-name: "langchain*"
+      - dependency-name: "langgraph*"
+      - dependency-name: "langsmith"
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
     commit-message:
