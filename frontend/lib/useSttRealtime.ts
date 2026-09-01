@@ -128,7 +128,7 @@ export function useSttRealtime() {
       // 성립하지 않는다. getSupabase() 가 던지기 전에 여기서 안내하고 끊는다.
       // (시연은 파일 업로드 경로를 쓴다 — 그쪽은 고정 상담으로 분기돼 있다.)
       if (IS_DEMO) {
-        setErrorMsg("시연 모드에서는 실시간 녹음을 사용할 수 없습니다. 파일 업로드를 이용해 주세요.");
+        setErrorMsg("실시간 녹음을 사용할 수 없습니다. 파일 업로드를 이용해 주세요.");
         setStatus("error");
         isActiveRef.current = false;
         return;

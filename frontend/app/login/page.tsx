@@ -107,12 +107,6 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-          {IS_DEMO && (
-            <p className="text-center text-[13px] font-medium text-symphony-text-muted">
-              시연 모드입니다. 아무 값이나 입력하면 진입합니다.
-            </p>
-          )}
-
           <FloatInput id="pb-id" label="ID" value={id} onChange={setId} />
 
           <FloatInput

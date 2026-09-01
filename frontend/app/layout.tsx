@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import DemoBanner from "@/components/common/DemoBanner";
 
 export const metadata: Metadata = {
   title: "S.upervisor",
@@ -22,7 +21,6 @@ export default function RootLayout({
       </head>
       <body className="min-h-full flex flex-col">
         {children}
-        <DemoBanner />
       </body>
     </html>
   );

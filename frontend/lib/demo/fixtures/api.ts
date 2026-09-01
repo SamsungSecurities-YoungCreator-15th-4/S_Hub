@@ -42,7 +42,7 @@ export function demoConsultation(): SttConsultationData {
       legal: IPS_DEFAULT.legal,
       unique: IPS_DEFAULT.unique,
     },
-    transcriptTitle: "데모 상담 기록",
+    transcriptTitle: "상담 기록",
     consultationDate: "",
   };
 }
@@ -63,7 +63,6 @@ export function demoTaxSummary(portfolioName: string): TaxInsightData {
       `[절세 요약 · ${portfolioName}]`,
       `- 전략 적용 시 연간 약 ${TAX_EFFECT.annualSavingManwon.toLocaleString()}만원의 세금 절감이 추정됩니다.`,
       `- 세후수익률(추정): ${TAX_EFFECT.afterTaxReturn.from} → ${TAX_EFFECT.afterTaxReturn.to}`,
-      "※ 시연 고정 데이터입니다.",
     ].join("\n"),
   };
 }
