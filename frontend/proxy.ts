@@ -10,12 +10,17 @@
  *   - AuthGuard(클라이언트): 런타임 세션 변화(다른 탭 로그아웃 등) 반영
  * Next 문서 권고대로 proxy 는 'optimistic check' 이며 단독 인증수단이 아니다.
  *
+ * 데모 모드도 같은 관문 구조를 쓰되 세션을 Supabase 가 아니라 데모 쿠키로 읽는다.
+ * 미들웨어는 엣지(서버)에서 돌아 sessionStorage·localStorage 를 볼 수 없으므로,
+ * 데모 로그인 여부는 쿠키로만 표현할 수 있다(`lib/demo/session.ts`).
+ *
  * 참고: @supabase/ssr Next.js 서버 클라이언트 패턴(createServerClient + cookies)
  *       frontend/node_modules/next/dist/docs/01-app/.../proxy.md
  */
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { IS_DEMO } from "@/lib/demo/flag";
+import { DEMO_SESSION_COOKIE } from "@/lib/demo/session";
 
 // 인증 없이 접근 가능한 공개 경로(로그인 화면). 무한 리다이렉트 방지에도 쓴다.
 const PUBLIC_PATHS = ["/login"];
@@ -45,13 +50,26 @@ function redirectTo(
 export async function proxy(request: NextRequest): Promise<NextResponse> {
   const { pathname } = request.nextUrl;
 
-  // 데모 모드: 라우트 보호를 통째로 끈다.
+  // 데모 모드: Supabase 대신 데모 쿠키로 같은 관문을 세운다.
   //
-  // 아래 fail-closed 분기가 시연을 정면으로 막는다 — Supabase env 가 없으면
-  // /login 을 뺀 모든 경로가 리다이렉트되므로, 클라이언트의 AuthGuard 는
-  // 실행될 기회조차 없다. 미들웨어는 서버(엣지)에서 먼저 돌기 때문이다.
-  // 데모 배포에는 Supabase 키를 넣지 않으므로 여기서 먼저 빠져나가야 한다.
-  if (IS_DEMO) return NextResponse.next({ request });
+  // 아래 fail-closed 분기와 Supabase 분기는 시연을 정면으로 막는다 — 데모 배포에는
+  // Supabase 키를 넣지 않으므로 /login 을 뺀 모든 경로가 리다이렉트되고, 클라이언트의
+  // AuthGuard 는 실행될 기회조차 없다(미들웨어가 서버에서 먼저 돈다).
+  // 그래서 여기서 먼저 빠져나가되, 관문 자체를 없애지는 않는다 — 로그인 화면은
+  // 브랜딩이자 시연의 첫 장면이라 반드시 거쳐야 하기 때문이다.
+  if (IS_DEMO) {
+    const hasDemoSession = request.cookies.has(DEMO_SESSION_COOKIE);
+
+    // 미로그인 + 보호 경로 → 로그인으로. 시연은 항상 첫 장면부터 시작한다.
+    if (!hasDemoSession && !isPublic(pathname)) {
+      return redirectTo(request, "/login");
+    }
+    // 로그인됨 + 로그인 화면 → 홈으로(Supabase 경로와 같은 동작).
+    if (hasDemoSession && isPublic(pathname)) {
+      return redirectTo(request, "/");
+    }
+    return NextResponse.next({ request });
+  }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;

@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getSupabase } from "@/lib/supabaseClient";
+import { IS_DEMO } from "@/lib/demo/flag";
+import { clearDemoSession } from "@/lib/demo/session";
 
 /**
  * 로그아웃 버튼(아이콘 전용·원형).
@@ -17,6 +19,9 @@ import { getSupabase } from "@/lib/supabaseClient";
  *
  * 실수 클릭 방지를 위해 헤더 맨 우측에 두고, 흰 배경·파란(brand) 아이콘으로
  * 비중요 액션임을 드러낸다. 글자는 빼고 호버 툴팁으로 의미를 안내한다.
+ *
+ * 데모 모드에서는 Supabase 세션이 없으므로 데모 쿠키를 지우는 것이 곧 로그아웃이다.
+ * 쿠키가 사라지면 proxy 가 다시 /login 으로 막아, 리허설을 첫 장면부터 다시 시작할 수 있다.
  */
 export default function LogoutButton() {
   const router = useRouter();
@@ -24,6 +29,15 @@ export default function LogoutButton() {
 
   async function handleLogout() {
     setLoading(true);
+
+    // 데모 모드: 데모 세션 쿠키만 지운다. getSupabase() 는 Supabase env 가 없는
+    // 시연 배포에서 throw 하므로 아예 호출하지 않는다.
+    if (IS_DEMO) {
+      clearDemoSession();
+      router.replace("/login");
+      return;
+    }
+
     try {
       // Supabase signOut은 예외 대신 { error }를 반환할 수 있다 — 디버깅용으로 기록.
       const { error } = await getSupabase().auth.signOut();

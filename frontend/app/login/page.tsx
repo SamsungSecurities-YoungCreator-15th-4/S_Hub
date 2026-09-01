@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 import { getSupabase } from "@/lib/supabaseClient";
 import { IS_DEMO } from "@/lib/demo/flag";
+import { DEMO_ACCOUNT, startDemoSession } from "@/lib/demo/session";
 
 function FloatInput({
   id,
@@ -59,8 +60,9 @@ function FloatInput({
 
 export default function LoginPage() {
   const router = useRouter();
-  const [id, setId] = useState("");
-  const [password, setPassword] = useState("");
+  // 데모는 입력란을 미리 채워 둔다 — 발표 중 타이핑은 실패 지점이 된다.
+  const [id, setId] = useState(IS_DEMO ? DEMO_ACCOUNT.id : "");
+  const [password, setPassword] = useState(IS_DEMO ? DEMO_ACCOUNT.password : "");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -70,10 +72,12 @@ export default function LoginPage() {
     setError(null);
     setSubmitting(true);
 
-    // 데모 모드: Supabase 를 부르지 않고 그대로 통과시킨다.
+    // 데모 모드: Supabase 를 부르지 않고 데모 세션 쿠키만 심고 통과시킨다.
     // getSupabase() 는 env 가 없으면 throw 하는데 이 핸들러에는 try/catch 가 없어,
     // 그냥 두면 setSubmitting(false) 가 실행되지 않아 버튼이 영영 잠긴다.
+    // 쿠키를 심어야 proxy(엣지)가 / 진입을 허용한다 — 값은 무엇이든 통과시킨다.
     if (IS_DEMO) {
+      startDemoSession();
       setSubmitting(false);
       router.push("/");
       return;
@@ -103,6 +107,12 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+          {IS_DEMO && (
+            <p className="text-center text-[13px] font-medium text-symphony-text-muted">
+              시연 모드입니다. 아무 값이나 입력하면 진입합니다.
+            </p>
+          )}
+
           <FloatInput id="pb-id" label="ID" value={id} onChange={setId} />
 
           <FloatInput
