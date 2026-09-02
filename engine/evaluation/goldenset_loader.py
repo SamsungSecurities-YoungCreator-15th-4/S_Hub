@@ -483,9 +483,24 @@ def load_all_cases(
             raise CaseFormatError(
                 f"사례 수가 manifest와 다릅니다: {len(cases)} != {manifest.get('case_count')}"
             )
-        recomputed = _compute_input_set_hash(pairs)
-        if recomputed != manifest.get("input_set_hash"):
+        # 지문을 두 갈래로 대조한다.
+        #
+        #  input_set_hash   : **동결본만** 덮는다. v1↔v7 비교의 기준선이라 사례가
+        #                     늘어도 이 값은 변하지 않아야 한다.
+        #  current_set_hash : 신규 사례를 포함한 현재 평가셋 전체.
+        #
+        # 옛 manifest(current_set_hash 이전 판)는 added_case_ids 가 없으므로
+        # 전체가 동결본으로 취급돼 기존 동작 그대로다.
+        added = set(manifest.get("added_case_ids") or [])
+        frozen_pairs = [p for p in pairs if p["id"] not in added]
+
+        if _compute_input_set_hash(frozen_pairs) != manifest.get("input_set_hash"):
             raise CaseFormatError(
-                "input_set_hash가 manifest와 다릅니다 — 평가셋 구성이 동결본과 다릅니다."
+                "input_set_hash가 manifest와 다릅니다 — 동결본 구성이 바뀌었습니다."
+            )
+        expected_current = manifest.get("current_set_hash")
+        if expected_current and _compute_input_set_hash(pairs) != expected_current:
+            raise CaseFormatError(
+                "current_set_hash가 manifest와 다릅니다 — 평가셋 구성이 기록과 다릅니다."
             )
     return cases

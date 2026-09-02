@@ -423,6 +423,37 @@ def main() -> None:
         input_set_hash=input_set_hash,
         langsmith_project=langsmith_project,
     )
+    # ── 판정불가를 결함과 구분한다 ────────────────────────────────────────
+    #
+    #  engine/judge/rubric.py 는 LLM 호출 예외를 passed=False 로 삼킨다. 파이프라인
+    #  에서는 그게 맞다 — 판정 못 한 리포트를 내보내지 않는 fail-closed 다.
+    #  그러나 **캘리브레이션 측정에서는 오염**이다. 키 만료·타임아웃 때문에 나온
+    #  '미통과'를 결함으로 세면 일치율·혼동행렬이 통째로 거짓이 된다.
+    #
+    #  2026-08-31 실제로 발생했다. Azure 키 만료로 401 이 나면서 LLM 축 2개가
+    #  22/22 실패 → '통과 0 / 미통과 22' 가 정상 결과처럼 저장됐다.
+    unjudged = [
+        (r["case_id"], ck.get("name"), str(ck.get("detail", "")))
+        for r in results
+        for ck in r.get("checks", [])
+        if str(ck.get("detail", "")).startswith("LLM Judge 호출 실패")
+    ]
+    if unjudged:
+        invalid_path = args.out.with_suffix(".INVALID.json")
+        write_results(results, invalid_path)
+        cases_hit = sorted({cid for cid, _, _ in unjudged})
+        print(
+            f"\n❌ 판정 실패 — 결과를 정식 경로에 저장하지 않았습니다.\n"
+            f"   LLM 축 판정불가 {len(unjudged)}건 / 사례 {len(cases_hit)}건"
+            f" (전체 {len(results)}건)\n"
+            f"   사유: {unjudged[0][2][:120]}\n\n"
+            f"   이 실행의 '미통과'는 결함이 아니라 **판정을 못 한 것**입니다.\n"
+            f"   일치율·혼동행렬 계산에 쓰면 안 됩니다.\n"
+            f"   원인 해소 후 다시 실행하세요. 진단용 사본: {invalid_path}",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+
     out_path = write_results(results, args.out)
     passed = sum(1 for r in results if r["passed"])
     anchor = f", freeze_commit={freeze_commit[:12]}" if freeze_commit else ""

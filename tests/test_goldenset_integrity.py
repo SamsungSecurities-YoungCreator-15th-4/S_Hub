@@ -34,9 +34,21 @@ CASES = GS / "cases"
 JUDGE_INPUTS = GS / "judge_inputs"
 
 AXES = ("출처", "수치 정합", "환각", "위조정밀도", "면책", "금지표현")
-EXPECTED_PASS = 10
-EXPECTED_FAIL = 10
-EXPECTED_TOTAL = 20
+# ── 동결본과 현행 평가셋을 구분한다 ───────────────────────────────────────
+#
+#  동결본(case_001~020)은 judge 프롬프트 v1↔v7 비교의 기준선이라 **영원히 20건**이고
+#  pass 10 / fail 10 균형도 고정이다. 여기가 흔들리면 8월에 쌓은 비교가 무효가 된다.
+#
+#  현행 평가셋은 운영에서 드러난 실패 유형이 쌓이며 자란다(case_021~). 신규 사례는
+#  대부분 fail 이므로 균형 상수를 적용하지 않는다.
+FROZEN_PASS = 10
+FROZEN_FAIL = 10
+FROZEN_TOTAL = 20
+FROZEN_IDS = frozenset(f"case_{i:03d}" for i in range(1, FROZEN_TOTAL + 1))
+
+EXPECTED_PASS = FROZEN_PASS  # 이전 이름 (호환)
+EXPECTED_FAIL = FROZEN_FAIL
+EXPECTED_TOTAL = FROZEN_TOTAL
 
 # 기준표 항목 번호 — 예: 출처-F2, 면책-B7, 수치 정합-F1
 RULE_REF = re.compile(r"[가-힣]+\s*-\s*[FPB]\d")
@@ -58,15 +70,35 @@ def cases() -> dict[str, dict]:
 
 # ── 1. 구성 ────────────────────────────────────────────────────────────────
 
+def test_frozen_cases_all_present(cases):
+    """동결본 20건은 하나도 사라지면 안 된다. 이게 v1↔v7 비교의 전제다."""
+    missing = sorted(FROZEN_IDS - set(cases))
+    assert not missing, f"동결본 누락: {missing}"
+
+
 def test_case_count(cases):
-    assert len(cases) == EXPECTED_TOTAL
+    """평가셋은 자랄 수 있지만 동결본 아래로 줄 수는 없다."""
+    assert len(cases) >= FROZEN_TOTAL
 
 
-def test_label_distribution(cases):
-    """분포가 바뀌면 실패한다. 라벨이 아니라 이 파일의 상수를 고칠 것."""
-    labels = [c.get("label") for c in cases.values()]
-    assert labels.count("pass") == EXPECTED_PASS
-    assert labels.count("fail") == EXPECTED_FAIL
+def test_frozen_label_distribution(cases):
+    """동결본의 pass/fail 균형은 고정이다. 라벨이 아니라 상수를 고칠 것."""
+    labels = [c.get("label") for cid, c in cases.items() if cid in FROZEN_IDS]
+    assert labels.count("pass") == FROZEN_PASS
+    assert labels.count("fail") == FROZEN_FAIL
+
+
+def test_added_cases_are_documented(cases):
+    """동결 이후 추가된 사례는 어디서 왔는지 적혀 있어야 한다.
+
+    '운영·차단에서 드러난 실패 유형'만 사례집에 들어온다는 규칙을 코드로 강제한다.
+    출처가 없으면 평가셋이 자란 게 아니라 그냥 커진 것이다.
+    """
+    undocumented = [
+        cid for cid, c in cases.items()
+        if cid not in FROZEN_IDS and not str(c.get("source_incident") or "").strip()
+    ]
+    assert not undocumented, f"source_incident 없이 추가된 사례: {undocumented}"
 
 
 # ── 2. frontmatter 완전성 ──────────────────────────────────────────────────
@@ -249,7 +281,15 @@ def test_judge_inputs_hashes_match_frozen_cases():
     frozen = (json.loads((GS / "case_hashes.json").read_text(encoding="utf-8"))
               .get("hashes") or {})
     got = {c["id"]: c["case_content_sha256"] for c in manifest["cases"]}
-    assert got == frozen, "judge_inputs 본문이 동결된 사례와 다르다"
+    # 동결본은 해시가 한 글자도 달라지면 안 된다.
+    assert {k: v for k, v in got.items() if k in frozen} == frozen, (
+        "judge_inputs 의 동결본 본문이 동결 해시와 다르다"
+    )
+    # 동결본 밖의 사례는 manifest 에 '추가분'으로 선언돼 있어야 한다.
+    # (선언 없이 끼어든 사례가 채점에 섞이는 것을 막는다)
+    assert sorted(set(got) - set(frozen)) == manifest.get("added_case_ids", []), (
+        "manifest.added_case_ids 에 없는 사례가 judge_inputs 에 있다"
+    )
 
 
 def test_judge_inputs_frontmatter_allowlist():
@@ -295,7 +335,12 @@ def test_case_hashes_match_record():
     recorded = (ch.load() or {}).get("hashes") or {}
     if not recorded:
         pytest.skip("case_hashes.json 기록 없음")
-    assert ch.compute() == recorded, "사례 본문이 기록된 해시와 다르다"
+    computed = ch.compute()
+    # 기록에 있는 사례(=동결본)만 대조한다. 동결 이후 추가된 사례는 아직 기록 대상이
+    # 아니므로 여기서 걸리면 안 된다 — 대신 위 test_added_cases_are_documented 가 본다.
+    assert {k: v for k, v in computed.items() if k in recorded} == recorded, (
+        "동결된 사례 본문이 기록된 해시와 다르다"
+    )
 
 
 def test_hash_excludes_answer_fields():

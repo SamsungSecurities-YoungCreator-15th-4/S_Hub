@@ -29,7 +29,16 @@ SOURCE_DIR = ROOT / "cases"
 OUTPUT_DIR = ROOT / "judge_inputs"
 HASH_RECORD = ROOT / "case_hashes.json"
 
-EXPECTED_CASE_COUNT = 20
+# v1-freeze 동결본 건수. **이 값은 늘리지 않는다.**
+#
+#  동결본(case_001~020)은 judge 프롬프트 v1↔v7 비교의 기준선이라 영원히 20건이다.
+#  중간에 사례가 늘면 "일치율이 좋아진 건지 문제가 쉬워진 건지" 구분할 수 없다.
+#
+#  운영에서 드러난 새 사례는 동결본을 건드리지 않고 뒤에 쌓인다(case_021~).
+#  - 동결본  : case_hashes.json 에 해시가 있는 사례. 본문이 바뀌면 즉시 중단한다.
+#  - 신규    : 해시 기록에 없는 사례. 해시를 새로 기록하고 입력본을 만든다.
+FROZEN_CASE_COUNT = 20
+EXPECTED_CASE_COUNT = FROZEN_CASE_COUNT  # 이전 이름 (테스트·문서 호환)
 ALLOWED_FRONTMATTER_FIELDS = ("id", "variant", "llm_draft")
 ANSWER_FIELDS = (
     "label",
@@ -126,6 +135,13 @@ def sanitize_case(text: str, *, source: Path) -> tuple[str, str, str]:
         for key in ALLOWED_FRONTMATTER_FIELDS
         if key in metadata
     }
+    # allowlist 를 통과한 값에도 정답이 샐 수 있다. variant 는 judge 에게 그대로
+    # 나가므로 "…함정" 처럼 결함을 알려주는 문구가 들어가면 채점이 무효가 된다.
+    # (실제로 case_021·022 초안에서 이 누출이 났다 — 2026-08-31)
+    _validate_body_has_no_answers(
+        "\n".join(str(value) for value in clean_metadata.values()),
+        source=source,
+    )
     clean_frontmatter = yaml.safe_dump(
         clean_metadata,
         allow_unicode=True,
@@ -148,17 +164,18 @@ def _load_frozen_hashes() -> dict[str, str]:
 
 
 def build_outputs() -> dict[Path, str]:
-    """동결 검증을 통과한 20건과 설명·manifest의 기대 출력을 만든다."""
+    """동결본 20건 + 이후 추가된 사례의 무라벨 입력본과 manifest를 만든다."""
     sources = sorted(SOURCE_DIR.glob("case_*.md"))
-    if len(sources) != EXPECTED_CASE_COUNT:
+    if len(sources) < FROZEN_CASE_COUNT:
         raise ValueError(
-            f"R1 사례는 정확히 {EXPECTED_CASE_COUNT}건이어야 합니다: {len(sources)}건"
+            f"동결본 {FROZEN_CASE_COUNT}건은 반드시 모두 있어야 합니다: {len(sources)}건"
         )
 
     frozen_hashes = _load_frozen_hashes()
     outputs: dict[Path, str] = {OUTPUT_DIR / "README.md": README}
     cases: list[dict[str, str]] = []
     seen_ids: set[str] = set()
+    added_ids: list[str] = []
 
     for source in sources:
         case_id, content_hash, clean_text = sanitize_case(
@@ -168,7 +185,11 @@ def build_outputs() -> dict[Path, str]:
         if case_id in seen_ids:
             raise ValueError(f"중복 사례 id: {case_id}")
         seen_ids.add(case_id)
-        if frozen_hashes.get(case_id) != content_hash:
+        recorded = frozen_hashes.get(case_id)
+        if recorded is None:
+            # 동결 이후 추가된 사례. 동결본을 건드리지 않으므로 해시 대조 대상이 아니다.
+            added_ids.append(case_id)
+        elif recorded != content_hash:
             raise ValueError(
                 f"{case_id}: 본문이 R1 동결 해시와 다릅니다. 입력본 생성을 중단합니다."
             )
@@ -183,30 +204,53 @@ def build_outputs() -> dict[Path, str]:
             }
         )
 
-    input_set_payload = [
-        {"id": case["id"], "case_content_sha256": case["case_content_sha256"]}
-        for case in cases
-    ]
-    input_set_hash = hashlib.sha256(
-        json.dumps(
-            input_set_payload,
-            ensure_ascii=False,
-            sort_keys=True,
-            separators=(",", ":"),
-        ).encode("utf-8")
-    ).hexdigest()
+    # 동결본이 하나라도 사라지면 v1↔v7 비교 기준선이 무너진다. 개수만으로는 못 잡는다
+    # (예: case_005 를 지우고 case_021·022·023 을 넣어도 22건이 된다).
+    missing_frozen = sorted(set(frozen_hashes) - seen_ids)
+    if missing_frozen:
+        raise ValueError(f"동결본이 누락됐습니다: {missing_frozen}")
+
+    def _set_hash(subset: list[dict[str, str]]) -> str:
+        payload = [
+            {"id": case["id"], "case_content_sha256": case["case_content_sha256"]}
+            for case in subset
+        ]
+        return hashlib.sha256(
+            json.dumps(
+                payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+            ).encode("utf-8")
+        ).hexdigest()
+
+    # input_set_hash 는 **동결본만** 덮는다.
+    #
+    #  기존 실행 기록(v1~v7 비교)이 이 값을 참조하므로, 사례가 늘어도 값이 변하면
+    #  안 된다. 신규 사례를 포함한 현재 평가셋 전체는 current_set_hash 로 따로 남긴다.
+    frozen_cases = [case for case in cases if case["id"] not in set(added_ids)]
     manifest = {
-        "schema_version": "2026-08-02.v2",
+        "schema_version": "2026-08-31.v3",
         "case_count": len(cases),
+        "frozen_case_count": len(frozen_cases),
+        "added_case_ids": sorted(added_ids),
         "allowed_frontmatter_fields": list(ALLOWED_FRONTMATTER_FIELDS),
         "answer_fields_removed": list(ANSWER_FIELDS),
-        "input_set_hash": input_set_hash,
+        "input_set_hash": _set_hash(frozen_cases),
+        "current_set_hash": _set_hash(cases),
         "cases": cases,
     }
     outputs[OUTPUT_DIR / "manifest.json"] = (
         json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
     )
     return outputs
+
+
+def _summary(outputs: dict[Path, str]) -> str:
+    """생성 결과를 '동결 N + 신규 M' 형태로 알린다. 성장 여부가 로그에 남는다."""
+    import json as _json
+
+    manifest = _json.loads(outputs[OUTPUT_DIR / "manifest.json"])
+    added = manifest["added_case_ids"]
+    tail = f" + 신규 {len(added)}건({', '.join(added)})" if added else ""
+    return f"무라벨 Judge 입력본 동결 {manifest['frozen_case_count']}건{tail}"
 
 
 def _unexpected_output_entries(outputs: dict[Path, str]) -> list[str]:
@@ -262,11 +306,11 @@ def main() -> int:
                 for problem in problems:
                     print(f"  - {problem}")
                 return 1
-            print(f"무라벨 Judge 입력본 {EXPECTED_CASE_COUNT}건이 생성 규칙과 일치합니다.")
+            print(_summary(outputs) + " 생성 규칙과 일치합니다.")
             return 0
 
         write_outputs(outputs)
-        print(f"무라벨 Judge 입력본 {EXPECTED_CASE_COUNT}건을 {OUTPUT_DIR}에 생성했습니다.")
+        print(_summary(outputs) + f"을 {OUTPUT_DIR}에 생성했습니다.")
         return 0
     except ValueError as exc:
         print(f"입력본 생성 실패: {exc}", file=sys.stderr)

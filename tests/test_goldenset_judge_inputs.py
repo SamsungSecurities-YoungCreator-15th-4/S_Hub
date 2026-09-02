@@ -84,7 +84,8 @@ def test_committed_judge_inputs_match_generator():
 def test_judge_inputs_contain_20_cases_without_answer_metadata():
     tool = _load_tool()
     files = sorted(tool.OUTPUT_DIR.glob("case_*.md"))
-    assert len(files) == tool.EXPECTED_CASE_COUNT
+    # 평가셋은 자란다. 동결본 아래로 줄지 않는 것만 본다.
+    assert len(files) >= tool.FROZEN_CASE_COUNT
 
     for path in files:
         metadata = _frontmatter(path.read_text(encoding="utf-8"))
@@ -132,9 +133,13 @@ def test_manifest_hashes_match_frozen_r1_case_hashes():
         "hashes"
     ]
 
-    assert manifest["case_count"] == 20
-    assert {
-        case["id"]: case["case_content_sha256"] for case in manifest["cases"]
-    } == frozen
+    got = {case["id"]: case["case_content_sha256"] for case in manifest["cases"]}
+
+    assert manifest["frozen_case_count"] == len(frozen)
+    assert manifest["case_count"] >= manifest["frozen_case_count"]
+    # 동결본 해시는 불변. 추가분은 added_case_ids 로 선언돼야 한다.
+    assert {k: v for k, v in got.items() if k in frozen} == frozen
+    assert sorted(set(got) - set(frozen)) == manifest["added_case_ids"]
     assert len(manifest["input_set_hash"]) == 64
+    assert len(manifest["current_set_hash"]) == 64
     assert "evalset_hash" not in manifest

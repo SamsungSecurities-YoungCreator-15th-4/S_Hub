@@ -36,10 +36,12 @@ def _case_paths() -> list:
     return sorted(JUDGE_INPUTS_DIR.glob("case_*.md"))
 
 
-def test_loads_all_twenty_cases():
+def test_loads_all_cases():
     cases = load_all_cases()
-    assert len(cases) == 20
-    assert [c["case_id"] for c in cases] == [f"case_{i:03d}" for i in range(1, 21)]
+    assert len(cases) >= 20   # 동결 20건 + 이후 추가분
+    ids = [c["case_id"] for c in cases]
+    # 동결 20건은 순서 그대로 앞에 있어야 하고, 신규는 뒤에 쌓인다.
+    assert ids[:20] == [f"case_{i:03d}" for i in range(1, 21)]
 
 
 def test_state_uses_allowlist_only():
@@ -76,9 +78,9 @@ def test_load_case_is_deterministic():
 
 
 def test_load_all_cases_verifies_manifest_integrity():
-    """기본 로드가 manifest 동결 해시 대조를 통과한다(원본 20건 그대로)."""
+    """기본 로드가 manifest 동결 해시 대조를 통과한다(동결 20건은 그대로, 신규는 added_case_ids 로 분리)."""
     cases = load_all_cases()  # verify=True 기본 — 통과하면 무결성 OK
-    assert len(cases) == 20
+    assert len(cases) >= 20   # 동결 20건 + 이후 추가분
 
 
 def test_input_set_hash_is_recorded_shape():
@@ -102,11 +104,11 @@ def test_runner_records_all_r1_cases_offline():
     from tests.test_judge_eval_evalset import _PassingLLM
 
     cases = _load_r1_cases()
-    assert len(cases) == 20
+    assert len(cases) >= 20   # 동결 20건 + 이후 추가분
     results = record_cases(
         cases, llm=_PassingLLM(), prompt_version="v1", code_sha="deadbeef"
     )
-    assert len(results) == 20
+    assert len(results) >= 20
     assert all(r["prompt_version"] == "v1" for r in results)
     # v1·v2 비교 앵커가 사례 내용에만 종속되도록 64자 해시가 채워져야 한다.
     assert all(len(r["case_content_sha256"]) == 64 for r in results)

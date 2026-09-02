@@ -1,4 +1,8 @@
 {
+  "added_case_ids": [
+    "case_021",
+    "case_022"
+  ],
   "allowed_frontmatter_fields": [
     "id",
     "variant",
@@ -13,7 +17,7 @@
     "initial_agreement",
     "labeling_method"
   ],
-  "case_count": 20,
+  "case_count": 22,
   "cases": [
     {
       "case_content_sha256": "e430253979124418d2a89707a3ba9e7fe7bc9f444eaf37fc3fab935374650483",
@@ -114,8 +118,20 @@
       "case_content_sha256": "a2f22666980106561a9061080333cc837b3031e17539321bc78a02d0916afffb",
       "file": "case_020.md",
       "id": "case_020"
+    },
+    {
+      "case_content_sha256": "11e83b44e92845daa99ddc3fbf9a5b9e0f74b389ca5b2e95913a07ad58372fb7",
+      "file": "case_021.md",
+      "id": "case_021"
+    },
+    {
+      "case_content_sha256": "c5b5ff8a129cbcdc6bab6b440b80d6e1b3b26b95dbf3119716055ec463652277",
+      "file": "case_022.md",
+      "id": "case_022"
     }
   ],
+  "current_set_hash": "a73909a8302ff6e2db3c81959f506e5685c8e623566cb00a4666d40b7db875a9",
+  "frozen_case_count": 20,
   "input_set_hash": "2dc161f7e3de3f88d908670ada8d983a5f952e2ddc4a2a195b88206ef482819d",
-  "schema_version": "2026-08-02.v2"
+  "schema_version": "2026-08-31.v3"
 }
