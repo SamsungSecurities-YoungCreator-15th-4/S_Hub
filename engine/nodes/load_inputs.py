@@ -10,13 +10,25 @@ from engine.utils.hashing import sha256_of_dict
 
 CONFIG_PATH = Path(__file__).resolve().parents[2] / "config" / "config.yaml"
 
-# 6자산군 더미 포트폴리오 — 위탁자산 총 50억 원 (고정)
+# 7자산군 더미 포트폴리오 — 위탁자산 총 50억 원 (고정)
+#
+#  2026-09 확장: 기존 `alternatives`(대체투자 10%)를 `gold` 6% + `reits` 4% 로 쪼갰다.
+#  9월 과제가 "대체자산(금·리츠·원자재·달러 등)을 하나 이상"을 요구했고, 한 덩어리로
+#  두면 리포트에 '대체투자'로만 보여 실체가 드러나지 않기 때문이다.
+#
+#  둘로 나눈 이유는 **스트레스 반응이 반대**라서다 — 고금리 국면에서 금은 상대적으로
+#  방어하고 리츠는 금리에 직격당한다. 같은 '대체'가 반대로 움직이는 것이 보여야
+#  분산 효과를 숫자로 설명할 수 있다.
+#
+#  ⚠️ 이 변경으로 computation_hash 가 바뀐다. 8월 제출물과 대조되지 않는다.
+#     8월 번들은 그대로 보존하고 9월 기준선을 새로 선언한다.
 DUMMY_PORTFOLIO = [
     {"asset_class": "domestic_equity", "name": "국내주식", "value_krw": 1_250_000_000, "weight": 0.25},
     {"asset_class": "global_equity", "name": "해외주식", "value_krw": 1_000_000_000, "weight": 0.20},
     {"asset_class": "domestic_bond", "name": "국내채권", "value_krw": 1_250_000_000, "weight": 0.25},
     {"asset_class": "global_bond", "name": "해외채권", "value_krw": 750_000_000, "weight": 0.15},
-    {"asset_class": "alternatives", "name": "대체투자", "value_krw": 500_000_000, "weight": 0.10},
+    {"asset_class": "gold", "name": "금", "value_krw": 300_000_000, "weight": 0.06},
+    {"asset_class": "reits", "name": "리츠", "value_krw": 200_000_000, "weight": 0.04},
     {"asset_class": "cash", "name": "현금성자산", "value_krw": 250_000_000, "weight": 0.05},
 ]
 
@@ -25,7 +37,8 @@ ASSET_DEFINITIONS = [
     ("global_equity", "해외주식"),
     ("domestic_bond", "국내채권"),
     ("global_bond", "해외채권"),
-    ("alternatives", "대체투자"),
+    ("gold", "금"),
+    ("reits", "리츠"),
     ("cash", "현금성자산"),
 ]
 
@@ -44,7 +57,7 @@ def portfolio_from_percentages(
     *,
     total_asset_krw: float = TOTAL_ASSET_KRW,
 ) -> list[dict]:
-    """6자산 비중(%)을 정량 엔진의 금액·0~1 비중 계약으로 변환한다."""
+    """7자산 비중(%)을 정량 엔진의 금액·0~1 비중 계약으로 변환한다."""
     expected = {asset_class for asset_class, _name in ASSET_DEFINITIONS}
     if set(percentages) != expected:
         missing = sorted(expected - set(percentages))

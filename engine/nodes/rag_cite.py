@@ -61,7 +61,8 @@ ASSET_LABELS = {
     "global_equity": "해외주식",
     "domestic_bond": "국내채권",
     "global_bond": "해외채권",
-    "alternatives": "대체투자",
+    "gold": "금",
+    "reits": "리츠",
     "cash": "현금성자산",
 }
 TAX_KEYWORDS = (
@@ -258,7 +259,8 @@ def _build_query(topic: str, metrics: dict, ips: dict | None = None) -> str:
             "global_equity": "글로벌 주식 미국 증시 업종 밸류에이션",
             "domestic_bond": "국내 채권 국고채 금리 듀레이션",
             "global_bond": "글로벌 채권 미국 국채 금리 듀레이션",
-            "alternatives": "대체투자 원자재 리츠 변동성",
+            "gold": "금 귀금속 안전자산 인플레이션 헤지",
+            "reits": "리츠 부동산 임대수익 금리 민감도",
             "cash": "현금성자산 단기금리 유동성",
         }.get(asset_class or "", "")
         return (
@@ -320,6 +322,111 @@ def _build_explanations(
             "revision": revision,
         },
     ]
+
+    # 위험조정 성과 지표 — **가정을 함께 적는다.**
+    #
+    #  9월 과제가 "Sharpe·MDD를 보여 주고 가정을 적을 것"을 요구했다. Sharpe 는
+    #  무위험수익률이 분자에 직접 들어가고 연율화는 거래일 수 가정에 의존하므로,
+    #  숫자만 적으면 골든셋 case_022 의 함정(엔진 미산출 지표를 근거 없이 표시)과
+    #  같은 것이 된다. 값이 없으면(변동성 0 등) 문단 자체를 만들지 않는다 —
+    #  없는 수치를 지어내지 않는 것이 이 프로젝트의 규약이다.
+    risk_adjusted = (metrics or {}).get("risk_adjusted") or {}
+    sharpe = risk_adjusted.get("sharpe_ratio")
+    mdd = risk_adjusted.get("max_drawdown")
+    if sharpe is not None or mdd is not None:
+        assumptions = risk_adjusted.get("assumptions") or {}
+        parts = []
+        if sharpe is not None:
+            parts.append(f"위험 한 단위당 초과수익을 나타내는 Sharpe Ratio는 약 {sharpe:.2f}입니다.")
+        if mdd is not None:
+            span = ""
+            peak, trough = risk_adjusted.get("max_drawdown_peak"), risk_adjusted.get("max_drawdown_trough")
+            if peak and trough:
+                span = f"({peak} 고점 대비 {trough} 저점) "
+            recovered = risk_adjusted.get("max_drawdown_recovered")
+            tail = "관측 구간 내 회복되었습니다." if recovered else "관측 구간 내에는 회복되지 않았습니다."
+            parts.append(f"관측 구간의 최대낙폭은 약 {mdd:.1%} {span}이며, {tail}")
+        rf = assumptions.get("rf_annual")
+        parts.append(
+            "산출 가정 — 무위험수익률 "
+            + (f"연 {rf:.2%}" if isinstance(rf, (int, float)) else "미지정")
+            + f"(출처: {assumptions.get('rf_source') or '미기재'}), "
+            + f"연율화 거래일 {assumptions.get('trading_days_per_year')}일, "
+            + f"관측치 {assumptions.get('n_observations')}일. "
+            "두 지표 모두 과거 관측 구간에서 산출한 추정치이며 미래 성과를 보장하지 않습니다."
+        )
+        explanations.append(
+            {"topic": "위험조정 성과", "text": " ".join(parts), "revision": revision}
+        )
+
+    # 세전 → 세금 → 비용 → 세후.
+    #
+    #  ⚠️ 중간발표 지적 — "단순 세금 하나로 절세를 했다면 개망한 거임".
+    #     그래서 **범위 밖 세목을 반드시 함께 적는다.** 이걸 빼면 독자가
+    #     "이게 세금의 전부"라고 읽는다. '절세'·'최적'이라는 말은 쓰지 않는다.
+    after_tax = (metrics or {}).get("after_tax") or {}
+    if after_tax.get("pre_tax_value_krw") is not None:
+        a = after_tax["assumptions"]
+        eok = lambda v: f"{v / 100_000_000:,.2f}억원"
+        lines = [
+            f"기초 자산 {eok(after_tax['opening_value_krw'])}에 기대수익을 반영한 "
+            f"세전 자산은 {eok(after_tax['pre_tax_value_krw'])}입니다.",
+            f"여기서 금융소득 과세 {eok(after_tax['tax_low_krw'])}~"
+            f"{eok(after_tax['tax_high_krw'])}과 보수 {eok(after_tax['fee_krw'])}를 차감하면 "
+            f"세후 기말자산은 {eok(after_tax['after_tax_value_low_krw'])}~"
+            f"{eok(after_tax['after_tax_value_high_krw'])} 구간입니다.",
+            "세금을 구간으로 제시하는 이유는 금융소득종합과세 세율이 고객의 다른 "
+            "소득에 따라 달라지기 때문이며, 본 리포트는 그 정보를 갖고 있지 않습니다.",
+        ]
+        if after_tax.get("out_of_scope"):
+            lines.append(
+                "본 계산은 **금융소득(이자·배당) 과세만** 다룹니다. 다음 세목은 "
+                "포함하지 않았으므로 실제 세부담은 달라질 수 있습니다 — "
+                + "; ".join(after_tax["out_of_scope"]) + "."
+            )
+        lines.append(
+            f"산출 가정 — 원천징수 {a['withholding_rate']:.1%}(출처: "
+            f"{a['withholding_rate_source']}), 종합과세 기준금액 "
+            f"{a['comprehensive_threshold_krw'] / 100_000_000:,.2f}억원(출처: "
+            f"{a['comprehensive_threshold_source']}), 보수(출처: {a['fee_source']}), "
+            f"기간 {a['horizon_years']:g}년. {a['taxable_ratio_note']}"
+        )
+        explanations.append(
+            {"topic": "세후 기말자산", "text": " ".join(lines), "revision": revision}
+        )
+
+    # A/B 비교안.
+    #
+    #  ⚠️ 핸드아웃 금지 항목에 '최적 포트폴리오'가 있다. 어느 쪽이 낫다고
+    #     쓰지 않는다. 차이만 적고, 고르는 주체가 사람임을 명시한다.
+    comparison = (metrics or {}).get("comparison") or {}
+    if comparison.get("rows"):
+        def _fmt(value):
+            if value is None:
+                return "산출 불가"
+            return f"{value:,.0f}원" if abs(value) >= 1000 else f"{value:.4f}"
+
+        picked = {r["key"]: r for r in comparison["rows"]}
+        lines = ["목적·리스크가 다른 두 배분안의 산출 결과를 나란히 제시합니다."]
+        for key, ko in (("var_1d_krw", "1일 VaR"), ("annualized_return", "연율화 기대수익"),
+                        ("annualized_volatility", "연율화 변동성"),
+                        ("worst_stress_loss_krw", "최악 스트레스 손실")):
+            row = picked.get(key)
+            if row and row["a"] is not None and row["b"] is not None:
+                lines.append(f"{ko}은 A안 {_fmt(row['a'])}, B안 {_fmt(row['b'])}입니다.")
+        if comparison.get("derivation_note"):
+            lines.append(comparison["derivation_note"].replace("**", ""))
+        lines.append(comparison["selection"]["note"])
+        ctx = comparison.get("context") or {}
+        lines.append(
+            f"두 안은 같은 조건(기준일 {ctx.get('as_of')}, {ctx.get('currency')}, "
+            f"관측치 {ctx.get('n_observations')}일, 시드 {ctx.get('seed')})에서 "
+            "계산했습니다. 조건이 다르면 비교가 성립하지 않으므로 엔진이 실행을 중단합니다."
+        )
+        explanations.append(
+            {"topic": "비교안 대조", "text": " ".join(lines), "revision": revision}
+        )
+
     explanations.append(
         {
             "topic": "거시환경·스트레스 개연성",

@@ -30,13 +30,14 @@ from engine.deterministic.returns import ASSET_CLASSES, _generate_dummy_returns,
 from engine.deterministic.stress import run_all_stress, SCENARIO_A_HIGH_RATE, SCENARIO_B_STRONG_USD, SCENARIO_C_COVID
 from engine.nodes.var_engine import var_engine
 
-# 6자산군 더미 포트폴리오(총 50억) — load_inputs.py와 동일 구조.
+# 7자산군 더미 포트폴리오(총 50억) — load_inputs.py와 동일 구조.
 PORTFOLIO = [
     {"asset_class": "domestic_equity", "value_krw": 1_250_000_000},
     {"asset_class": "global_equity", "value_krw": 1_000_000_000},
     {"asset_class": "domestic_bond", "value_krw": 1_250_000_000},
     {"asset_class": "global_bond", "value_krw": 750_000_000},
-    {"asset_class": "alternatives", "value_krw": 500_000_000},
+    {"asset_class": "gold", "value_krw": 300_000_000},
+    {"asset_class": "reits", "value_krw": 200_000_000},
     {"asset_class": "cash", "value_krw": 250_000_000},
 ]
 
@@ -253,7 +254,8 @@ def test_tail_contribution_direction_high_vol_asset_contributes_more():
             "global_equity": _wave_returns(scale=0.005),  # 저변동
             "domestic_bond": _wave_returns(scale=0.005),
             "global_bond": _wave_returns(scale=0.005),
-            "alternatives": _wave_returns(scale=0.005),
+            "gold": _wave_returns(scale=0.005),
+            "reits": _wave_returns(scale=0.005),
             "cash": _wave_returns(scale=0.0001),
         },
         index=idx,
@@ -585,7 +587,7 @@ def test_apply_fx_conversion_formula():
     테스트가 없었다. _apply_fx_conversion을 순수 함수로 분리해 직접 확인한다.
     """
     idx = pd.bdate_range("2026-01-01", periods=2)
-    # 현지통화(USD) 수익률: global_equity/global_bond/alternatives = +2%, 나머지 = +1%
+    # 현지통화(USD) 수익률: global_equity/global_bond/gold/reits = +2%, 나머지 = +1%
     pct = pd.DataFrame(
         {ac: [0.02, 0.02] if ac in returns_mod.USD_DENOMINATED else [0.01, 0.01]
          for ac in returns_mod.REAL_ASSET_TICKERS},
@@ -603,7 +605,8 @@ def test_apply_fx_conversion_formula():
     expected_day2 = (1 + 0.02) * (1 - 0.01) - 1
     assert out["global_equity"].iloc[0] == pytest.approx(expected_day1)
     assert out["global_equity"].iloc[1] == pytest.approx(expected_day2)
-    assert out["alternatives"].iloc[0] == pytest.approx(expected_day1)
+    assert out["gold"].iloc[0] == pytest.approx(expected_day1)
+    assert out["reits"].iloc[0] == pytest.approx(expected_day1)
     # cash는 시장데이터 무관 — rf_annual/252 상수.
     assert out["cash"].tolist() == pytest.approx([0.0325 / 252, 0.0325 / 252])
 
@@ -736,23 +739,23 @@ def test_stress_shock_contract_locked():
     """[리뷰 반영] 충격값·포폴 결과는 문서/RAG 확정 계약값이므로 정확히 고정한다."""
     assert SCENARIO_A_HIGH_RATE["shocks"] == {
         "domestic_equity": -0.25, "global_equity": -0.25, "domestic_bond": -0.15,
-        "global_bond": -0.12, "alternatives": -0.10, "cash": 0.0,
+        "global_bond": -0.12, "gold": -0.05, "reits": -0.20, "cash": 0.0,
     }
     assert SCENARIO_B_STRONG_USD["shocks"] == {
         "domestic_equity": -0.12, "global_equity": -0.03, "domestic_bond": -0.05,
-        "global_bond": -0.01, "alternatives": -0.02, "cash": 0.0,
+        "global_bond": -0.01, "gold": -0.02, "reits": -0.03, "cash": 0.0,
     }
     res = run_all_stress(PORTFOLIO)
-    assert res["A_high_rate"]["loss_pct"] == 0.178
-    assert res["A_high_rate"]["loss_krw"] == 890_000_000.0
-    assert res["B_strong_usd"]["loss_pct"] == 0.052
-    assert res["B_strong_usd"]["loss_krw"] == 260_000_000.0
+    assert res["A_high_rate"]["loss_pct"] == 0.179
+    assert res["A_high_rate"]["loss_krw"] == 895_000_000.0
+    assert res["B_strong_usd"]["loss_pct"] == 0.0524
+    assert res["B_strong_usd"]["loss_krw"] == 262_000_000.0
     assert SCENARIO_C_COVID["shocks"] == {
         "domestic_equity": -0.30, "global_equity": -0.25, "domestic_bond": -0.03,
-        "global_bond": -0.01, "alternatives": -0.02, "cash": 0.0,
+        "global_bond": -0.01, "gold": -0.05, "reits": -0.30, "cash": 0.0,
     }
-    assert res["C_covid"]["loss_pct"] == 0.136
-    assert res["C_covid"]["loss_krw"] == 680_000_000.0
+    assert res["C_covid"]["loss_pct"] == 0.149
+    assert res["C_covid"]["loss_krw"] == 745_000_000.0
     # 손실 순서 A > C > B
     assert res["A_high_rate"]["loss_krw"] > res["C_covid"]["loss_krw"] > res["B_strong_usd"]["loss_krw"]
 
@@ -933,13 +936,14 @@ def test_var_engine_uses_config_seed_for_confidence_interval(tmp_path, monkeypat
 def test_stress_band_range_locked():
     """[range 밴드] 충격밴드 low/high도 확정 계약값이므로 정확히 고정한다."""
     res = run_all_stress(PORTFOLIO)
-    assert res["A_high_rate"]["loss_pct_low"] == 0.13955
-    assert res["A_high_rate"]["loss_pct_high"] == 0.21645
-    assert res["A_high_rate"]["loss_krw_low"] == 697_750_000.0
-    assert res["A_high_rate"]["loss_krw_high"] == 1_082_250_000.0
-    assert res["B_strong_usd"]["loss_pct_low"] == 0.0405
-    assert res["B_strong_usd"]["loss_pct_high"] == 0.0635
-    assert res["C_covid"]["loss_pct_low"] == 0.103
-    assert res["C_covid"]["loss_pct_high"] == 0.169
+    # 2026-09 자산군 분할(gold·reits) 반영해 재계산한 확정 계약값.
+    assert res["A_high_rate"]["loss_pct_low"] == 0.1401
+    assert res["A_high_rate"]["loss_pct_high"] == 0.2179
+    assert res["A_high_rate"]["loss_krw_low"] == 700_500_000.0
+    assert res["A_high_rate"]["loss_krw_high"] == 1_089_500_000.0
+    assert res["B_strong_usd"]["loss_pct_low"] == 0.04082
+    assert res["B_strong_usd"]["loss_pct_high"] == 0.06398
+    assert res["C_covid"]["loss_pct_low"] == 0.11295
+    assert res["C_covid"]["loss_pct_high"] == 0.18505
     for name in res:
         assert res[name]["loss_krw_low"] <= res[name]["loss_krw"] <= res[name]["loss_krw_high"]
