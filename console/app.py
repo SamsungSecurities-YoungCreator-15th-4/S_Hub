@@ -51,6 +51,7 @@ from console.rag_evidence import (
 )
 from console.report_export import pdf_export_state
 from console.start_page import render_start_page
+from console.trust_panel import render_trust_panel
 
 ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(ROOT / ".env")
@@ -1042,6 +1043,11 @@ if not report:
                 value=0,
                 label_visibility="collapsed",
             )
+
+        # judge 신뢰 지표 전용 패널 (9월 과제 R4 요구).
+        # 지표가 goldenset/reports/ 안에만 있으면 팀·리뷰어가 볼 수 없다.
+        with st.expander("judge 신뢰 지표 (사람 라벨 대조)"):
+            render_trust_panel()
 
         prepare_clicked = st.button("IPS 추출", type="primary")
 
