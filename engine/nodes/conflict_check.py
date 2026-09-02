@@ -10,7 +10,9 @@ from engine.state import RiskState
 from engine.utils.hashing import sha256_of_dict
 
 POLICY_PATH = Path(__file__).resolve().parents[2] / "config" / "ips_policy.yaml"
-RISKY_ASSET_CLASSES = {"domestic_equity", "global_equity", "alternatives"}
+# 위험자산 판정 대상. 리츠는 주식과 상관이 높고 하방 낙폭이 커 포함하고,
+# 금은 위기 국면 방어 성격이라 제외한다(2026-09 자산군 분할 시 결정).
+RISKY_ASSET_CLASSES = {"domestic_equity", "global_equity", "reits"}
 
 
 @lru_cache(maxsize=1)
@@ -231,7 +233,7 @@ def conflict_check(state: RiskState) -> dict:
                 severity="review",
                 category="risk_tolerance",
                 detail=(
-                    f"균형형 고객의 주식·대체투자 비중 {risky_ratio:.1%}가 내부 "
+                    f"균형형 고객의 주식·리츠 비중 {risky_ratio:.1%}가 내부 "
                     f"사전검토 기준 {thresholds['balanced_max_risky_ratio']:.0%}를 초과"
                 ),
                 observed=risky_ratio,

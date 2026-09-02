@@ -12,14 +12,17 @@
 # 금리 상승 → 채권 가격 직접 하락(듀레이션 효과) + 주식·대체 할인율 상승 충격.
 SCENARIO_A_HIGH_RATE = {
     "name": "A_high_rate",
-    "description": "정책금리 +250bp 급등 — 채권 가격 직접 하락 + 주식·대체 할인율 상승 충격",
+    "description": "정책금리 +250bp 급등 — 채권 가격 직접 하락, 리츠는 금리 직격·금은 상대적 방어",
     "reference": "2022 고금리 국면(한·미 정책금리 급등) 참조 — 핵심 특징을 반영한 가상 시나리오(방향·크기 정합)",
     "shocks": {
         "domestic_equity": -0.25,
         "global_equity": -0.25,
         "domestic_bond": -0.15,
         "global_bond": -0.12,
-        "alternatives": -0.10,
+        # 금리 상승은 무이자 자산인 금에 불리하나, 인플레 헤지 수요가 일부 상쇄한다.
+        "gold": -0.05,
+        # 리츠는 할인율 상승과 차입비용 증가를 동시에 받아 금리에 가장 민감하다.
+        "reits": -0.20,
         "cash": 0.0,
     },
 }
@@ -36,7 +39,9 @@ SCENARIO_B_STRONG_USD = {
         "global_equity": -0.03,
         "domestic_bond": -0.05,
         "global_bond": -0.01,
-        "alternatives": -0.02,
+        # 달러 강세는 금 달러가격에 하방 압력이나, 미헤지 USD 표기라 환산이익이 상쇄한다.
+        "gold": -0.02,
+        "reits": -0.03,
         "cash": 0.0,
     },
 }
@@ -52,7 +57,11 @@ SCENARIO_C_COVID = {
         "global_equity": -0.25,
         "domestic_bond": -0.03,
         "global_bond": -0.01,
-        "alternatives": -0.02,
+        # 현금 확보 쏠림 국면에서는 안전자산인 금도 유동성 확보를 위해 매도된다
+        # (2020-03 초기 금 하락 국면 참조).
+        "gold": -0.05,
+        # 상업용 부동산 직격 — 2020-03 리츠는 주식 지수보다 낙폭이 컸다.
+        "reits": -0.30,
         "cash": 0.0,
     },
 }
@@ -68,7 +77,8 @@ SHOCK_BAND = {
     "global_equity": 0.25,
     "domestic_bond": 0.15,
     "global_bond": 0.15,
-    "alternatives": 0.20,
+    "gold": 0.15,
+    "reits": 0.25,
     "cash": 0.0,
 }
 

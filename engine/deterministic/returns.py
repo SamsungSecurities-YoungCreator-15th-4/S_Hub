@@ -1,4 +1,4 @@
-"""결정론 계층 — 6자산군 일별 수익률 데이터 준비 + parquet 캐시.
+"""결정론 계층 — 7자산군 일별 수익률 데이터 준비 + parquet 캐시.
 
 주의: 이 패키지(app.engine)에서는 langchain/llm 관련 import 금지.
 순수 결정론 데이터 계층 — 동일 입력에 대해 항상 동일한 수익률을 재현한다.
@@ -20,13 +20,14 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-# 6자산군 — load_inputs.py 포트폴리오와 동일한 asset_class 키(순서 고정)
+# 7자산군 — load_inputs.py 포트폴리오와 동일한 asset_class 키(순서 고정)
 ASSET_CLASSES = [
     "domestic_equity",
     "global_equity",
     "domestic_bond",
     "global_bond",
-    "alternatives",
+    "gold",
+    "reits",
     "cash",
 ]
 
@@ -37,7 +38,8 @@ _DUMMY_VOL = {
     "global_equity": 0.0115,
     "domestic_bond": 0.0035,
     "global_bond": 0.0045,
-    "alternatives": 0.0080,
+    "gold": 0.0080,
+    "reits": 0.0110,
     "cash": 0.0002,
 }
 # 자산군별 위상차 — 자산 간 움직임을 비동조로 만들어 분산 효과가 나오도록.
@@ -46,20 +48,23 @@ _DUMMY_PHASE = {
     "global_equity": 0.7,
     "domestic_bond": 1.6,
     "global_bond": 2.3,
-    "alternatives": 3.1,
+    "gold": 3.1,
+    "reits": 0.9,
     "cash": 0.5,
 }
 
 DEFAULT_N = 250  # 약 1년(거래일) 관측
-DEFAULT_AS_OF = "2026-07-03"
+# config.yaml 의 as_of_date 와 같은 값이어야 한다 — 갈리면 인자를 생략한
+# 호출이 조용히 다른 구간을 쓴다. 테스트가 두 값을 묶어 검사한다.
+DEFAULT_AS_OF = "2026-08-28"
 CACHE_PATH = Path(__file__).resolve().parents[2] / "data" / "returns_dummy.parquet"
 
 
 def _generate_dummy_returns(n: int = DEFAULT_N, as_of_date: str | None = None) -> pd.DataFrame:
-    """고정 수식 기반 6자산군 더미 일별 수익률 (결정론적, 랜덤 미사용).
+    """고정 수식 기반 7자산군 더미 일별 수익률 (결정론적, 랜덤 미사용).
 
     실데이터 전환 시 이 함수만 실제 시장데이터 로더로 교체한다.
-    반환: 거래일 DatetimeIndex × 6자산군 컬럼의 일별 수익률 DataFrame.
+    반환: 거래일 DatetimeIndex × 7자산군 컬럼의 일별 수익률 DataFrame.
     """
     i = np.arange(n, dtype=float)
     data: dict[str, np.ndarray] = {}
@@ -83,7 +88,7 @@ def load_returns(
     cache_path: Path | str = CACHE_PATH,
     use_cache: bool = True,
 ) -> pd.DataFrame:
-    """6자산군 일별 수익률을 반환. parquet 캐시가 있으면 읽고, 없으면 생성 후 저장.
+    """7자산군 일별 수익률을 반환. parquet 캐시가 있으면 읽고, 없으면 생성 후 저장.
 
     - 캐시 히트 시에도 동일 데이터가 재현되므로 재현성에 영향이 없다.
     - 실데이터 전환 시에도 이 함수의 인터페이스(반환 스키마)는 유지한다.
@@ -124,9 +129,10 @@ REAL_ASSET_TICKERS = {
     "domestic_bond": "114260.KS",   # KODEX 국고채3년 (KRW)
     "global_equity": "ACWI",        # iShares MSCI ACWI (USD)
     "global_bond": "IGOV",          # iShares International Treasury Bond, 무헤지 (USD)
-    "alternatives": "GLD",          # SPDR Gold Shares (USD)
+    "gold": "GLD",                  # SPDR Gold Shares (USD)
+    "reits": "VNQ",                 # Vanguard Real Estate ETF (USD)
 }
-USD_DENOMINATED = {"global_equity", "global_bond", "alternatives"}
+USD_DENOMINATED = {"global_equity", "global_bond", "gold", "reits"}
 FX_TICKER = "KRW=X"  # USD/KRW (1달러당 원화)
 
 REAL_CACHE_PATH = Path(__file__).resolve().parents[2] / "data" / "returns_real.parquet"
@@ -175,7 +181,7 @@ def _fetch_real_returns(
     as_of_date: str | None = None,
     rf_annual: float = DEFAULT_RF_ANNUAL,
 ) -> pd.DataFrame:
-    """yfinance로 6자산군 실데이터를 조회해 일별 원화 환산 수익률로 변환한다.
+    """yfinance로 7자산군 실데이터를 조회해 일별 원화 환산 수익률로 변환한다.
 
     - 해외자산(USD 상장)은 현지통화 수익률 × USD/KRW 환율변동을 복리 결합해
       원화 환산 총수익률로 만든다: r_KRW = (1+r_USD)*(1+r_fx) - 1.
@@ -293,7 +299,7 @@ def load_real_returns(
     use_cache: bool = True,
     rf_annual: float = DEFAULT_RF_ANNUAL,
 ) -> pd.DataFrame:
-    """실데이터(yfinance) 6자산군 일별 수익률을 반환. parquet 캐시 우선.
+    """실데이터(yfinance) 7자산군 일별 수익률을 반환. parquet 캐시 우선.
 
     캐시 유효성은 요청 파라미터(n·as_of_date·rf_annual·티커셋)를 사이드카
     JSON(meta_path)에 기록해 정확히 일치할 때만 재사용한다 — 실제 거래소

@@ -981,7 +981,7 @@ if not report:
         st.markdown('<span class="section-card-marker"></span>', unsafe_allow_html=True)
         st.markdown(
             '<div class="section-title">2. 포트폴리오 '
-            '<span class="section-cap">6개 자산군 비중을 입력해 주세요.</span></div>',
+            '<span class="section-cap">7개 자산군 비중을 입력해 주세요.</span></div>',
             unsafe_allow_html=True,
         )
         percentages: dict[str, float] = {}

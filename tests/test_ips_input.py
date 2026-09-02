@@ -97,7 +97,7 @@ def test_extract_conflict_demo_option_is_isolated_in_state(monkeypatch):
 
 def test_new_ips_liquidity_amount_uses_existing_30_percent_conflict_rule():
     portfolio = portfolio_from_percentages(
-        {asset_class: value for (asset_class, _), value in zip(ASSET_DEFINITIONS, [25, 20, 25, 15, 10, 5])}
+        {asset_class: value for (asset_class, _), value in zip(ASSET_DEFINITIONS, [25, 20, 25, 15, 6, 4, 5])}
     )
     result = conflict_check(
         {
@@ -123,7 +123,7 @@ def test_legacy_liquidity_none_amount_is_treated_as_zero():
             asset_class: value
             for (asset_class, _), value in zip(
                 ASSET_DEFINITIONS,
-                [25, 20, 25, 15, 10, 5],
+                [25, 20, 25, 15, 6, 4, 5],
             )
         }
     )
@@ -160,7 +160,7 @@ def test_conflict_check_blocks_missing_time_and_allows_review_for_concentration(
             asset_class: value
             for (asset_class, _), value in zip(
                 ASSET_DEFINITIONS,
-                [70, 0, 10, 10, 5, 5],
+                [70, 0, 10, 10, 3, 2, 5],
             )
         }
     )
@@ -181,7 +181,7 @@ def test_conflict_check_blocks_missing_time_and_allows_review_for_concentration(
 def test_portfolio_percentages_convert_to_50_eok_contract():
     percentages = {
         asset_class: value
-        for (asset_class, _), value in zip(ASSET_DEFINITIONS, [25, 20, 25, 15, 10, 5])
+        for (asset_class, _), value in zip(ASSET_DEFINITIONS, [25, 20, 25, 15, 6, 4, 5])
     }
     portfolio = portfolio_from_percentages(percentages)
 
@@ -201,7 +201,7 @@ def test_portfolio_percentages_reject_non_finite_values(invalid):
         asset_class: value
         for (asset_class, _), value in zip(
             ASSET_DEFINITIONS,
-            [25, 20, 25, 15, 10, 5],
+            [25, 20, 25, 15, 6, 4, 5],
         )
     }
     percentages["cash"] = invalid
@@ -220,7 +220,7 @@ def test_load_inputs_preserves_ui_raw_input_and_portfolio(monkeypatch, tmp_path)
 
     monkeypatch.setattr(load_inputs_module, "CONFIG_PATH", config)
     portfolio = portfolio_from_percentages(
-        {asset_class: value for (asset_class, _), value in zip(ASSET_DEFINITIONS, [20, 20, 20, 20, 10, 10])}
+        {asset_class: value for (asset_class, _), value in zip(ASSET_DEFINITIONS, [20, 20, 20, 20, 6, 4, 10])}
     )
     result = load_inputs({"raw_input": "UI 상담 입력", "portfolio": portfolio})
 
