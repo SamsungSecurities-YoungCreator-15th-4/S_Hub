@@ -14,7 +14,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from engine.engine.metrics import (
+from engine.deterministic.metrics import (
     bootstrap_var_cvar_ci,
     compute_metrics,
     historical_cvar,
@@ -25,9 +25,9 @@ from engine.engine.metrics import (
     var_backtest,
     var_ci_order_statistic,
 )
-from engine.engine import returns as returns_mod
-from engine.engine.returns import ASSET_CLASSES, _generate_dummy_returns, load_real_returns, load_returns
-from engine.engine.stress import run_all_stress, SCENARIO_A_HIGH_RATE, SCENARIO_B_STRONG_USD, SCENARIO_C_COVID
+from engine.deterministic import returns as returns_mod
+from engine.deterministic.returns import ASSET_CLASSES, _generate_dummy_returns, load_real_returns, load_returns
+from engine.deterministic.stress import run_all_stress, SCENARIO_A_HIGH_RATE, SCENARIO_B_STRONG_USD, SCENARIO_C_COVID
 from engine.nodes.var_engine import var_engine
 
 # 6자산군 더미 포트폴리오(총 50억) — load_inputs.py와 동일 구조.
@@ -281,7 +281,7 @@ def test_computation_hash_payload_covers_full_drilldown(monkeypatch):
         captured["payload"] = payload
         return "captured-hash"
 
-    monkeypatch.setattr("engine.engine.metrics.sha256_of_dict", capture_hash)
+    monkeypatch.setattr("engine.deterministic.metrics.sha256_of_dict", capture_hash)
     df = _generate_dummy_returns(n=250, as_of_date="2026-07-03")
 
     metrics = compute_metrics(df, PORTFOLIO, confidence=0.99, horizons=[1, 10])

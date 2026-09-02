@@ -26,7 +26,7 @@ grep -rni "symphony|engine" frontend/**/*.ts(x)           → runStatus.ts의 �
 ## Part 1. 엔진 파이프라인 인벤토리
 
 `engine/graph.py`의 조립 순서대로. 계층 판정 기준은 AGENTS.md의 불변 규칙 3
-(`engine/engine/` 안 = 결정론 계층, LLM 호출은 `engine/llm/` + 노드 계층에서만).
+(`engine/deterministic/` 안 = 결정론 계층, LLM 호출은 `engine/llm/` + 노드 계층에서만).
 
 | # | 노드 · 파일 | 하는 일 | 입력 (읽는 state) | 출력 (쓰는 state) | 계층 | 대시보드 표시 |
 |---|---|---|---|---|---|---|
@@ -34,7 +34,7 @@ grep -rni "symphony|engine" frontend/**/*.ts(x)           → runStatus.ts의 �
 | 2 | `extract_ips`<br>`engine/nodes/extract_ips.py:32` | 상담 자연어 → IPS 구조화 추출 (+ 유동성 필요금액) | `demo_options`, `raw_input`, `conflicts`, `conflict_retries` | `ips`, `liquidity_required_krw`, `ips_extraction_meta`, `conflict_retries` | **LLM** (`engine/llm/extract_ips_chain.py`) | **없음** |
 | 3 | `conflict_check`<br>`engine/nodes/conflict_check.py:71` | `config/ips_policy.yaml` 임계값으로 적합성 충돌을 block/review로 판정 | `ips`, `portfolio`, `liquidity_required_krw` | `conflicts`, `conflict_policy` | 결정론 (노드) | **없음** |
 | 4 | `approval_gate`<br>`engine/nodes/approval_gate.py:14` | PB 검토 결과 검증 후 승인을 locked로 전이 (HITL 인터럽트 지점) | `approval`, `conflicts`, `run_config` | `approval` (+`approval_hash`) | 결정론 (노드) | **없음** |
-| 5 | `var_engine`<br>`engine/nodes/var_engine.py:30` | VaR·CVaR·스트레스·기여도 일괄 계산 | `run_config`, `portfolio` | `metrics` | **결정론 계층** (`engine/engine/metrics.py`) | **없음** |
+| 5 | `var_engine`<br>`engine/nodes/var_engine.py:30` | VaR·CVaR·스트레스·기여도 일괄 계산 | `run_config`, `portfolio` | `metrics` | **결정론 계층** (`engine/deterministic/metrics.py`) | **없음** |
 | 6 | `rag_cite`<br>`engine/nodes/rag_cite.py:830` | 수치별 설명문 생성 + Chroma 검색 인용 후보 → 결정론 검증 통과분만 채택 | `metrics`, `run_config`, `judge_retries`, `citation_rejections`, `judge_feedback`, `ips` | `run_config`, `explanations`, `citations`, `citation_rejections` | **LLM + 결정론 검증 혼합** | **없음** |
 | 7 | `judge_eval`<br>`engine/nodes/judge_eval.py:375` | 형태 검사(결정론) + 6축 루브릭으로 통과/재작성/차단 판정 | `run_config`, `metrics`, `explanations`, `citations`, `approval`, `portfolio`, `judge_retries`, `demo_options` | `run_config`, `judge`, `judge_retries`, `judge_feedback` | **혼합** — 6축 중 4축 결정론, `hallucination`·`false_precision` 2축만 주입 LLM (`engine/judge/rubric.py:354`) | **없음** |
 | 8 | `assemble_report`<br>`engine/nodes/assemble_report.py:294` | 최종 리포트 조립 + 확정/미확정 상태·거버넌스 기록 | `metrics`, `run_config`, `portfolio`, `citations`, `explanations`, `judge`, `approval`, `conflicts`, `ips`, `ips_extraction_meta`, `conflict_policy`, `trace_id`, `raw_input`, `judge_retries` | `report` | 결정론 (노드) | **없음** |
@@ -46,7 +46,7 @@ grep -rni "symphony|engine" frontend/**/*.ts(x)           → runStatus.ts의 �
 |---|---|
 | `rag_cite`의 실제 인용 산출 개수·품질 | Azure 키·Chroma 인덱스가 이 환경에 없다. `rag_cite.py:16-18`의 폴백 경로(빈 인용)로만 동작하므로 실인용 경로를 관측하지 못했다 |
 | `judge_eval` LLM 2축의 판정 분포 | 위와 같은 이유. 결정론 4축만 관측 가능 |
-| `metrics` 딕셔너리의 전체 키 목록 | `compute_metrics`(`engine/engine/metrics.py:264`)가 horizon별로 키를 동적 생성한다. 실행해 확인한 것은 `meta.computation_hash` 경로뿐이며, 전체 스키마는 실행 산출물로 확정해야 한다 |
+| `metrics` 딕셔너리의 전체 키 목록 | `compute_metrics`(`engine/deterministic/metrics.py:264`)가 horizon별로 키를 동적 생성한다. 실행해 확인한 것은 `meta.computation_hash` 경로뿐이며, 전체 스키마는 실행 산출물로 확정해야 한다 |
 | `report` 딕셔너리를 소비하는 UI 계약 | 소비자가 `console/`(Streamlit)뿐이고 대시보드 쪽 계약이 존재하지 않는다 |
 
 ---
@@ -81,7 +81,7 @@ Part 1이 전부 "없음"이므로 9개 노드 산출물 전체가 갭이다. �
 
 | | 엔진 | 백엔드·대시보드 |
 |---|---|---|
-| 정의 위치 | `engine/engine/returns.py:122` `REAL_ASSET_TICKERS` | `backend/app/portfolio/assets.py:27` `ASSET_TICKERS` |
+| 정의 위치 | `engine/deterministic/returns.py:122` `REAL_ASSET_TICKERS` | `backend/app/portfolio/assets.py:27` `ASSET_TICKERS` |
 | 개수 | 6 (`domestic_equity`, `global_equity`, `domestic_bond`, `global_bond`, `alternatives`, `cash`) | 12 (`domestic_equity`, `overseas_blue_chip`, `overseas_growth`, `overseas_dividend`, `general_bond`, `separate_tax_bond`, `low_coupon_bond`, `reit`, `gold`, `commodity`, `dollar`, `cash`) |
 
 세부 대조:
@@ -97,7 +97,7 @@ Part 1이 전부 "없음"이므로 9개 노드 산출물 전체가 갭이다. �
 
 **이것이 최상위 병목이다.** 자산군 키가 맞지 않으면 포트폴리오를 그대로 넘길 수 없고,
 엔진의 `portfolio_returns`는 매핑 없는 자산군을 만나면 조용히 넘어가지 않고
-`ValueError`로 실패한다(`engine/engine/metrics.py:51`).
+`ValueError`로 실패한다(`engine/deterministic/metrics.py:51`).
 
 ### ② IPS `Return` 필드의 단위가 다르다 — % vs 억 원 *(새로 찾음)*
 
@@ -129,7 +129,7 @@ Part 1이 전부 "없음"이므로 9개 노드 산출물 전체가 갭이다. �
 
 | | 엔진 | 백엔드·대시보드 |
 |---|---|---|
-| 정의 위치 | `engine/engine/stress.py:13,29,45` | `backend/app/portfolio/metrics.py:622` `CRISIS_SCENARIO_SHOCKS` |
+| 정의 위치 | `engine/deterministic/stress.py:13,29,45` | `backend/app/portfolio/metrics.py:622` `CRISIS_SCENARIO_SHOCKS` |
 | 시나리오 | A 고금리(+250bp) · B 강달러(+15%) · C 코로나 | `crisis_2008` · `crisis_ru_war` + 금리·환율 2축 슬라이더 |
 | 충격의 의미 | **즉시 가격 충격** — `loss = -(value × shock)` (`stress.py:104`) | **연간 수익률 충격을 관측기간 전체에 일별 드리프트로 주입** 후 지표 재계산 (`metrics.py:664` `apply_return_shocks`) |
 | 산출물 | `loss_krw`, `loss_pct` (+ 밴드 상·하한) | 재계산된 기대수익률·변동성·MDD·세후수익률 |
@@ -154,7 +154,7 @@ Part 1이 전부 "없음"이므로 9개 노드 산출물 전체가 갭이다. �
 
 | | 값 | 쓰임 | 근거 |
 |---|---|---|---|
-| 엔진 | **0.0325** | `cash` 자산군의 일별 수익률 생성(`rf/252`) | `engine/engine/returns.py:134` · `config/config.yaml` `rf_rate` |
+| 엔진 | **0.0325** | `cash` 자산군의 일별 수익률 생성(`rf/252`) | `engine/deterministic/returns.py:134` · `config/config.yaml` `rf_rate` |
 | 백엔드 | **0.035** (미국 기준 가정) | 샤프·소르티노의 분모 | `backend/app/portfolio/constants.py:105-106` `DEFAULT_RISK_FREE_RATE` |
 
 같은 이름의 상수가 값도 다르고 역할도 다르다(수익률 생성 vs 지표 분모).
@@ -176,7 +176,7 @@ Part 4에서 수치로 대조한다. 코드 차이는 네 가지다.
 
 | 항목 | 엔진 `historical_var` | 백엔드 `calculate_historical_var` |
 |---|---|---|
-| 기본 신뢰수준 | `0.99` (`engine/engine/metrics.py:16`) | `0.95` (`backend/app/portfolio/metrics.py:300`) |
+| 기본 신뢰수준 | `0.99` (`engine/deterministic/metrics.py:16`) | `0.95` (`backend/app/portfolio/metrics.py:300`) |
 | 음수 결과 | 그대로 반환 — `float(-q)` (`metrics.py:25`) | `max(-q, 0.0)`로 0에 고정 (`metrics.py:313`) |
 | 반올림 | 없음 (float 그대로) | `safe_round(..., 6)` 6자리 (`metrics.py:318-320`) |
 | method 라벨 | 없음 | `"historical_5_percentile"` 고정 (`metrics.py:321`) — **신뢰수준을 0.99로 넘겨도 라벨은 5 percentile 그대로다** |
@@ -201,15 +201,15 @@ Part 4에서 수치로 대조한다. 코드 차이는 네 가지다.
 | 항목 | 값 |
 |---|---|
 | 입력 시계열 | `data/returns_dummy.parquet` — 레포에 이미 있는 산출물 (1,250행 × 6자산, 2021-09-20 ~ 2026-07-03) |
-| 시계열 성격 | `engine/engine/returns.py`의 고정 수식 더미. 무작위성 없음 → 시드 불필요 |
+| 시계열 성격 | `engine/deterministic/returns.py`의 고정 수식 더미. 무작위성 없음 → 시드 불필요 |
 | 포트폴리오 | `engine/nodes/load_inputs.py:14` `DUMMY_PORTFOLIO` (50억 원, 6자산) |
-| 포트폴리오 수익률 | `engine.engine.metrics.portfolio_returns`로 생성 (n=1250, mean −0.00005419, std 0.00349700) |
+| 포트폴리오 수익률 | `engine.deterministic.metrics.portfolio_returns`로 생성 (n=1250, mean −0.00005419, std 0.00349700) |
 | 실행 함수 | 두 함수를 **실제로 import해서 호출**했다. 재구현·복사 없음 |
 | 실행 환경 | numpy 2.5.2 / pandas 3.0.5 (레포 핀과 다름 — Part 3-⑦) |
 | 예외 | Part 4-③의 클램프 측정만 시드 고정 난수 사용. **시드 42** (`numpy.random.default_rng(42)`) |
 
 `data/returns_dummy.parquet`는 `.gitignore` 대상이라 다른 사람 로컬에는 없을 수 있다.
-`engine.engine.returns.load_returns()`를 한 번 호출하면 같은 파일이 결정론적으로 재생성된다.
+`engine.deterministic.returns.load_returns()`를 한 번 호출하면 같은 파일이 결정론적으로 재생성된다.
 
 ### ① 신뢰수준을 맞췄을 때 — 사실상 동일
 
@@ -286,7 +286,7 @@ numpy와 pandas의 분위수는 비트 단위로 같다. **따라서 두 함수�
 ### ⑥ 어느 쪽이 왜 다른가 — 코드 인용
 
 ```python
-# engine/engine/metrics.py:16-25
+# engine/deterministic/metrics.py:16-25
 def historical_var(returns: np.ndarray, confidence: float = 0.99) -> float:
     ...
     q = np.quantile(np.asarray(returns, dtype=float), 1.0 - confidence)
@@ -354,11 +354,11 @@ python - <<'PY'
 import sys; sys.path.insert(0, "backend"); sys.path.insert(0, ".")
 import pandas as pd
 from app.portfolio.metrics import calculate_historical_var
-from engine.engine.metrics import historical_var, portfolio_returns
+from engine.deterministic.metrics import historical_var, portfolio_returns
 from engine.nodes.load_inputs import DUMMY_PORTFOLIO
 
 df = pd.read_parquet("data/returns_dummy.parquet")   # 없으면:
-                                                     # from engine.engine.returns import load_returns
+                                                     # from engine.deterministic.returns import load_returns
                                                      # df = load_returns()
 r = portfolio_returns(df, DUMMY_PORTFOLIO); s = pd.Series(r)
 print("engine  0.99:", historical_var(r))

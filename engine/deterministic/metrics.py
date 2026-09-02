@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import norm
 
-from engine.engine.stress import run_all_stress
+from engine.deterministic.stress import run_all_stress
 from engine.utils.hashing import sha256_of_dict
 
 

@@ -17,7 +17,7 @@
    같은 입력이면 같은 결과가 나와야 한다. 계산 결과에는 computation_hash를 남긴다.
 2. **설명가능(화이트박스)** — 모든 수치·주장에는 근거(citations/evidence)를 첨부한다.
    최종 판단은 사람이 한다(HITL, `approval_gate` 직전 인터럽트).
-3. **계층 경계** — `engine/engine/`(결정론 계층) 안에서는 langchain·openai import를 금지한다.
+3. **계층 경계** — `engine/deterministic/`(결정론 계층) 안에서는 langchain·openai import를 금지한다.
    수치 계산은 순수 파이썬/numpy로만 한다. LLM 호출은 `engine/llm/` + 노드 계층에서만 한다.
 4. **데이터 계약** — `engine/state.py`(`RiskState`/`IPSProfile`)는 팀 합의 없이 수정하지 않는다.
    변경이 필요하면 먼저 팀에 공유한다.
@@ -205,7 +205,7 @@ RAG 근거 문서는 `corpus/`에 카테고리별로 둔다. 상세 목록은 [`
   `frontend/` · `backend/` · 엔진(`engine/`·`console/`·`scripts/`·`tests/`·`config/`).
   두 영역을 동시에 건드리는 변경은 PR을 분리하는 것을 먼저 고려하고,
   나눌 수 없으면 PR 본문에 이유를 적는다.
-- **계층 경계**: `engine/engine/`(결정론 계층)에는 langchain/openai 등 LLM 관련 import를 절대 추가하지 않는다. LLM 호출은 `engine/llm/` + 노드 계층에서만 한다.
+- **계층 경계**: `engine/deterministic/`(결정론 계층)에는 langchain/openai 등 LLM 관련 import를 절대 추가하지 않는다. LLM 호출은 `engine/llm/` + 노드 계층에서만 한다.
 - **데이터 계약**: `engine/state.py`의 `RiskState`/`IPSProfile`은 팀 합의 없이 수정하지 않는다.
 - **재현성**: 노드는 결정론적으로 동작해야 하며(랜덤 시드 고정), 계산 결과에는 computation_hash를 남긴다.
 - **커밋 메시지**: 한국어로, `타입: 설명` 형식. 타입은 `feat`, `fix`, `docs`, `chore`, `refactor`, `test` 중 하나.

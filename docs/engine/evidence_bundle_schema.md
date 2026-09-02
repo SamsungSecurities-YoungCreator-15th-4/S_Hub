@@ -322,7 +322,7 @@ JSON이 표현하지 못하는 타입(datetime·Decimal·set·Path·bytes·numpy
 
 모르는 타입은 추측해서 바꾸지 않고 `_unserializable` 표식(타입명·repr)으로 남긴다 — 조용히 통과시키는 것보다 눈에 띄는 편이 낫다. Decimal은 float으로 바꾸면 값이 달라지므로 문자열로 원형을 보존하고, set은 순서가 없어 정렬해야 결정론이 된다.
 
-현재 그래프의 최종 state에는 변환 대상이 없다(`engine/engine/`이 경계에서 전부 `float()`로 캐스팅한다). 그래서 `conversions`는 보통 빈 리스트이며, **비어 있다는 사실 자체가 "원형 그대로 실렸다"는 증거**가 된다.
+현재 그래프의 최종 state에는 변환 대상이 없다(`engine/deterministic/`이 경계에서 전부 `float()`로 캐스팅한다). 그래서 `conversions`는 보통 빈 리스트이며, **비어 있다는 사실 자체가 "원형 그대로 실렸다"는 증거**가 된다.
 
 ---
 
