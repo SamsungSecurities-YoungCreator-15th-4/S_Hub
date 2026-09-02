@@ -531,7 +531,7 @@ export default function Sidebar() {
                 {customer.persisted === false && (
                   <DataSourceBadge
                     source="fallback"
-                    note="DB 저장 실패 — 데모로만 추가된 고객입니다."
+                    note="DB 저장 실패 — 예시로만 추가된 고객입니다."
                   />
                 )}
               </div>
@@ -671,7 +671,7 @@ export default function Sidebar() {
           )}
           {sttStatus === "error" && (
             <p className="mt-1.5 text-[10px] font-semibold text-amber-600">
-              {sttNote ?? "전사에 실패해 데모 데이터를 표시합니다."}
+              {sttNote ?? "전사에 실패해 예시 데이터를 표시합니다."}
             </p>
           )}
           {realtimeStatus === "error" && realtimeError && (
@@ -870,7 +870,7 @@ export default function Sidebar() {
                     {c.persisted === false && (
                       <DataSourceBadge
                         source="fallback"
-                        note="DB 저장 실패 — 데모로만 추가된 고객입니다."
+                        note="DB 저장 실패 — 예시로만 추가된 고객입니다."
                       />
                     )}
                   </div>

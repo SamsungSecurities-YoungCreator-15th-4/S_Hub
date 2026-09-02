@@ -64,10 +64,10 @@ export function buildTaxResultFromMock(
 /** 호출 실패 시 클라이언트 폴백 요약(숫자는 mock 그대로, 생성/변형 없음). */
 function fallbackSummary(name: string): string {
   return [
-    `[절세 요약(데모) · ${name}]`,
+    `[절세 요약(예시) · ${name}]`,
     `- 전략 적용 시 연간 약 ${TAX_EFFECT.annualSavingManwon.toLocaleString()}만원의 세금 절감이 추정됩니다.`,
     `- 세후수익률(추정): ${TAX_EFFECT.afterTaxReturn.from} → ${TAX_EFFECT.afterTaxReturn.to}`,
-    "※ 백엔드 연결 실패로 데모 데이터를 표시합니다. 수치는 임시 추정값입니다.",
+    "※ 백엔드 연결 실패로 예시 데이터를 표시합니다. 수치는 임시 추정값입니다.",
   ].join("\n");
 }
 
@@ -88,8 +88,8 @@ export async function fetchTaxInsight(
   } catch (err) {
     const note =
       err instanceof ApiError && err.isTimeout
-        ? "응답 시간 초과로 데모 요약을 표시합니다."
-        : "백엔드 연결 실패로 데모 요약을 표시합니다.";
+        ? "응답 시간 초과로 예시 요약을 표시합니다."
+        : "백엔드 연결 실패로 예시 요약을 표시합니다.";
     return fallback(
       { summary: fallbackSummary(taxResult.portfolio_name ?? "선택 포트폴리오") },
       note,

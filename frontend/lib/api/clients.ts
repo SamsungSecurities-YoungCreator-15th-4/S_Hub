@@ -87,8 +87,8 @@ export async function createClient(
     // 네트워크/타임아웃/5xx — 저장은 실패했으나 화면은 죽지 않게 로컬 데모로 추가.
     const note =
       err instanceof ApiError && err.isTimeout
-        ? "응답 시간 초과로 저장되지 않았습니다(데모로만 추가)."
-        : "백엔드 저장 실패 — 데모로만 추가되었습니다(새로고침 시 사라짐).";
+        ? "응답 시간 초과로 저장되지 않았습니다(예시로만 추가)."
+        : "백엔드 저장 실패 — 예시로만 추가되었습니다(새로고침 시 사라짐).";
     return {
       status: "fallback",
       data: { clientId: "", name, aumEokwon },
@@ -193,7 +193,7 @@ export async function listClients(): Promise<ApiResult<ListedClient[]>> {
   } catch {
     return fallback(
       [],
-      "고객 목록을 DB에서 불러오지 못해 데모 고객 목록을 표시합니다.",
+      "고객 목록을 DB에서 불러오지 못해 예시 고객 목록을 표시합니다.",
     );
   }
 }

@@ -121,13 +121,13 @@ export async function uploadSttConsultation(
       consultationDate: res.consultation_date,
     });
   } catch (err) {
-    let note = "백엔드 연결 실패로 데모 상담을 표시합니다.";
+    let note = "백엔드 연결 실패로 예시 상담을 표시합니다.";
     if (err instanceof ApiError) {
-      if (err.isTimeout) note = "STT 처리 시간 초과로 데모 상담을 표시합니다.";
+      if (err.isTimeout) note = "STT 처리 시간 초과로 예시 상담을 표시합니다.";
       else if (err.status === 404)
-        note = "등록되지 않은 고객입니다. 데모 상담을 표시합니다.";
+        note = "등록되지 않은 고객입니다. 예시 상담을 표시합니다.";
       else if (err.status === 400)
-        note = "오디오 파일을 처리할 수 없습니다(.wav 확인). 데모 상담을 표시합니다.";
+        note = "오디오 파일을 처리할 수 없습니다(.wav 확인). 예시 상담을 표시합니다.";
     }
     return fallback(mockConsultation(), note);
   }
