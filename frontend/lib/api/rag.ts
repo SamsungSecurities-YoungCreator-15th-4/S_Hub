@@ -98,8 +98,8 @@ export async function fetchRagInsight(
     }
     const note =
       err instanceof ApiError && err.isTimeout
-        ? "응답 시간 초과로 데모 데이터를 표시합니다."
-        : "백엔드 연결 실패로 데모 데이터를 표시합니다.";
+        ? "응답 시간 초과로 예시 데이터를 표시합니다."
+        : "백엔드 연결 실패로 예시 데이터를 표시합니다.";
     return fallback({ ...mockInsight(), question: query }, note);
   }
 }

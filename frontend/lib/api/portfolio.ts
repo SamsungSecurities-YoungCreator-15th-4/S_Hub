@@ -341,8 +341,8 @@ export async function fetchPortfolioCalculate(
   } catch (err) {
     const note =
       err instanceof ApiError && err.isTimeout
-        ? "응답 시간 초과로 데모 포트폴리오를 표시합니다."
-        : "백엔드 연결 실패로 데모 포트폴리오를 표시합니다.";
+        ? "응답 시간 초과로 예시 포트폴리오를 표시합니다."
+        : "백엔드 연결 실패로 예시 포트폴리오를 표시합니다.";
     return fallback(
       { portfolios: PORTFOLIOS, calculationSessionId: "", correlationHeatmap: null, portfolioTax: null, taxOptimizer: null },
       note,
