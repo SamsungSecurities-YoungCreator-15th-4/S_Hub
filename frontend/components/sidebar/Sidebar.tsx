@@ -14,6 +14,13 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import DataSourceBadge from "@/components/common/DataSourceBadge";
@@ -897,121 +904,140 @@ export default function Sidebar() {
       )}
 
       {/* ── 지난 기록 모달 ── */}
-      {historyOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-[440px] rounded-2xl bg-card p-5 shadow-xl">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-[15px] font-extrabold">지난 상담 기록</h3>
-              <button
-                onClick={() => setHistoryOpen(false)}
-                className="rounded p-1 text-muted-foreground hover:text-foreground"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
-            <div className="flex max-h-[320px] flex-col gap-1.5 overflow-y-auto">
-              {historyLoading ? (
-                <p className="px-1 py-2 text-[12px] font-medium text-muted-foreground">
-                  불러오는 중...
-                </p>
-              ) : historyError ? (
-                <p className="px-1 py-2 text-[12px] font-medium text-amber-600">
-                  {historyError}
-                </p>
-              ) : pastList.length === 0 ? (
-                <p className="px-1 py-2 text-[12px] font-medium text-muted-foreground">
-                  지난 상담 기록이 없습니다.
-                </p>
-              ) : (
-                pastList.map((c) => (
-                  <div
-                    key={c.consultationId}
-                    className="flex items-center justify-between rounded-xl border px-3 py-2"
+      <Dialog
+        open={historyOpen}
+        onOpenChange={(open) => {
+          // 불러오는 중에는 ESC·백드롭으로 닫히지 않게 한다 — 진행 중인 요청의
+          // 결과가 닫힌 모달 뒤에서 반영되는 것을 막는다.
+          if (!open && loadingId !== null) return;
+          setHistoryOpen(open);
+        }}
+      >
+        <DialogContent
+          showCloseButton={false}
+          overlayClassName="bg-black/40"
+          aria-describedby={undefined}
+          className="block w-[440px] rounded-2xl bg-card p-5 text-foreground shadow-xl sm:max-w-none"
+        >
+          <DialogHeader className="mb-4 flex-row items-center justify-between gap-0">
+            <DialogTitle className="font-sans text-[15px] leading-normal font-extrabold">
+              지난 상담 기록
+            </DialogTitle>
+            <DialogClose className="rounded p-1 text-muted-foreground hover:text-foreground">
+              <X className="size-4" />
+              <span className="sr-only">닫기</span>
+            </DialogClose>
+          </DialogHeader>
+          <div className="flex max-h-[320px] flex-col gap-1.5 overflow-y-auto">
+            {historyLoading ? (
+              <p className="px-1 py-2 text-[12px] font-medium text-muted-foreground">
+                불러오는 중...
+              </p>
+            ) : historyError ? (
+              <p className="px-1 py-2 text-[12px] font-medium text-amber-600">
+                {historyError}
+              </p>
+            ) : pastList.length === 0 ? (
+              <p className="px-1 py-2 text-[12px] font-medium text-muted-foreground">
+                지난 상담 기록이 없습니다.
+              </p>
+            ) : (
+              pastList.map((c) => (
+                <div
+                  key={c.consultationId}
+                  className="flex items-center justify-between rounded-xl border px-3 py-2"
+                >
+                  <span className="text-[13px] font-semibold">
+                    {c.transcriptTitle}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 shrink-0 text-[11px] font-bold"
+                    disabled={loadingId !== null}
+                    onClick={() => loadPast(c.consultationId)}
                   >
-                    <span className="text-[13px] font-semibold">
-                      {c.transcriptTitle}
-                    </span>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 shrink-0 text-[11px] font-bold"
-                      disabled={loadingId !== null}
-                      onClick={() => loadPast(c.consultationId)}
-                    >
-                      {loadingId === c.consultationId
-                        ? "불러오는 중"
-                        : "불러오기"}
-                    </Button>
-                  </div>
-                ))
-              )}
-            </div>
+                    {loadingId === c.consultationId
+                      ? "불러오는 중"
+                      : "불러오기"}
+                  </Button>
+                </div>
+              ))
+            )}
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
 
       {/* ── 고객 추가 모달 ── */}
-      {addModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-[360px] rounded-2xl bg-card p-5 shadow-xl">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-[15px] font-extrabold">고객 추가</h3>
-              <button
-                onClick={() => {
-                  setAddModalOpen(false);
-                  setAddError(null);
-                }}
-                className="rounded p-1 text-muted-foreground hover:text-foreground"
-              >
-                <X className="size-4" />
-              </button>
+      <Dialog
+        open={addModalOpen}
+        onOpenChange={(open) => {
+          // 저장 중에는 ESC·백드롭으로 닫지 않는다.
+          if (!open && addLoading) return;
+          setAddModalOpen(open);
+          if (!open) setAddError(null);
+        }}
+      >
+        <DialogContent
+          showCloseButton={false}
+          overlayClassName="bg-black/40"
+          aria-describedby={undefined}
+          className="block w-[360px] rounded-2xl bg-card p-5 text-foreground shadow-xl sm:max-w-none"
+        >
+          <DialogHeader className="mb-4 flex-row items-center justify-between gap-0">
+            <DialogTitle className="font-sans text-[15px] leading-normal font-extrabold">
+              고객 추가
+            </DialogTitle>
+            <DialogClose className="rounded p-1 text-muted-foreground hover:text-foreground">
+              <X className="size-4" />
+              <span className="sr-only">닫기</span>
+            </DialogClose>
+          </DialogHeader>
+          <div className="flex flex-col gap-3">
+            <div>
+              <label className="mb-1 block text-[11px] font-bold text-muted-foreground">
+                고객명
+              </label>
+              <Input
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="예: 홍길동"
+                onKeyDown={(e) => e.key === "Enter" && handleAddCustomer()}
+              />
             </div>
-            <div className="flex flex-col gap-3">
-              <div>
-                <label className="mb-1 block text-[11px] font-bold text-muted-foreground">
-                  고객명
-                </label>
-                <Input
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  placeholder="예: 홍길동"
-                  onKeyDown={(e) => e.key === "Enter" && handleAddCustomer()}
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-[11px] font-bold text-muted-foreground">
-                  운용자산 (억원)
-                </label>
-                <Input
-                  type="number"
-                  value={newAum}
-                  onChange={(e) => setNewAum(e.target.value)}
-                  placeholder="예: 20"
-                />
-              </div>
-              {addError && (
-                <p className="text-[11px] font-semibold text-amber-600">
-                  {addError}
-                </p>
+            <div>
+              <label className="mb-1 block text-[11px] font-bold text-muted-foreground">
+                운용자산 (억원)
+              </label>
+              <Input
+                type="number"
+                value={newAum}
+                onChange={(e) => setNewAum(e.target.value)}
+                placeholder="예: 20"
+              />
+            </div>
+            {addError && (
+              <p className="text-[11px] font-semibold text-amber-600">
+                {addError}
+              </p>
+            )}
+            <Button
+              onClick={handleAddCustomer}
+              className="w-full font-bold"
+              disabled={!newName.trim() || addLoading}
+            >
+              {addLoading ? (
+                <>
+                  <Loader2 className="size-3.5 animate-spin" />
+                  저장 중…
+                </>
+              ) : (
+                "추가하기"
               )}
-              <Button
-                onClick={handleAddCustomer}
-                className="w-full font-bold"
-                disabled={!newName.trim() || addLoading}
-              >
-                {addLoading ? (
-                  <>
-                    <Loader2 className="size-3.5 animate-spin" />
-                    저장 중…
-                  </>
-                ) : (
-                  "추가하기"
-                )}
-              </Button>
-            </div>
+            </Button>
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

@@ -3,6 +3,13 @@
 import { useState } from "react";
 import { PanelRightClose, PanelRightOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import InsightSection from "@/components/right-panel/InsightSection";
 import HelpTooltip from "@/components/common/HelpTooltip";
 import { useAutoCollapse } from "@/lib/useAutoCollapse";
@@ -72,28 +79,36 @@ export default function RightPanel() {
         </Button>
       </HelpTooltip>
 
-      {confirmOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="w-80 rounded-2xl bg-card p-6 shadow-xl ring-1 ring-foreground/10">
-            <p className="text-[15px] font-extrabold">IPS에 반영하시겠습니까?</p>
-            <p className="mt-1.5 text-[13px] font-medium text-muted-foreground">
+      {/* IPS 승인 확인 — 닫기(X) 없이 승인/거절만 두던 기존 UI를 그대로 두고,
+          ESC·백드롭 클릭·포커스 트랩만 Dialog 프리미티브에서 얻는다. */}
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent
+          showCloseButton={false}
+          overlayClassName="bg-black/40 backdrop-blur-sm"
+          className="block w-80 rounded-2xl bg-card p-6 text-foreground shadow-xl sm:max-w-none"
+        >
+          <DialogHeader className="block">
+            <DialogTitle className="font-sans text-[15px] leading-normal font-extrabold">
+              IPS에 반영하시겠습니까?
+            </DialogTitle>
+            <DialogDescription className="mt-1.5 text-[13px] font-medium text-muted-foreground">
               AI 인사이트 요약을 IPS의 <b>Unique</b> 항목에 추가합니다.
-            </p>
-            <div className="mt-4 flex gap-2">
-              <Button className="flex-1" onClick={handleConfirm}>
-                승인
-              </Button>
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={() => setConfirmOpen(false)}
-              >
-                거절
-              </Button>
-            </div>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4 flex gap-2">
+            <Button className="flex-1" onClick={handleConfirm}>
+              승인
+            </Button>
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => setConfirmOpen(false)}
+            >
+              거절
+            </Button>
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
