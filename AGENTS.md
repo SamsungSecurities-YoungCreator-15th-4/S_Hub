@@ -18,6 +18,7 @@
 2. **설명가능(화이트박스)** — 모든 수치·주장에는 근거(citations/evidence)를 첨부한다.
    최종 판단은 사람이 한다(HITL, `approval_gate` 직전 인터럽트).
 3. **계층 경계** — `engine/deterministic/`(결정론 계층) 안에서는 langchain·openai import를 금지한다.
+   이 규칙은 `tests/test_layer_separation.py` 가 **코드로 강제**한다(문서에만 두지 않는다).
    수치 계산은 순수 파이썬/numpy로만 한다. LLM 호출은 `engine/llm/` + 노드 계층에서만 한다.
 4. **데이터 계약** — `engine/state.py`(`RiskState`/`IPSProfile`)는 팀 합의 없이 수정하지 않는다.
    변경이 필요하면 먼저 팀에 공유한다.
@@ -59,8 +60,11 @@ S_Hub/
 │   ├── graph.py       # StateGraph 조립 (9노드 + 조건부 분기 2개)
 │   ├── hard_stop_policy.py      # Hard Stop 정책 버전 로더·검증(SSOT 접근점)
 │   ├── deployment_validation.py # 실제 배포 계약 검증(--validate-deployment)
+│   ├── context.py     # CalcContext — 기준일·통화·시드·rf·검색인덱스 지문을 한 곳에
 │   ├── nodes/         # 그래프 노드 (순수 함수, 바꾼 키만 반환)
 │   ├── engine/        # 결정론 계층 — langchain/llm import 금지
+│   │                  #   metrics(VaR·CVaR·Sharpe·MDD) · returns · stress
+│   │                  #   tax(세전→세금→비용→세후) · compare(A/B, 우열 판단 안 함)
 │   ├── llm/           # AzureChatOpenAI 팩토리·프롬프트 체인
 │   ├── rag/           # 검색·인용 검증·인덱스 배포
 │   ├── judge/         # judge 6축 루브릭 (런타임 판정)
@@ -69,6 +73,7 @@ S_Hub/
 │   ├── observability/ # LangSmith 트레이싱
 │   └── utils/         # 해시 등 공용 유틸
 ├── console/           # [S.ymphony] Streamlit 엔진 콘솔 (구 ui/)
+│                      #   trust_metrics.py(신뢰 지표 집계) · trust_panel.py(전용 패널)
 ├── config/            # [S.ymphony] config.yaml · ips_policy.yaml · hard_stop_policy.yaml · rag_sources.json
 ├── corpus/            # [S.ymphony] RAG 근거 문서 (21건, 원문 PDF는 gitignore·로컬 전용 / manifest.md 참조)
 ├── data/              # [S.ymphony] 시장 데이터 (gitignore 대상 산출물 포함)
