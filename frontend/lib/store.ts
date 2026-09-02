@@ -26,6 +26,11 @@ import type {
   StressTaxData,
 } from "./api";
 import type { CurrentWeightsInput } from "./assetMapping";
+import {
+  INITIAL_RUN_STATUS,
+  canTransition,
+  type RunStatus,
+} from "./runStatus";
 
 export type { CurrentWeightsInput };
 
@@ -58,7 +63,7 @@ export const EMPTY_IPS: IpsState = {
 /** STT 상담 연동 상태(비동기 흐름·출처 표시용). */
 export type SttStatus = "idle" | "uploading" | "done" | "error";
 
-interface DashboardState {
+export interface DashboardState {
   customers: Customer[];
   selectedCustomerId: string;
   selectedPortfolioId: string;
@@ -133,6 +138,18 @@ interface DashboardState {
     ips: IpsState,
     scenario: { ratePct: number; fxKrw: number },
   ) => void;
+
+  // ── 실행 상태(확정 수명주기) ──
+  // 값·전이 규칙의 출처는 lib/runStatus.ts 하나뿐이다(엔진 계약을 그대로 옮긴 것).
+  // 아직 어느 화면에도 연결하지 않았다 — PDF 확정 게이트가 이 필드를 읽을 예정이다.
+  /** 현재 상담의 실행 상태. 초기값 draft. */
+  runStatus: RunStatus;
+  /** blocked 사유(엔진 governance.confirmation_blocked_reason에 대응). 없으면 빈 문자열. */
+  runStatusReason: string;
+  /** 전이표에 있는 전이만 반영한다. 규칙에 없는 전이는 상태를 바꾸지 않는다. */
+  setRunStatus: (next: RunStatus, reason?: string) => void;
+  /** 초기 상태(draft)로 되돌린다. 재실행·상담 전환 시 사용. */
+  resetRunStatus: () => void;
 
   // ── 상단바 실시간 시장 지표 ──
   // MacroTicker 가 /api/macro-indicators 로 받은 실데이터를 여기에 올려, PDF 등
@@ -224,6 +241,18 @@ export const useDashboardStore = create<DashboardState>((set) => ({
   setAnalysisBaseline: (ips, scenario) =>
     set({ lastAnalyzedIps: ips, lastAnalyzedScenario: scenario }),
 
+  runStatus: INITIAL_RUN_STATUS,
+  runStatusReason: "",
+  setRunStatus: (next, reason) =>
+    set((s) => {
+      // 실패 폐쇄: 규칙에 없는 전이는 조용히 무시하고 현재 상태를 유지한다.
+      // 잘못된 전이로 확정(locked)이나 차단 해제가 일어나는 것을 막는 것이 목적이다.
+      if (!canTransition(s.runStatus, next)) return s;
+      return { runStatus: next, runStatusReason: reason ?? "" };
+    }),
+  resetRunStatus: () =>
+    set({ runStatus: INITIAL_RUN_STATUS, runStatusReason: "" }),
+
   macroIndicators: MACRO_INDICATORS,
   setMacroIndicators: (rows) => set({ macroIndicators: rows }),
 
@@ -314,3 +343,18 @@ export const useDashboardStore = create<DashboardState>((set) => ({
   setConsultationId: (id) => set({ consultationId: id }),
   setSttStatus: (status, note) => set({ sttStatus: status, sttNote: note }),
 }));
+
+// ── 실행 상태 셀렉터 ──
+// 스토어에 셀렉터 관례가 없어 컴포넌트가 각자 s.runStatus 를 적으면 키 이름이
+// 흩어진다. 읽는 경로를 여기 하나로 모아 둔다.
+
+/** 현재 실행 상태. */
+export const selectRunStatus = (s: DashboardState): RunStatus => s.runStatus;
+
+/** blocked 사유. 차단 상태가 아니면 빈 문자열. */
+export const selectRunStatusReason = (s: DashboardState): string =>
+  s.runStatusReason;
+
+/** 컴포넌트용 구독 훅 — `const status = useRunStatus();` */
+export const useRunStatus = (): RunStatus =>
+  useDashboardStore(selectRunStatus);
