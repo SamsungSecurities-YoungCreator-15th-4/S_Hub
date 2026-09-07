@@ -49,8 +49,11 @@ export const CALC_UNIT_TO_ENGINE_CLASS: Record<CalcUnitId, EngineAssetClass> = {
   infraFund: "alternatives",
 };
 
+/** 카드 시나리오 키. STRESS_SCENARIOS 의 key 와 1:1 대응한다. */
+export type StressScenarioKey = "covid" | "high_rate" | "strong_usd";
+
 export interface StressScenario {
-  key: string;
+  key: StressScenarioKey;
   /** 카드 제목 — 사람이 기억하는 사건 이름. */
   label: string;
   /** 그때 무슨 일이 있었는지 한 줄. */

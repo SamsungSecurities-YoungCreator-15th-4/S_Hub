@@ -522,25 +522,6 @@ export const SCENARIO_BASE = {
 };
 
 // 시나리오 슬라이더 변화 → 예상 평가손익(억원) 더미 선형 민감도.
-// 정본 시안의 표시값(금리 +1.00%p · 환율 -450원 → 현재 -1.0 / A -1.6 / B -3.2억)을
-// 재현하도록 역산한 자리표시자다. 실제 민감도는 백엔드 시뮬레이션으로 대체.
-export const SCENARIO_SENSITIVITY: Record<
-  "current" | "a" | "b",
-  { perRatePct: number; perFxKrw: number }
-> = {
-  current: { perRatePct: -0.4, perFxKrw: 0.6 / 450 },
-  a: { perRatePct: -0.6, perFxKrw: 1.0 / 450 },
-  b: { perRatePct: -1.2, perFxKrw: 2.0 / 450 },
-};
-
-// 기준 시나리오에서 이만큼 벗어나면 "큰 폭 변동" 경고를 띄운다 (UI 더미 기준)
-export const SCENARIO_WARN = {
-  rateDeltaPct: 0.75,
-  fxDeltaKrw: 300,
-  message:
-    "매우 큰 폭의 변동을 가정한 시나리오입니다. 정밀한 수치보다는 전체적인 흐름을 보시는 용도로 적합합니다.",
-};
-
 /**
  * AI 인사이트 하단의 출처/인용 목록 원소 타입.
  * 실제 출처는 백엔드 RAG(`/rag/insight`)의 citations 로 채운다.

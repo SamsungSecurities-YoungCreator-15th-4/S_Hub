@@ -3,6 +3,7 @@
  * 구조: 표지 → 시장현황&IPS → 포트폴리오 비교 → 절세 최적화 → AI 인사이트
  */
 
+import { STRESS_SCENARIOS } from "@/lib/stressScenarios";
 import { useDashboardStore } from "@/lib/store";
 import { buildPdfAllocation, buildPdfMacroCell, buildPdfPerfRows } from "@/lib/pdfPortfolioData";
 import {
@@ -704,7 +705,7 @@ function PortfolioPage() {
   const storePortfolios = useDashboardStore((s) => s.portfolios);
   const basePortfolios = useDashboardStore((s) => s.basePortfolios);
   const isStressMode = useDashboardStore((s) => s.isStressMode);
-  const stressPreset = useDashboardStore((s) => s.stressPreset);
+  const stressScenarioKey = useDashboardStore((s) => s.stressScenarioKey);
   const scenario = useDashboardStore((s) => s.scenario);
   const liveBase = useDashboardStore((s) => s.liveBase);
   const customers = useDashboardStore((s) => s.customers);
@@ -755,7 +756,7 @@ function PortfolioPage() {
           pnl: fmtPnl(null),
         },
         {
-          name: stressPreset === "crisis" ? "금융위기" : stressPreset === "war" ? "러우전쟁" : "설정 시나리오",
+          name: STRESS_SCENARIOS.find((sc) => sc.key === stressScenarioKey)?.label ?? "미선택",
           rate: `${scenario.ratePct.toFixed(2)}%`,
           fx: `${scenario.fxKrw.toLocaleString("ko-KR")}원`,
           pnl: fmtPnl(pnlEok(selId)),
