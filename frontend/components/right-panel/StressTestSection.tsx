@@ -109,21 +109,21 @@ function ScenarioCard({
           : "border-border hover:border-brand/40"
       }`}
     >
-      <p className="text-[13px] font-extrabold">{scenario.label}</p>
-      <p className="mt-0.5 text-[10.5px] font-semibold leading-snug text-muted-foreground">
-        {scenario.shockSummary}
-      </p>
-      <div className="mt-1.5 flex items-baseline gap-1.5">
+      <div className="flex items-baseline justify-between gap-1.5">
+        <span className="text-[13px] font-extrabold">{scenario.label}</span>
         <span className="text-[17px] font-extrabold text-down tabular-nums">
           &minus;{formatKrwLoss(loss.lossKrw)}
         </span>
-        <span className="text-[11px] font-semibold text-down/70 tabular-nums">
-          총자산 대비 &minus;{(loss.lossPct * 100).toFixed(1)}%
-        </span>
       </div>
-      <p className="text-[10.5px] font-semibold text-muted-foreground tabular-nums">
+      <p className="text-right text-[10.5px] font-semibold text-muted-foreground tabular-nums">
         {formatKrwLoss(loss.lossKrwLow)} ~ {formatKrwLoss(loss.lossKrwHigh)}
       </p>
+      {/* 자산군별 충격은 근거라 고른 카드에서만 편다 — 세 장을 훑을 때는 이름과 금액만 보이게. */}
+      {selected && (
+        <p className="mt-1.5 border-t border-border pt-1.5 text-[10.5px] font-semibold leading-snug text-muted-foreground">
+          {scenario.shockSummary}
+        </p>
+      )}
     </button>
   );
 }
