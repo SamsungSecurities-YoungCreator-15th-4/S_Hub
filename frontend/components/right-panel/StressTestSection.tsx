@@ -109,26 +109,26 @@ function ScenarioCard({
           : "border-border hover:border-brand/40"
       }`}
     >
-      <div className="flex items-baseline justify-between">
+      <div className="flex items-baseline gap-1.5">
         <span className="text-[13px] font-extrabold">{scenario.label}</span>
-        <span className="text-[11px] font-semibold text-muted-foreground tabular-nums">
-          자산의 {(loss.lossPct * 100).toFixed(1)}%
+        <span className="text-[11px] font-medium text-muted-foreground">
+          {scenario.blurb}
         </span>
       </div>
-      <p className="mt-0.5 text-[11px] font-medium leading-snug text-muted-foreground">
-        {scenario.blurb}
+      <p className="mt-0.5 text-[10.5px] font-semibold leading-snug text-muted-foreground">
+        {scenario.shockSummary}
       </p>
-      <p className="mt-1.5 text-[17px] font-extrabold text-down tabular-nums">
-        &minus;{formatKrwLoss(loss.lossKrw)}
-      </p>
+      <div className="mt-1.5 flex items-baseline gap-1.5">
+        <span className="text-[17px] font-extrabold text-down tabular-nums">
+          &minus;{formatKrwLoss(loss.lossKrw)}
+        </span>
+        <span className="text-[11px] font-semibold text-down/70 tabular-nums">
+          총자산 대비 &minus;{(loss.lossPct * 100).toFixed(1)}%
+        </span>
+      </div>
       <p className="text-[10.5px] font-semibold text-muted-foreground tabular-nums">
         {formatKrwLoss(loss.lossKrwLow)} ~ {formatKrwLoss(loss.lossKrwHigh)}
       </p>
-      {selected && (
-        <p className="mt-1.5 border-t border-border pt-1.5 text-[10px] font-medium leading-snug text-muted-foreground">
-          {scenario.reference}
-        </p>
-      )}
     </button>
   );
 }

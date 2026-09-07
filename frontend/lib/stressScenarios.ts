@@ -56,8 +56,13 @@ export interface StressScenario {
   key: StressScenarioKey;
   /** 카드 제목 — 사람이 기억하는 사건 이름. */
   label: string;
-  /** 그때 무슨 일이 있었는지 한 줄. */
+  /** 국면을 한마디로. */
   blurb: string;
+  /**
+   * 카드에 표기할 자산군별 충격 요약.
+   * 아래 shocks 값을 그대로 옮긴 것이라 화면 문구와 계산 근거가 같다.
+   */
+  shockSummary: string;
   /** 엔진 reference 원문 — 근거 표기용. */
   reference: string;
   shocks: Record<EngineAssetClass, number>;
@@ -72,7 +77,8 @@ export const STRESS_SCENARIOS: StressScenario[] = [
   {
     key: "covid",
     label: "2020 코로나",
-    blurb: "팬데믹으로 위험자산이 한꺼번에 팔려나간 국면",
+    blurb: "위험자산 투매",
+    shockSummary: "국내주식 −30% · 해외주식 −25% · 채권 −1~3%",
     reference: "2020-02~03 코로나 급락 국면 참조 — 핵심 특징을 반영한 가상 시나리오(방향·크기 정합)",
     shocks: {
       domestic_equity: -0.3,
@@ -86,7 +92,8 @@ export const STRESS_SCENARIOS: StressScenario[] = [
   {
     key: "high_rate",
     label: "2022 고금리",
-    blurb: "정책금리가 빠르게 올라 채권 가격이 직접 내린 국면",
+    blurb: "금리 급등",
+    shockSummary: "주식 −25% · 국내채권 −15% · 해외채권 −12%",
     reference: "2022 고금리 국면(한·미 정책금리 급등) 참조 — 핵심 특징을 반영한 가상 시나리오(방향·크기 정합)",
     shocks: {
       domestic_equity: -0.25,
@@ -100,7 +107,8 @@ export const STRESS_SCENARIOS: StressScenario[] = [
   {
     key: "strong_usd",
     label: "2022 강달러",
-    blurb: "원/달러가 급등해 원화자산이 위험회피 충격을 받은 국면",
+    blurb: "원화 약세",
+    shockSummary: "국내주식 −12% · 국내채권 −5% · 해외주식 −3%",
     reference: "2022 강달러 국면(원/달러 1,440원대) 참조 — 핵심 특징을 반영한 가상 시나리오(방향·크기 정합)",
     shocks: {
       domestic_equity: -0.12,
