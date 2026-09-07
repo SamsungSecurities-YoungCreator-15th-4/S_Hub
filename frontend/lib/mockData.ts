@@ -226,7 +226,7 @@ export interface Portfolio {
   badge: "현재" | "베스트" | "추천";
   /** 백엔드 8개 자산군 원본 allocation (도넛 차트에 직접 사용) */
   allocation?: { asset_class: string; name: string; weight: number }[];
-  /** 11종 계산 단위 비중(%). CorrelationHeatmap 필터링용 — 도넛 표시는 allocation 우선 */
+  /** 11종 계산 단위 비중(%). PDF 상관관계 히트맵 필터링용 — 도넛 표시는 allocation 우선 */
   weights: CalcUnitWeights;
   metrics: PortfolioMetrics;
   backtest?: BacktestPoint[];
@@ -386,17 +386,6 @@ export const BACKTEST_SERIES = [
     sp500: 190,
     msciAcwi: 168,
   },
-];
-
-// ── 상관관계 히트맵 (6분류 기준 더미 행렬, 대칭) ────────────────
-// DISPLAY_GROUPS 순서와 동일한 6x6 행렬.
-export const CORRELATION_MATRIX: number[][] = [
-  [1.0, 0.62, 0.71, 0.18, 0.05, 0.12],
-  [0.62, 1.0, 0.68, 0.22, 0.1, 0.15],
-  [0.71, 0.68, 1.0, 0.14, 0.02, 0.09],
-  [0.18, 0.22, 0.14, 1.0, 0.74, 0.4],
-  [0.05, 0.1, 0.02, 0.74, 1.0, 0.35],
-  [0.12, 0.15, 0.09, 0.4, 0.35, 1.0],
 ];
 
 // ── 절세 최적화 시뮬레이터 ─────────────────────────────────────

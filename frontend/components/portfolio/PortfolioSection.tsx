@@ -1,10 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import AssetDonut from "@/components/portfolio/AssetDonut";
-import CorrelationHeatmap from "@/components/portfolio/CorrelationHeatmap";
 import {
   BACKEND_ASSET_COLORS,
   DISPLAY_GROUP_COLORS,
@@ -111,7 +109,6 @@ function PortfolioCard({
   onSelect: () => void;
   selectable: boolean;
 }) {
-  const [view, setView] = useState<"donut" | "heatmap">("donut");
   // 백엔드 8개 자산군이 있으면 직접 사용, 없으면 구형 6분류 변환으로 폴백
   const allocation = pf.allocation
     ? pf.allocation
@@ -167,35 +164,12 @@ function PortfolioCard({
             </span>
           )}
         </div>
-        <div
-          className="flex rounded-lg bg-muted p-0.5"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {(["donut", "heatmap"] as const).map((v) => (
-            <button
-              key={v}
-              type="button"
-              onClick={() => setView(v)}
-              className={`rounded-md px-2 py-0.5 text-[9.5px] font-bold transition-colors ${
-                view === v
-                  ? "bg-white text-brand-dark shadow-sm"
-                  : "text-muted-foreground/70 hover:text-foreground"
-              }`}
-            >
-              {v === "donut" ? "자산배분" : "상관관계"}
-            </button>
-          ))}
-        </div>
       </div>
 
       <div className="flex h-72 items-stretch gap-2.5">
-        {view === "donut" ? (
-          <div className="flex flex-1 flex-col items-center">
-            <AssetDonut allocation={allocation} />
-          </div>
-        ) : (
-          <CorrelationHeatmap portfolio={pf} />
-        )}
+        <div className="flex flex-1 flex-col items-center">
+          <AssetDonut allocation={allocation} />
+        </div>
       </div>
 
       <div className="mt-2.5 grid grid-cols-3 gap-px overflow-hidden rounded-lg bg-muted">
