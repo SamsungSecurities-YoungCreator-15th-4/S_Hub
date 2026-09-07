@@ -756,7 +756,7 @@ function PortfolioPage() {
           pnl: fmtPnl(null),
         },
         {
-          name: STRESS_SCENARIOS.find((sc) => sc.key === stressScenarioKey)?.label ?? "미선택",
+          name: STRESS_SCENARIOS.find((sc) => sc.key === stressScenarioKey)?.label ?? "현재 (충격 없음)",
           rate: `${scenario.ratePct.toFixed(2)}%`,
           fx: `${scenario.fxKrw.toLocaleString("ko-KR")}원`,
           pnl: fmtPnl(pnlEok(selId)),

@@ -63,6 +63,26 @@ export default function StressTestSection() {
         </p>
       ) : (
         <div className="flex flex-col gap-2">
+          {/*
+            "현재" 는 충격을 적용하지 않은 상태다. 대시보드의 다른 지표는 어차피
+            늘 현재 기준이라 계산상 바뀌는 것은 없지만, 고른 카드를 되돌릴 방법이
+            보이지 않아 상태로 노출한다.
+          */}
+          <button
+            type="button"
+            onClick={() => setStressScenarioKey(null)}
+            aria-pressed={stressScenarioKey === null}
+            className={`rounded-lg px-2.5 py-1.5 text-left text-[12px] font-bold transition-colors ${
+              stressScenarioKey === null
+                ? "bg-brand/[0.06] text-brand-dark"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            현재
+            <span className="ml-1.5 text-[10.5px] font-semibold text-muted-foreground">
+              충격 없음
+            </span>
+          </button>
           {STRESS_SCENARIOS.map((scenario) => (
             <ScenarioCard
               key={scenario.key}
