@@ -5,8 +5,7 @@ import { Card } from "@/components/ui/card";
 import AssetDonut from "@/components/portfolio/AssetDonut";
 import {
   BACKEND_ASSET_COLORS,
-  DISPLAY_GROUP_COLORS,
-  toDisplayAllocation,
+  toCalcUnitAllocation,
 } from "@/lib/assetMapping";
 import { type Portfolio, type PortfolioMetrics } from "@/lib/mockData";
 import { pctOfAumLabel } from "@/lib/formatKrw";
@@ -126,11 +125,7 @@ function PortfolioCard({
           weight: a.weight,
           color: BACKEND_ASSET_COLORS[a.asset_class] ?? "#8899AA",
         }))
-    : toDisplayAllocation(pf.weights).map((a) => ({
-        label: a.group,
-        weight: a.weight,
-        color: DISPLAY_GROUP_COLORS[a.group],
-      }));
+    : toCalcUnitAllocation(pf.weights);
   const m = pf.metrics as PortfolioMetrics & {
     afterTaxReturnRangeLabel?: string;
     mddRangeLabel?: string;
@@ -174,7 +169,7 @@ function PortfolioCard({
         </div>
       </div>
 
-      <div className="flex h-72 items-stretch gap-2.5">
+      <div className="flex min-h-72 items-stretch gap-2.5">
         <div className="flex flex-1 flex-col items-center">
           <AssetDonut allocation={allocation} />
         </div>

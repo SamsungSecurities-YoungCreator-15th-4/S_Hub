@@ -93,6 +93,46 @@ export const BACKEND_ASSET_COLORS: Record<string, string> = {
   cash:            "#E2E8F0",
 };
 
+/**
+ * 11종 계산 단위 색상.
+ *
+ * 계열로 묶어 읽히게 한다 — 주식은 브랜드 파랑, 채권은 청록, 대체는 황토.
+ * 한 색상 램프로 11칸을 나누면 뒤쪽 네댓 개가 서로 구분되지 않는다.
+ */
+export const CALC_UNIT_COLORS: Record<CalcUnitId, string> = {
+  // 주식 4
+  domesticEquity: "#0064FF",
+  overseasDividendEquity: "#2C7BFF",
+  overseasGrowthEquity: "#5C9CFF",
+  emergingEquity: "#8AB6FF",
+  // 채권 3
+  domesticBond: "#0E8C7F",
+  overseasBond: "#35AE9F",
+  lowCouponBond: "#7ACFC3",
+  // 대체 4
+  separateTaxBond: "#C08A2B",
+  reits: "#D9A94F",
+  gold: "#E7C685",
+  infraFund: "#F1DDB4",
+};
+
+/**
+ * 11종 비중을 그대로 도넛 데이터로 만든다.
+ *
+ * 6분류(CALC_TO_DISPLAY)는 세제 기준 묶음이라 리츠·금·인프라펀드가 전부
+ * "분리과세" 로 합쳐져 차트에서 이름이 사라진다. 자산배분을 보여주는
+ * 자리에서는 계산 단위를 그대로 쓴다.
+ */
+export function toCalcUnitAllocation(
+  weights: CalcUnitWeights,
+): { label: string; weight: number; color: string }[] {
+  return CALC_UNITS.map((unit) => ({
+    label: unit.label,
+    weight: weights[unit.id] ?? 0,
+    color: CALC_UNIT_COLORS[unit.id],
+  }));
+}
+
 // ── 11종 → 6분류 매핑 ──────────────────────────────────────────
 // TODO(팀 확정 필요): 특히 대체자산 4종을 "분리과세"로 묶는 부분은 가안.
 export const CALC_TO_DISPLAY: Record<CalcUnitId, DisplayGroup> = {
