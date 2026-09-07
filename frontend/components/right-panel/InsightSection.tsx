@@ -21,7 +21,7 @@ import {
   fetchRagInsight,
 } from "@/lib/api";
 import { useDashboardStore } from "@/lib/store";
-import { DOCUMENT_LINKS } from "@/lib/documentLinks";
+import { lookupDocument } from "@/lib/documentLinks";
 
 /** 우측 하단: AI 인사이트 검색(RAG /rag/insight 실연결) + 결과 + 요약 + 출처/인용 */
 export default function InsightSection() {
@@ -191,7 +191,7 @@ export default function InsightSection() {
             </p>
             <div className="flex-1 overflow-y-auto min-h-0">
               {citations.map((src, i) => {
-                const docInfo = DOCUMENT_LINKS[src.title];
+                const docInfo = lookupDocument(src.title);
                 const displayDate = docInfo?.date ?? src.date;
                 const inner = (
                   <>

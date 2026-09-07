@@ -554,8 +554,8 @@ export const SCENARIO_WARN = {
 
 /**
  * AI 인사이트 하단의 출처/인용 목록 원소 타입.
- * 실제 출처는 백엔드 RAG(`/rag/insight`)의 citations 로만 채운다.
- * 하드코딩한 출처명은 근거가 없어 제거했고, 목록은 비어 있다.
+ * 실제 출처는 백엔드 RAG(`/rag/insight`)의 citations 로 채운다.
+ * 아래 INSIGHT.sources 는 백엔드 미연결(시연·폴백) 시에만 쓰이는 대체값이다.
  */
 export interface InsightSource {
   title: string;
@@ -569,5 +569,24 @@ export const INSIGHT = {
     "현재 고객 포트폴리오의 시장 환경 대응 전략 및 최적 자산 배분 방향을 분석해 주세요.",
   defaultAnswer:
     "현재 고객 포트폴리오는 국내주식 20%, 해외배당주 22% 비중으로 선진국 배당 자산에 상대적으로 집중되어 있습니다. 최근 미 연준의 금리 동결 기조 장기화 가능성을 고려할 때, 단기 채권 듀레이션을 1~2년 이내로 유지하면서 투자등급 회사채 비중을 소폭 확대하는 전략이 유효합니다.\n\n환율 측면에서는 원/달러 환율이 1,380~1,420원 구간에서 등락하는 현 상황에서, 해외자산 중 비헤지 비중이 44%에 달해 환손실 리스크가 잠재합니다. 달러 익스포저의 30% 수준까지 환헤지 전환을 단계적으로 검토하시기 바랍니다.\n\n세후 수익률 기준으로는 포트폴리오 A(세후 5.5%)가 현재 포트폴리오(세후 4.0%) 대비 약 1.5%p 우위에 있으며, ISA 계좌 편입과 연금저축 한도 추가 납입을 통해 절세 여력이 연간 최대 1,080만원 추가로 확보 가능합니다.\n\n리스크 관리 측면에서 MDD -11.2% 수준은 VVIP 고객 손실 허용 범위(통상 -15% 이내) 내에 있으나, 글로벌 경기 둔화 시나리오 하에서 해외성장주 비중(12%)이 변동성 확대의 주요 원인이 될 수 있습니다. 포트폴리오 B의 해외성장주 22% 비중 확대안은 고수익 추구 성향 고객에 한해 선별 제안을 권고합니다.",
-  sources: [] as InsightSource[],
+  /**
+   * 시연·폴백용 인용 목록. 새로 지어낸 출처가 아니라 **실제 RAG 코퍼스 문서**다.
+   *
+   * 값의 출처: `backend/data/<category>/*.pdf` (= `corpus/manifest.md` 21건).
+   * title·date 는 운영 인제스천 스크립트가 생성하는 문자열을 그대로 옮긴 것이라
+   * 백엔드 연결 시 `/rag/insight` 가 돌려주는 값과 형식·내용이 일치한다.
+   *   · title : `backend/scripts/ingest_documents.py` humanize_title()
+   *             = "<파일명 stem, _ → 공백> (<source_type>)"
+   *             source_type 폴더명 매핑 house_view→house_view / tax→tax_law / macro→macro
+   *   · date  : 같은 파일 parse_published_date() = 파일명의 YYYYMM→YYYY-MM-01,
+   *             YYYY→YYYY-01-01
+   *
+   * 코퍼스에 없는 문서명을 여기 추가하지 않는다 — 화면의 출처는 추적 가능해야 한다.
+   */
+  sources: [
+    { title: "bok mpd 202601 (macro)", date: "2026-01-01" },
+    { title: "fed fomc 202601 (macro)", date: "2026-01-01" },
+    { title: "samsung equity 202511 (house_view)", date: "2025-11-01" },
+    { title: "nts taxguide 2026 vol1 (tax_law)", date: "2026-01-01" },
+  ] as InsightSource[],
 };
