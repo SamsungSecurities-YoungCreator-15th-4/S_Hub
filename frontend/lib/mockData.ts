@@ -208,11 +208,12 @@ export interface PortfolioMetrics {
   volatilityPct: number;
   sharpe: number;
   sortino: number;
-  volatilityAmountLabel: string;
+  /** 백엔드 실계산 원화 병기. 없으면 화면이 비율×총자산으로 계산한다. */
+  volatilityAmountLabel?: string;
   mddPct: number; // 양수로 보관, 표시 시 ▼ 접두
-  mddAmountLabel: string;
+  mddAmountLabel?: string;
   afterTaxReturnPct: number;
-  afterTaxAmountLabel: string;
+  afterTaxAmountLabel?: string;
 }
 
 export interface BacktestPoint {
@@ -260,13 +261,10 @@ export const PORTFOLIOS: Portfolio[] = [
     metrics: {
       expectedReturnPct: 4.8,
       volatilityPct: 11.2,
-      volatilityAmountLabel: "±3,200만원",
       sharpe: 0.43,
       sortino: 0.3,
       mddPct: 14.6,
-      mddAmountLabel: "-3,200만원",
       afterTaxReturnPct: 4.0,
-      afterTaxAmountLabel: "+7,200만원",
     },
   },
   {
@@ -289,13 +287,10 @@ export const PORTFOLIOS: Portfolio[] = [
     metrics: {
       expectedReturnPct: 6.4,
       volatilityPct: 12.5,
-      volatilityAmountLabel: "±3,800만원",
       sharpe: 0.61,
       sortino: 0.48,
       mddPct: 11.2,
-      mddAmountLabel: "-2,000만원",
       afterTaxReturnPct: 5.5,
-      afterTaxAmountLabel: "+9,900만원",
     },
   },
   {
@@ -318,13 +313,10 @@ export const PORTFOLIOS: Portfolio[] = [
     metrics: {
       expectedReturnPct: 8.7,
       volatilityPct: 20.3,
-      volatilityAmountLabel: "±6,100만원",
       sharpe: 0.43,
       sortino: 0.43,
       mddPct: 23.3,
-      mddAmountLabel: "-4,200만원",
       afterTaxReturnPct: 7.2,
-      afterTaxAmountLabel: "+1.29억원",
     },
   },
 ];

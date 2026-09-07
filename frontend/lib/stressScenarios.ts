@@ -172,16 +172,5 @@ export function runStress(
   };
 }
 
-/** 손실액을 "6,900만원" · "1억 1,200만원" 형태로 표기한다(만원 단위 반올림). */
-export function formatKrwLoss(krw: number): string {
-  const manwon = Math.round(Math.abs(krw) / 10_000);
-  if (manwon === 0) return "0원";
-  const eok = Math.floor(manwon / 10_000);
-  const rest = manwon % 10_000;
-  if (eok > 0) {
-    return rest > 0
-      ? `${eok.toLocaleString("ko-KR")}억 ${rest.toLocaleString("ko-KR")}만원`
-      : `${eok.toLocaleString("ko-KR")}억원`;
-  }
-  return `${manwon.toLocaleString("ko-KR")}만원`;
-}
+/** 손실액 표기. 표기 규칙은 lib/formatKrw.ts 하나로 모은다. */
+export { formatKrwCompact as formatKrwLoss } from "./formatKrw";
