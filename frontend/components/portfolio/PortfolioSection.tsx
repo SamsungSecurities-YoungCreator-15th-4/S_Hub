@@ -275,11 +275,23 @@ function Metric({
         <div
           className={`mt-1 text-[14px] font-extrabold leading-none tabular-nums ${toneCls}`}
         >
-          {arrow && <span className="mr-0.5 text-[14px]">{arrow}</span>}
-          {sub ? (value === 0 ? sub.replace(/^[+\-±]/, "") : sub) : v}
+          {/* 금액은 부호(+ · - · ±)만 달고 삼각형은 아래 비율이 가져간다. */}
+          {sub ? (
+            value === 0 ? (
+              sub.replace(/^[+\-±]/, "")
+            ) : (
+              sub
+            )
+          ) : (
+            <>
+              {arrow && <span className="mr-0.5 text-[14px]">{arrow}</span>}
+              {v}
+            </>
+          )}
         </div>
         {sub && (
-          <div className="mt-0.5 text-[12px] font-bold tabular-nums text-muted-foreground">
+          <div className={`mt-0.5 text-[12px] font-bold tabular-nums ${toneCls}`}>
+            {arrow && <span className="mr-0.5">{arrow}</span>}
             {v}
           </div>
         )}
