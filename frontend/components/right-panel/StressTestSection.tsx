@@ -109,12 +109,7 @@ function ScenarioCard({
           : "border-border hover:border-brand/40"
       }`}
     >
-      <div className="flex items-baseline gap-1.5">
-        <span className="text-[13px] font-extrabold">{scenario.label}</span>
-        <span className="text-[11px] font-medium text-muted-foreground">
-          {scenario.blurb}
-        </span>
-      </div>
+      <p className="text-[13px] font-extrabold">{scenario.label}</p>
       <p className="mt-0.5 text-[10.5px] font-semibold leading-snug text-muted-foreground">
         {scenario.shockSummary}
       </p>
