@@ -455,6 +455,16 @@ export const TAX_THRESHOLD = {
   comprehensiveRateLabel: "최고 49.5%",
 };
 
+/**
+ * 절세 제안 카드에 연계할 상품 목록의 원소 타입.
+ * 개별 상품·펀드 제시는 백엔드에 근거가 없어(계산 대상은 ISA·연금 등 계좌 제도뿐)
+ * 목록을 비워 두었다. 근거 있는 상품 소스가 생기면 여기에 채운다.
+ */
+export interface TaxAdviceProduct {
+  name: string;
+  desc: string;
+}
+
 export const TAX_ADVICE = {
   cards: [
     {
@@ -463,13 +473,7 @@ export const TAX_ADVICE = {
       body: "이자·배당 자산 1,200만원을 ISA 잔여 한도로 이전 — 비과세 200만 + 초과분 9.9% 분리과세, 종합과세 합산 제외.",
       tag: "비과세 자산 이전",
       saving: "+21만원",
-      products: [
-        { name: "삼성증권 ISA 계좌 소개", desc: "" },
-        { name: "삼성증권 중개형 ISA 계좌", desc: "" },
-        { name: "삼성증권 신탁형 ISA 계좌", desc: "" },
-        { name: "삼성증권 일임형 ISA 계좌", desc: "" },
-        { name: "삼성증권 일임형 ISA 모델 포트폴리오", desc: "" },
-      ],
+      products: [] as TaxAdviceProduct[],
     },
     {
       icon: "연",
@@ -477,17 +481,7 @@ export const TAX_ADVICE = {
       body: "연금저축+IRP 잔여 한도 0만원 납입 시 13.2% 세액공제 — 만 55세 이후 연금 수령.",
       tag: "부적합·투자기간 3년 < 연금 수령까지 22년",
       saving: "",
-      products: [
-        { name: "삼성증권 연금저축계좌 소개", desc: "" },
-        { name: "삼성증권 IRP 계좌", desc: "" },
-        { name: "삼성증권 퇴직연금 DB형", desc: "" },
-        { name: "삼성증권 퇴직연금 DC형", desc: "" },
-        { name: "삼성증권 연금저축계좌 ETF/리츠 수수료 이벤트", desc: "" },
-        { name: "삼성증권 연금저축펀드 / TDF", desc: "" },
-        { name: "삼성증권 퇴직연금 원리금보장상품", desc: "" },
-        { name: "삼성증권 퇴직연금 펀드", desc: "" },
-        { name: "타 증권사 퇴직연금 이전 / 가져오기", desc: "" },
-      ],
+      products: [] as TaxAdviceProduct[],
     },
     {
       icon: "채",
@@ -495,12 +489,7 @@ export const TAX_ADVICE = {
       body: "일반채·저쿠폰채 이자 중 종합과세 구간분을 장기채권 분리과세(33%)로 종결해 한계세율 과세를 회피.",
       tag: "분리과세 전환",
       saving: "+142만원",
-      products: [
-        { name: "개인투자용 국채 3년물", desc: "" },
-        { name: "개인투자용 국채 5년물", desc: "" },
-        { name: "개인투자용 국채 10년물", desc: "" },
-        { name: "개인투자용 국채 20년물", desc: "" },
-      ],
+      products: [] as TaxAdviceProduct[],
     },
     {
       icon: "배",
@@ -508,11 +497,7 @@ export const TAX_ADVICE = {
       body: "고배당(해외배당·리츠) 중 종합과세 구간 배당을 저배당·자본이득형으로 조정해 추가과세 회피.",
       tag: "저율과세 편입",
       saving: "+1,419만원",
-      products: [
-        { name: "삼성증권 중개형 ISA 내 국내 고배당주", desc: "" },
-        { name: "삼성증권 중개형 ISA 내 국내상장 해외 배당 ETF", desc: "" },
-        { name: "삼성증권 퇴직연금 DC/IRP 계좌 내 배당 ETF·리츠", desc: "" },
-      ],
+      products: [] as TaxAdviceProduct[],
     },
     {
       icon: "공",
@@ -520,11 +505,7 @@ export const TAX_ADVICE = {
       body: "해외주식 양도차익을 연 250만원 기본공제 한도까지 실현해 비과세로 차익 확정.",
       tag: "기본공제 활용",
       saving: "+55만원",
-      products: [
-        { name: "삼성증권 해외주식", desc: "" },
-        { name: "삼성증권 글로벌 ETF 외", desc: "" },
-        { name: "삼성증권 국내상장ETF vs 해외상장 ETF 비교", desc: "" },
-      ],
+      products: [] as TaxAdviceProduct[],
     },
     {
       icon: "L",
@@ -532,11 +513,7 @@ export const TAX_ADVICE = {
       body: "평가손실을 확정해 해외주식 양도차익과 통산 → 통산액의 양도세(22%)만큼 절감.",
       tag: "평가손실 확정",
       saving: "+704만원",
-      products: [
-        { name: "삼성증권 해외주식", desc: "" },
-        { name: "삼성증권 글로벌 ETF 외", desc: "" },
-        { name: "삼성증권 국내상장ETF vs 해외상장 ETF 비교", desc: "" },
-      ],
+      products: [] as TaxAdviceProduct[],
     },
   ],
   totalLabel: "절세 제안 적용 시 예상 추가 절감",
@@ -575,6 +552,16 @@ export const SCENARIO_WARN = {
     "매우 큰 폭의 변동을 가정한 시나리오입니다. 정밀한 수치보다는 전체적인 흐름을 보시는 용도로 적합합니다.",
 };
 
+/**
+ * AI 인사이트 하단의 출처/인용 목록 원소 타입.
+ * 실제 출처는 백엔드 RAG(`/rag/insight`)의 citations 로 채운다.
+ * 아래 INSIGHT.sources 는 백엔드 미연결(시연·폴백) 시에만 쓰이는 대체값이다.
+ */
+export interface InsightSource {
+  title: string;
+  date: string;
+}
+
 // ── AI 인사이트 ────────────────────────────────────────────────
 export const INSIGHT = {
   placeholder: "예: 재무제표, RAG 문서, 분석 결과 요약",
@@ -582,10 +569,24 @@ export const INSIGHT = {
     "현재 고객 포트폴리오의 시장 환경 대응 전략 및 최적 자산 배분 방향을 분석해 주세요.",
   defaultAnswer:
     "현재 고객 포트폴리오는 국내주식 20%, 해외배당주 22% 비중으로 선진국 배당 자산에 상대적으로 집중되어 있습니다. 최근 미 연준의 금리 동결 기조 장기화 가능성을 고려할 때, 단기 채권 듀레이션을 1~2년 이내로 유지하면서 투자등급 회사채 비중을 소폭 확대하는 전략이 유효합니다.\n\n환율 측면에서는 원/달러 환율이 1,380~1,420원 구간에서 등락하는 현 상황에서, 해외자산 중 비헤지 비중이 44%에 달해 환손실 리스크가 잠재합니다. 달러 익스포저의 30% 수준까지 환헤지 전환을 단계적으로 검토하시기 바랍니다.\n\n세후 수익률 기준으로는 포트폴리오 A(세후 5.5%)가 현재 포트폴리오(세후 4.0%) 대비 약 1.5%p 우위에 있으며, ISA 계좌 편입과 연금저축 한도 추가 납입을 통해 절세 여력이 연간 최대 1,080만원 추가로 확보 가능합니다.\n\n리스크 관리 측면에서 MDD -11.2% 수준은 VVIP 고객 손실 허용 범위(통상 -15% 이내) 내에 있으나, 글로벌 경기 둔화 시나리오 하에서 해외성장주 비중(12%)이 변동성 확대의 주요 원인이 될 수 있습니다. 포트폴리오 B의 해외성장주 22% 비중 확대안은 고수익 추구 성향 고객에 한해 선별 제안을 권고합니다.",
+  /**
+   * 시연·폴백용 인용 목록. 새로 지어낸 출처가 아니라 **실제 RAG 코퍼스 문서**다.
+   *
+   * 값의 출처: `backend/data/<category>/*.pdf` (= `corpus/manifest.md` 21건).
+   * title·date 는 운영 인제스천 스크립트가 생성하는 문자열을 그대로 옮긴 것이라
+   * 백엔드 연결 시 `/rag/insight` 가 돌려주는 값과 형식·내용이 일치한다.
+   *   · title : `backend/scripts/ingest_documents.py` humanize_title()
+   *             = "<파일명 stem, _ → 공백> (<source_type>)"
+   *             source_type 폴더명 매핑 house_view→house_view / tax→tax_law / macro→macro
+   *   · date  : 같은 파일 parse_published_date() = 파일명의 YYYYMM→YYYY-MM-01,
+   *             YYYY→YYYY-01-01
+   *
+   * 코퍼스에 없는 문서명을 여기 추가하지 않는다 — 화면의 출처는 추적 가능해야 한다.
+   */
   sources: [
-    { title: "Young Creator 리서치 · 글로벌 전략", date: "2026.05.20" },
-    { title: "yfinance Market Data API", date: "실시간" },
-    { title: "Bloomberg Macro Outlook", date: "2026.05" },
-    { title: "국세청 금융소득 종합과세 가이드", date: "2026" },
-  ],
+    { title: "bok mpd 202601 (macro)", date: "2026-01-01" },
+    { title: "fed fomc 202601 (macro)", date: "2026-01-01" },
+    { title: "samsung equity 202511 (house_view)", date: "2025-11-01" },
+    { title: "nts taxguide 2026 vol1 (tax_law)", date: "2026-01-01" },
+  ] as InsightSource[],
 };

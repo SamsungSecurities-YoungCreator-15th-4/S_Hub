@@ -21,7 +21,7 @@ import {
   fetchRagInsight,
 } from "@/lib/api";
 import { useDashboardStore } from "@/lib/store";
-import { DOCUMENT_LINKS } from "@/lib/documentLinks";
+import { lookupDocument } from "@/lib/documentLinks";
 
 /** 우측 하단: AI 인사이트 검색(RAG /rag/insight 실연결) + 결과 + 요약 + 출처/인용 */
 export default function InsightSection() {
@@ -183,17 +183,15 @@ export default function InsightSection() {
           </div>
         </div>
 
-        {/* 출처 / 인용 목록 */}
-        <div className="flex flex-1 flex-col min-h-[130px]">
-          <p className="mb-1 shrink-0 text-[14px] font-bold">출처 / 인용 목록</p>
-          <div className="flex-1 overflow-y-auto min-h-0">
-            {citations.length === 0 ? (
-              <p className="py-1.5 text-[12px] font-medium text-muted-foreground">
-                표시할 출처가 없습니다.
-              </p>
-            ) : (
-              citations.map((src, i) => {
-                const docInfo = DOCUMENT_LINKS[src.title];
+        {/* 출처 / 인용 목록 — 인용이 없으면 라벨까지 통째로 감춘다 */}
+        {citations.length > 0 && (
+          <div className="flex flex-1 flex-col min-h-[130px]">
+            <p className="mb-1 shrink-0 text-[14px] font-bold">
+              출처 / 인용 목록
+            </p>
+            <div className="flex-1 overflow-y-auto min-h-0">
+              {citations.map((src, i) => {
+                const docInfo = lookupDocument(src.title);
                 const displayDate = docInfo?.date ?? src.date;
                 const inner = (
                   <>
@@ -228,10 +226,10 @@ export default function InsightSection() {
                     {inner}
                   </div>
                 );
-              })
-            )}
+              })}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </Card>
   );

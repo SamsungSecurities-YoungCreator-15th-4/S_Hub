@@ -86,3 +86,21 @@ export const DOCUMENT_LINKS: Record<string, DocumentInfo> = {
     date: "2026",
   },
 };
+
+/**
+ * 인용 제목 → 문서 링크 조회.
+ *
+ * 위 키는 파일명 stem(`_`→공백)만 담고 있는데, 백엔드가 실제로 내려보내는
+ * `document.title` 은 `backend/scripts/ingest_documents.py` 의 humanize_title()
+ * 결과라 `"<stem> (<source_type>)"` 형태로 source_type 접미사가 붙는다.
+ * (같은 함수의 독스트링 예시는 접미사 없는 형태로 적혀 있어 서로 어긋나 있다.)
+ *
+ * 어느 형태로 들어와도 같은 문서를 찾도록 정확 일치 → 접미사 제거 순으로 조회한다.
+ * 접미사를 떼는 정규식은 마지막 괄호 묶음만 지우므로 제목 중간의 괄호는 보존한다.
+ */
+export function lookupDocument(title: string): DocumentInfo | undefined {
+  const exact = DOCUMENT_LINKS[title];
+  if (exact) return exact;
+  const stripped = title.replace(/\s*\([^()]*\)\s*$/, "").trim();
+  return stripped === title ? undefined : DOCUMENT_LINKS[stripped];
+}

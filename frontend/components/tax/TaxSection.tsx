@@ -378,7 +378,11 @@ function AdviceCards({ liveCards, totalManwon }: AdviceCardsProps) {
       <div className="max-h-[520px] overflow-y-auto">
         <div className="grid grid-cols-2 gap-3">
           {cards.map((card) => {
-            const active = tabs[card.title] ?? "제안설명";
+            // 연계 상품 목록이 비면 "상품추천" 탭 자체를 감춘다 — 빈 탭·빈 박스를 남기지 않는다.
+            const hasProducts = card.products.length > 0;
+            const active = hasProducts
+              ? (tabs[card.title] ?? "제안설명")
+              : "제안설명";
             return (
               <div
                 key={card.title}
@@ -388,24 +392,26 @@ function AdviceCards({ liveCards, totalManwon }: AdviceCardsProps) {
                   <span className="flex-1 text-[13px] font-extrabold leading-tight">
                     {card.title}
                   </span>
-                  <div className="flex shrink-0 rounded-md bg-muted p-0.5">
-                    {(["제안설명", "상품추천"] as AdviceTab[]).map((t) => (
-                      <button
-                        key={t}
-                        type="button"
-                        onClick={() =>
-                          setTabs((prev) => ({ ...prev, [card.title]: t }))
-                        }
-                        className={`rounded-sm px-1.5 py-0.5 text-[10px] font-bold transition-colors ${
-                          active === t
-                            ? "bg-white text-brand-dark shadow-sm"
-                            : "text-muted-foreground"
-                        }`}
-                      >
-                        {t}
-                      </button>
-                    ))}
-                  </div>
+                  {hasProducts && (
+                    <div className="flex shrink-0 rounded-md bg-muted p-0.5">
+                      {(["제안설명", "상품추천"] as AdviceTab[]).map((t) => (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() =>
+                            setTabs((prev) => ({ ...prev, [card.title]: t }))
+                          }
+                          className={`rounded-sm px-1.5 py-0.5 text-[10px] font-bold transition-colors ${
+                            active === t
+                              ? "bg-white text-brand-dark shadow-sm"
+                              : "text-muted-foreground"
+                          }`}
+                        >
+                          {t}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {active === "제안설명" ? (

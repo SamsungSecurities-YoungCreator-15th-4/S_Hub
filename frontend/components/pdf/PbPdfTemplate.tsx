@@ -694,7 +694,7 @@ function MarketIpsPage() {
         </table>
       </div>
 
-      <PageFooter page={2} total={6} />
+      <PageFooter page={2} total={5} />
     </div>
   );
 }
@@ -1015,7 +1015,7 @@ function PortfolioPage() {
         )}
       </div>
 
-      <PageFooter page={3} total={6} />
+      <PageFooter page={3} total={5} />
     </div>
   );
 }
@@ -1637,127 +1637,12 @@ function TaxPage() {
         </div>
       </div>
 
-      <PageFooter page={4} total={6} />
+      <PageFooter page={4} total={5} />
     </div>
   );
 }
 
-// ── 페이지 5: 절세 제안 추천 상품 ──────────────────────────────
-function TaxProductsPage() {
-  const taxAdvice = buildPdfTaxAdvice(extractTaxOptimizerEntry(useDashboardStore((s) => s.taxOptimizer), useDashboardStore((s) => s.selectedPortfolioId)));
-  return (
-    <div
-      data-pdf-page=""
-      style={{
-        width: W,
-        height: H,
-        fontFamily: "Pretendard, Apple SD Gothic Neo, sans-serif",
-        background: "white",
-        position: "relative",
-        overflow: "hidden",
-      }}
-    >
-      <PageHeader
-        pageNum="③-2"
-        title="전략별 추천 상품"
-        subtitle="삼성증권 상품 연계 목록"
-      />
-
-      <div style={{ padding: "28px 40px 80px", wordBreak: "keep-all" }}>
-        <div
-          style={{ display: "flex", alignItems: "center", marginBottom: 16 }}
-        >
-          <SectionBar />
-          <div style={{ fontSize: 15, fontWeight: 800, color: TEXT }}>
-            전략별 추천 상품 목록
-          </div>
-        </div>
-
-        <table
-          style={{
-            width: "100%",
-            borderCollapse: "collapse",
-            tableLayout: "fixed",
-          }}
-        >
-          <colgroup>
-            <col style={{ width: 176 }} />
-            <col />
-          </colgroup>
-          <thead>
-            <tr style={{ background: BRAND }}>
-              <th
-                style={{
-                  padding: "10px 14px",
-                  textAlign: "left",
-                  fontSize: 13,
-                  fontWeight: 700,
-                  color: "white",
-                }}
-              >
-                전략
-              </th>
-              <th
-                style={{
-                  padding: "10px 14px",
-                  textAlign: "left",
-                  fontSize: 13,
-                  fontWeight: 700,
-                  color: "white",
-                }}
-              >
-                추천 상품 목록
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {taxAdvice.cards.map((card, i) => (
-              <tr
-                key={card.title}
-                style={{
-                  borderBottom: `1px solid ${BORDER}`,
-                  background: i % 2 === 0 ? "white" : BG_ALT,
-                }}
-              >
-                <td
-                  style={{
-                    padding: "13px 14px",
-                    verticalAlign: "top" as const,
-                  }}
-                >
-                  <div
-                    style={{ display: "flex", alignItems: "center", gap: 8 }}
-                  >
-                    <span
-                      style={{ fontSize: 13, fontWeight: 800, color: TEXT }}
-                    >
-                      {card.title}
-                    </span>
-                  </div>
-                </td>
-                <td
-                  style={{
-                    padding: "13px 14px",
-                    fontSize: 12,
-                    color: TEXT,
-                    lineHeight: 1.85,
-                    whiteSpace: "pre-line" as const,
-                  }}
-                >
-                  {card.products.map((p) => p.name).join("\n")}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <PageFooter page={5} total={6} />
-    </div>
-  );
-}
-
-// ── 페이지 6: AI 인사이트 ────────────────────────────────────────
+// ── 페이지 5: AI 인사이트 ────────────────────────────────────────
 function AiPage() {
   const insightResult = useDashboardStore((s) => s.insightResult);
   if (!insightResult) return null;
@@ -1884,74 +1769,79 @@ function AiPage() {
           </div>
         </div>
 
-        <div
-          style={{ display: "flex", alignItems: "center", marginBottom: 16 }}
-        >
-          <SectionBar />
-          <div style={{ fontSize: 14, fontWeight: 800, color: TEXT }}>
-            출처 / 인용 목록
-          </div>
-        </div>
+        {/* 인용이 없으면 제목·표 헤더까지 통째로 생략한다 */}
+        {citationSources.length > 0 && (
+          <>
+            <div
+              style={{ display: "flex", alignItems: "center", marginBottom: 16 }}
+            >
+              <SectionBar />
+              <div style={{ fontSize: 14, fontWeight: 800, color: TEXT }}>
+                출처 / 인용 목록
+              </div>
+            </div>
 
-        <table style={{ width: "100%", borderCollapse: "collapse" as const }}>
-          <thead>
-            <tr style={{ background: BG_ALT }}>
-              <th
-                style={{
-                  padding: "7px 12px",
-                  textAlign: "left" as const,
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: MUTED,
-                  borderBottom: `1px solid ${BORDER}`,
-                }}
-              >
-                파일명
-              </th>
-              <th
-                style={{
-                  padding: "7px 12px",
-                  textAlign: "left" as const,
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: MUTED,
-                  borderBottom: `1px solid ${BORDER}`,
-                  width: 110,
-                }}
-              >
-                발행일자
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {citationSources.map((src, i) => (
-              <tr
-                key={src.title}
-                style={{
-                  borderBottom: `1px solid ${BORDER}`,
-                  background: i % 2 === 0 ? "white" : BG_ALT,
-                }}
-              >
-                <td
-                  style={{
-                    padding: "8px 12px",
-                    fontSize: 11,
-                    color: TEXT,
-                    fontWeight: 600,
-                  }}
-                >
-                  {src.title}
-                </td>
-                <td style={{ padding: "8px 12px", fontSize: 11, color: MUTED }}>
-                  {src.date}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+            <table style={{ width: "100%", borderCollapse: "collapse" as const }}>
+              <thead>
+                <tr style={{ background: BG_ALT }}>
+                  <th
+                    style={{
+                      padding: "7px 12px",
+                      textAlign: "left" as const,
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: MUTED,
+                      borderBottom: `1px solid ${BORDER}`,
+                    }}
+                  >
+                    파일명
+                  </th>
+                  <th
+                    style={{
+                      padding: "7px 12px",
+                      textAlign: "left" as const,
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: MUTED,
+                      borderBottom: `1px solid ${BORDER}`,
+                      width: 110,
+                    }}
+                  >
+                    발행일자
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {citationSources.map((src, i) => (
+                  <tr
+                    key={src.title}
+                    style={{
+                      borderBottom: `1px solid ${BORDER}`,
+                      background: i % 2 === 0 ? "white" : BG_ALT,
+                    }}
+                  >
+                    <td
+                      style={{
+                        padding: "8px 12px",
+                        fontSize: 11,
+                        color: TEXT,
+                        fontWeight: 600,
+                      }}
+                    >
+                      {src.title}
+                    </td>
+                    <td style={{ padding: "8px 12px", fontSize: 11, color: MUTED }}>
+                      {src.date}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
       </div>
 
-      <PageFooter page={6} total={6} />
+      <PageFooter page={5} total={5} />
     </div>
   );
 }
@@ -1964,7 +1854,6 @@ export default function PbPdfTemplate() {
       <MarketIpsPage />
       <PortfolioPage />
       <TaxPage />
-      <TaxProductsPage />
       <AiPage />
     </div>
   );
