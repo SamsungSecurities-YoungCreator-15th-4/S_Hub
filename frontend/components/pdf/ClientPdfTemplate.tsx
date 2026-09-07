@@ -655,7 +655,7 @@ function MarketIpsPage() {
         </div>
       </div>
 
-      <PageFooter page={2} total={6} />
+      <PageFooter page={2} total={5} />
     </div>
   );
 }
@@ -1092,7 +1092,7 @@ function PortfolioPage() {
         </div>
       </div>
 
-      <PageFooter page={3} total={6} />
+      <PageFooter page={3} total={5} />
     </div>
   );
 }
@@ -1732,141 +1732,7 @@ function TaxPage() {
         </div>
       </div>
 
-      <PageFooter page={4} total={6} />
-    </div>
-  );
-}
-
-// ── Page 5: 전략별 추천 상품 ────────────────────────────────────
-
-function TaxProductsPage() {
-  const taxAdvice = buildPdfTaxAdvice(
-    extractTaxOptimizerEntry(
-      useDashboardStore((s) => s.taxOptimizer),
-      useDashboardStore((s) => s.selectedPortfolioId),
-    ),
-  );
-  return (
-    <div
-      data-pdf-page=""
-      style={{
-        width: 794,
-        height: 1123,
-        fontFamily: "Pretendard, Apple SD Gothic Neo, sans-serif",
-        background: "white",
-        position: "relative",
-        overflow: "hidden",
-      }}
-    >
-      <div
-        style={{
-          background: `linear-gradient(90deg, ${BRAND_DARK} 0%, ${BRAND} 100%)`,
-          padding: "19px 40px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}
-      >
-        <div>
-          <div style={{ fontSize: 18, fontWeight: 800, color: "white" }}>
-            ③-2 전략별 추천 상품
-          </div>
-          <div
-            style={{
-              fontSize: 13,
-              color: "rgba(255,255,255,0.75)",
-              marginTop: 2,
-            }}
-          >
-            절세 제안 · 삼성증권 상품 연계 목록
-          </div>
-        </div>
-      </div>
-
-      <div style={{ padding: "28px 40px 80px", wordBreak: "keep-all" }}>
-        <div
-          style={{ display: "flex", alignItems: "center", marginBottom: 16 }}
-        >
-          <SectionBar />
-          <div style={{ fontSize: 15, fontWeight: 800, color: TEXT }}>
-            전략별 추천 상품 목록
-          </div>
-        </div>
-
-        <table
-          style={{
-            width: "100%",
-            borderCollapse: "collapse",
-            tableLayout: "fixed" as const,
-          }}
-        >
-          <colgroup>
-            <col style={{ width: 176 }} />
-            <col />
-          </colgroup>
-          <thead>
-            <tr style={{ background: BRAND }}>
-              <th
-                style={{
-                  padding: "10px 14px",
-                  textAlign: "left" as const,
-                  fontSize: 13,
-                  fontWeight: 700,
-                  color: "white",
-                }}
-              >
-                전략
-              </th>
-              <th
-                style={{
-                  padding: "10px 14px",
-                  textAlign: "left" as const,
-                  fontSize: 13,
-                  fontWeight: 700,
-                  color: "white",
-                }}
-              >
-                추천 상품 목록
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {taxAdvice.cards.map((card, i) => (
-              <tr
-                key={card.title}
-                style={{
-                  borderBottom: `1px solid ${BORDER}`,
-                  background: i % 2 === 0 ? "white" : "#FAFAFA",
-                }}
-              >
-                <td
-                  style={{
-                    padding: "13px 14px",
-                    verticalAlign: "top" as const,
-                  }}
-                >
-                  <span style={{ fontSize: 13, fontWeight: 800, color: TEXT }}>
-                    {card.title}
-                  </span>
-                </td>
-                <td
-                  style={{
-                    padding: "13px 14px",
-                    fontSize: 12,
-                    color: TEXT,
-                    lineHeight: 1.85,
-                    whiteSpace: "pre-line" as const,
-                  }}
-                >
-                  {card.products.map((p) => p.name).join("\n")}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <PageFooter page={5} total={6} />
+      <PageFooter page={4} total={5} />
     </div>
   );
 }
@@ -2182,7 +2048,7 @@ function DiversificationPage() {
         </div>
       </div>
 
-      <PageFooter page={6} total={6} />
+      <PageFooter page={5} total={5} />
     </div>
   );
 }
@@ -2196,7 +2062,6 @@ export default function ClientPdfTemplate() {
       <MarketIpsPage />
       <PortfolioPage />
       <TaxPage />
-      <TaxProductsPage />
       <DiversificationPage />
     </>
   );
