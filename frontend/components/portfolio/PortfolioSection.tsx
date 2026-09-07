@@ -132,7 +132,7 @@ function PortfolioCard({
   };
 
   const portfolioType =
-    pf.id === "a" ? "수익추구형" : pf.id === "b" ? "안정추구형" : null;
+    pf.id === "a" ? "안정추구형" : pf.id === "b" ? "수익추구형" : null;
 
   return (
     <Card

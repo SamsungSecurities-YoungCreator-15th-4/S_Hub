@@ -724,8 +724,8 @@ function PortfolioPage() {
 
   const cols = [
     { p: current, alloc: buildPdfAllocation(current), label: "현재 포트폴리오", badge: "", badgeColor: "#6B7280", headerColor: "#6B7280", selected: false },
-    { p: portA, alloc: buildPdfAllocation(portA), label: "포트폴리오 A", badge: "수익추구형", badgeColor: BRAND, headerColor: BRAND, selected: selId === "a" },
-    { p: portB, alloc: buildPdfAllocation(portB), label: "포트폴리오 B", badge: "안정추구형", badgeColor: "#2C7BFF", headerColor: "#2C7BFF", selected: selId === "b" },
+    { p: portA, alloc: buildPdfAllocation(portA), label: "포트폴리오 A", badge: "안정추구형", badgeColor: BRAND, headerColor: BRAND, selected: selId === "a" },
+    { p: portB, alloc: buildPdfAllocation(portB), label: "포트폴리오 B", badge: "수익추구형", badgeColor: "#2C7BFF", headerColor: "#2C7BFF", selected: selId === "b" },
   ];
 
   const perfRows = buildPdfPerfRows(storePortfolios);

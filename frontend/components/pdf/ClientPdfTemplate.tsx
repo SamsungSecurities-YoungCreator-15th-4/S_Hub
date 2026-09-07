@@ -51,8 +51,8 @@ const ACCOUNT_PDF = [
 ];
 
 const PORT_TYPE_LABEL: Record<string, string> = {
-  a: "수익추구형",
-  b: "안정추구형",
+  a: "안정추구형",
+  b: "수익추구형",
 };
 
 const BRAND = "#0050D6";
