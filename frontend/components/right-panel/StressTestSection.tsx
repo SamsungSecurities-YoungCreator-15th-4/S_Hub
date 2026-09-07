@@ -62,7 +62,8 @@ export default function StressTestSection() {
           고객 자산과 포트폴리오가 정해지면 계산됩니다.
         </p>
       ) : (
-        <div className="flex flex-col gap-2">
+        /* 중앙 대시보드의 넓은 컬럼에서는 네 개를 한 줄로, 좁아지면 2열 → 1열. */
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
           {/*
             "현재" 는 충격을 적용하지 않은 상태다. 대시보드의 다른 지표는 어차피
             늘 현재 기준이라 계산상 바뀌는 것은 없지만, 고른 카드를 되돌릴 방법이

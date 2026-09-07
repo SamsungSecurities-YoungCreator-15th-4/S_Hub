@@ -25,7 +25,6 @@ import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import DataSourceBadge from "@/components/common/DataSourceBadge";
 import { isTrusted } from "@/lib/api/result";
-import StressTestSection from "@/components/right-panel/StressTestSection";
 import CurrentPortfolioInput from "@/components/sidebar/CurrentPortfolioInput";
 import SttRecordingModal from "@/components/sidebar/SttRecordingModal";
 import { isCurrentWeightsInputValid } from "@/lib/assetMapping";
@@ -840,8 +839,6 @@ export default function Sidebar() {
         </Card>
 
         <CurrentPortfolioInput />
-
-        <StressTestSection />
 
         <Button
           size="lg"
