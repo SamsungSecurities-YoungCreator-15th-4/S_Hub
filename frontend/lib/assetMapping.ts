@@ -96,24 +96,25 @@ export const BACKEND_ASSET_COLORS: Record<string, string> = {
 /**
  * 11종 계산 단위 색상.
  *
- * 계열로 묶어 읽히게 한다 — 주식은 브랜드 파랑, 채권은 청록, 대체는 황토.
+ * 모두 푸른 계열이되 주식은 브랜드 파랑, 채권은 시안 쪽, 대체는 남보라 쪽으로
+ * 기울여 세 묶음이 구분되게 한다.
  * 한 색상 램프로 11칸을 나누면 뒤쪽 네댓 개가 서로 구분되지 않는다.
  */
 export const CALC_UNIT_COLORS: Record<CalcUnitId, string> = {
-  // 주식 4
-  domesticEquity: "#0064FF",
-  overseasDividendEquity: "#2C7BFF",
-  overseasGrowthEquity: "#5C9CFF",
-  emergingEquity: "#8AB6FF",
-  // 채권 3
-  domesticBond: "#0E8C7F",
-  overseasBond: "#35AE9F",
-  lowCouponBond: "#7ACFC3",
-  // 대체 4
-  separateTaxBond: "#C08A2B",
-  reits: "#D9A94F",
-  gold: "#E7C685",
-  infraFund: "#F1DDB4",
+  // 주식 4 — 브랜드 파랑
+  domesticEquity: "#003D99",
+  overseasDividendEquity: "#0064FF",
+  overseasGrowthEquity: "#3B86FF",
+  emergingEquity: "#6BA4FF",
+  // 채권 3 — 시안 쪽으로 기운 파랑
+  domesticBond: "#0F6E9E",
+  overseasBond: "#2E93C4",
+  lowCouponBond: "#68B9DC",
+  // 대체 4 — 남보라 쪽으로 기운 파랑
+  separateTaxBond: "#3F4FA8",
+  reits: "#6E7CC8",
+  gold: "#9AA5DE",
+  infraFund: "#C3CAEE",
 };
 
 /**
