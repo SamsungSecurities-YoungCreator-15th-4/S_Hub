@@ -268,22 +268,24 @@ function Metric({
         >
           {k}
         </div>
+        {/*
+          원화 금액을 먼저 읽히게 한다 — 매스 고객은 비율보다 금액으로 이해한다.
+          원화 병기가 없는 지표(샤프·소르티노 등)는 비율·수치가 그대로 큰 값이 된다.
+        */}
         <div
           className={`mt-1 text-[14px] font-extrabold leading-none tabular-nums ${toneCls}`}
         >
           {arrow && <span className="mr-0.5 text-[14px]">{arrow}</span>}
-          {v}
+          {sub ? (value === 0 ? sub.replace(/^[+\-±]/, "") : sub) : v}
         </div>
+        {sub && (
+          <div className="mt-0.5 text-[12px] font-bold tabular-nums text-muted-foreground">
+            {v}
+          </div>
+        )}
         {rangeSub && (
           <div className="mt-0.5 text-[11px] font-semibold tabular-nums text-muted-foreground">
             {rangeSub}
-          </div>
-        )}
-        {sub && (
-          <div
-            className={`mt-0.5 text-[12px] font-bold tabular-nums ${toneCls}`}
-          >
-            {value === 0 ? sub.replace(/^[+\-±]/, "") : sub}
           </div>
         )}
       </div>
