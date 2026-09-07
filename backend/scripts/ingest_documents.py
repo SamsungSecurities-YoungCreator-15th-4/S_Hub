@@ -91,7 +91,14 @@ def parse_published_date(filename: str) -> str | None:
 
 
 def humanize_title(rel_path: Path, source_type: str) -> str:
-    """파일명 기반 사람이 읽을 제목(예: 'macro/fed_fomc_202601.pdf' → 'fed fomc 202601')."""
+    """파일명 + source_type 기반 사람이 읽을 제목.
+
+    예: ('macro/fed_fomc_202601.pdf', 'macro') → 'fed fomc 202601 (macro)'
+
+    반환값은 document.title 로 저장돼 /rag/insight 의 citations[].title 로 프런트까지
+    그대로 전달된다. 접미사를 포함한 이 형태가 계약이므로 바꾸면 프런트의 문서 링크
+    조회(frontend/lib/documentLinks.ts lookupDocument)와 어긋난다.
+    """
     stem = rel_path.stem.replace("_", " ").strip()
     return f"{stem} ({source_type})"
 
