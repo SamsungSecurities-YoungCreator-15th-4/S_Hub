@@ -3,7 +3,7 @@
  * 구조: 표지 → 시장현황&IPS → 포트폴리오 비교 → 절세 최적화 → AI 인사이트
  */
 
-import { STRESS_SCENARIOS } from "@/lib/stressScenarios";
+import { STRESS_SCENARIOS, runStress } from "@/lib/stressScenarios";
 import { useDashboardStore } from "@/lib/store";
 import { buildPdfAllocation, buildPdfMacroCell, buildPdfPerfRows } from "@/lib/pdfPortfolioData";
 import {
@@ -703,11 +703,7 @@ function MarketIpsPage() {
 // ── 페이지 3: 포트폴리오 비교 ────────────────────────────────────
 function PortfolioPage() {
   const storePortfolios = useDashboardStore((s) => s.portfolios);
-  const basePortfolios = useDashboardStore((s) => s.basePortfolios);
-  const isStressMode = useDashboardStore((s) => s.isStressMode);
   const stressScenarioKey = useDashboardStore((s) => s.stressScenarioKey);
-  const scenario = useDashboardStore((s) => s.scenario);
-  const liveBase = useDashboardStore((s) => s.liveBase);
   const customers = useDashboardStore((s) => s.customers);
   const selectedCustomerId = useDashboardStore((s) => s.selectedCustomerId);
   const selectedPortfolioId = useDashboardStore((s) => s.selectedPortfolioId);
@@ -730,39 +726,37 @@ function PortfolioPage() {
 
   const perfRows = buildPdfPerfRows(storePortfolios);
 
-  // ── Stress Test: store 기반 동적 행 ──────────────────────────────
-  const pnlEok = (id: "current" | "a" | "b"): number | null => {
-    if (!isStressMode) return null;
-    const base = basePortfolios.find((p) => p.id === id);
-    const stressed = storePortfolios.find((p) => p.id === id);
-    if (!base || !stressed) return null;
-    return ((stressed.metrics.expectedReturnPct - base.metrics.expectedReturnPct) / 100) * aumEokwon;
-  };
+  // ── Stress Test ─────────────────────────────────────────────────
+  // 화면 카드(StressTestSection)와 같은 runStress 를 쓴다 — 리포트 숫자가
+  // 대시보드와 어긋날 수 없게 계산 경로를 하나로 묶는다.
+  //
+  // 이전에는 isStressMode(백엔드 stress 엔드포인트) 기준이었으나, 금리·환율
+  // 슬라이더가 없어지면서 그 플래그를 켤 경로가 사라져 섹션 자체가 렌더되지
+  // 않았다. 시나리오가 자산군 충격 기반이므로 금리·환율 열도 충격 가정으로 바꾼다.
+  const selectedPf = selId === "a" ? portA : portB;
+  const stressTotalKrw = aumEokwon * 100_000_000;
 
-  const fmtPnl = (v: number | null): { text: string; color: string } => {
-    if (v === null) return { text: "기준", color: MUTED };
-    if (Math.abs(v) < 0.001) return { text: "0.0억원", color: TEXT };
-    const sign = v > 0 ? "▲ +" : "▼ ";
-    return { text: `${sign}${Math.abs(v).toFixed(1)}억원`, color: v > 0 ? UP : BRAND };
+  const fmtLoss = (lossKrw: number): { text: string; color: string } => {
+    const eok = lossKrw / 100_000_000;
+    if (Math.abs(eok) < 0.001) return { text: "0.0억원", color: TEXT };
+    return { text: `▼ -${Math.abs(eok).toFixed(1)}억원`, color: BRAND };
   };
 
   // 예상 평가손익은 선택한 포트폴리오(selId) 기준으로 표시한다.
-  const stressRows = isStressMode
-    ? [
-        {
-          name: "현재 (기준)",
-          rate: `${liveBase.ratePct.toFixed(2)}%`,
-          fx: `${liveBase.fxKrw.toLocaleString("ko-KR")}원`,
-          pnl: fmtPnl(null),
-        },
-        {
-          name: STRESS_SCENARIOS.find((sc) => sc.key === stressScenarioKey)?.label ?? "현재 (충격 없음)",
-          rate: `${scenario.ratePct.toFixed(2)}%`,
-          fx: `${scenario.fxKrw.toLocaleString("ko-KR")}원`,
-          pnl: fmtPnl(pnlEok(selId)),
-        },
-      ]
-    : [];
+  const stressRows = [
+    {
+      name: "현재 (충격 없음)",
+      shock: "—",
+      pnl: { text: "기준", color: MUTED },
+      selected: stressScenarioKey === null,
+    },
+    ...STRESS_SCENARIOS.map((sc) => ({
+      name: sc.label,
+      shock: sc.shockSummary,
+      pnl: fmtLoss(runStress(selectedPf.weights, stressTotalKrw, sc).lossKrw),
+      selected: stressScenarioKey === sc.key,
+    })),
+  ];
 
   return (
     <div
@@ -949,14 +943,13 @@ function PortfolioPage() {
               }}
             >
               <colgroup>
-                <col style={{ width: 220 }} />
-                <col style={{ width: 110 }} />
-                <col style={{ width: 130 }} />
+                <col style={{ width: 180 }} />
                 <col />
+                <col style={{ width: 130 }} />
               </colgroup>
               <thead>
                 <tr style={{ background: BG_ALT }}>
-                  {["시나리오", "금리", "환율", "예상 평가손익"].map((h) => (
+                  {["시나리오", "충격 가정", "예상 평가손익"].map((h) => (
                     <th
                       key={h}
                       style={{
@@ -979,7 +972,12 @@ function PortfolioPage() {
                     key={row.name}
                     style={{
                       borderBottom: `1px solid #D1D5DB`,
-                      background: i % 2 === 0 ? "white" : BG_ALT,
+                      // 대시보드에서 고른 시나리오를 리포트에서도 알아볼 수 있게 강조한다.
+                      background: row.selected
+                        ? `${BRAND}0D`
+                        : i % 2 === 0
+                          ? "white"
+                          : BG_ALT,
                     }}
                   >
                     <td
@@ -987,16 +985,13 @@ function PortfolioPage() {
                         padding: "8px 10px",
                         fontSize: 11,
                         fontWeight: 700,
-                        color: TEXT,
+                        color: row.selected ? BRAND : TEXT,
                       }}
                     >
                       {row.name}
                     </td>
                     <td style={{ padding: "8px 10px", fontSize: 11, color: TEXT }}>
-                      {row.rate}
-                    </td>
-                    <td style={{ padding: "8px 10px", fontSize: 11, color: TEXT }}>
-                      {row.fx}
+                      {row.shock}
                     </td>
                     <td
                       style={{
