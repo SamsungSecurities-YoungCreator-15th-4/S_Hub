@@ -127,6 +127,7 @@ export default function Sidebar() {
     consultationId,
     portfolioSource,
     currentWeightsInput,
+    signalCollapsePanels,
   } = useDashboardStore();
   const customer =
     customers.find((c) => c.id === selectedCustomerId) ?? customers[0];
@@ -173,8 +174,17 @@ export default function Sidebar() {
     prevAnalyzingRef.current = analyzing;
     if (!finished || !collapseAfterAnalyzeRef.current) return;
     collapseAfterAnalyzeRef.current = false;
+    signalCollapsePanels();
+  }, [analyzing, signalCollapsePanels]);
+
+  // 신호를 받으면 접는다. 우측 패널도 같은 신호를 본다.
+  const collapsePanelsSignal = useDashboardStore((s) => s.collapsePanelsSignal);
+  const seenCollapseSignalRef = useRef(collapsePanelsSignal);
+  useEffect(() => {
+    if (seenCollapseSignalRef.current === collapsePanelsSignal) return;
+    seenCollapseSignalRef.current = collapsePanelsSignal;
     setIsOpen(false);
-  }, [analyzing, setIsOpen]);
+  }, [collapsePanelsSignal, setIsOpen]);
 
   // 자동 분석하기: 페이지 첫 로드 또는 고객 전환 시 handleAnalyze 자동 실행
   const handleAnalyzeRef = useRef<(() => Promise<void>) | null>(null);
