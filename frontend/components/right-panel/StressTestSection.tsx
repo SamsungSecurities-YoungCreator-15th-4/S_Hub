@@ -72,14 +72,14 @@ export default function StressTestSection() {
             type="button"
             onClick={() => setStressScenarioKey(null)}
             aria-pressed={stressScenarioKey === null}
-            className={`rounded-lg px-2.5 py-1.5 text-left text-[12px] font-bold transition-colors ${
+            className={`flex items-baseline justify-between rounded-xl border px-2.5 py-2 text-left transition-colors ${
               stressScenarioKey === null
-                ? "bg-brand/[0.06] text-brand-dark"
-                : "text-muted-foreground hover:text-foreground"
+                ? "border-brand bg-brand/[0.04]"
+                : "border-border hover:border-brand/40"
             }`}
           >
-            현재
-            <span className="ml-1.5 text-[10.5px] font-semibold text-muted-foreground">
+            <span className="text-[13px] font-extrabold">현재</span>
+            <span className="text-[11px] font-semibold text-muted-foreground">
               충격 없음
             </span>
           </button>
