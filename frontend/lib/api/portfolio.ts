@@ -208,6 +208,7 @@ function mapPortfolioItem(item: BackendPortfolioItem): Portfolio {
 
   const metrics: MetricsWithRange = {
     expectedReturnPct:    m.expected_return ?? 0,
+    expectedReturnAvailable: m.expected_return != null && Number.isFinite(m.expected_return),
     volatilityPct:        m.volatility ?? 0,
     sharpe:               m.sharpe ?? 0,
     sortino:              m.sortino ?? 0,
@@ -533,6 +534,7 @@ export async function fetchStressMetrics(
           metrics: {
             ...p.metrics,
             expectedReturnPct: stressed.expected_return ?? p.metrics.expectedReturnPct,
+            expectedReturnAvailable: stressed.expected_return != null && Number.isFinite(stressed.expected_return),
             mddPct: Math.abs(stressed.mdd ?? -p.metrics.mddPct),
             afterTaxReturnPct: stressed.after_tax_return ?? p.metrics.afterTaxReturnPct,
             volatilityPct: stressed.volatility ?? p.metrics.volatilityPct,

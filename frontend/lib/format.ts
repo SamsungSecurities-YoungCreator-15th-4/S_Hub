@@ -22,3 +22,19 @@ export function formatManwon(
   const u = opts?.withWon === false && unit === "만원" ? "만" : unit;
   return `${sign}${value}${u}`;
 }
+
+/** 원 단위 입력. 기존 만원 표시 규칙을 재사용하며 NaN/Infinity는 표시하지 않는다. */
+export function formatWon(won: number, options?: { rounding: "ceil" | "floor" }): string {
+  if (!Number.isFinite(won)) return "—";
+  // 전략의 최소 저축·최대 가격은 만원 단위까지 보존한다.
+  // 억 단위 소수 둘째 자리 반올림으로 상한·하한이 뒤집히는 것을 방지한다.
+  if (options) {
+    const rounded = Math[options.rounding](won / 10000);
+    const abs = Math.abs(rounded);
+    const eok = Math.floor(abs / 10000);
+    const rest = abs % 10000;
+    return `${rounded < 0 ? "-" : ""}${eok ? `${eok.toLocaleString("ko-KR")}억${rest ? " " : "원"}` : ""}${rest || !eok ? `${rest.toLocaleString("ko-KR")}만원` : ""}`;
+  }
+  const formatted = formatManwon(won / 10000);
+  return formatted.endsWith("억") ? `${formatted}원` : formatted;
+}

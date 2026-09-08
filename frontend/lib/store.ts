@@ -5,6 +5,7 @@
 
 import { create } from "zustand";
 import type { StressScenarioKey } from "./stressScenarios";
+import type { HomeGoalDraft } from "./home-goal/types";
 import {
   type ConsultMessage,
   type Customer,
@@ -65,6 +66,9 @@ export const EMPTY_IPS: IpsState = {
 export type SttStatus = "idle" | "uploading" | "done" | "error";
 
 export interface DashboardState {
+  /** 고객별 주택 목표 가정. 세션 내 보관하며 전체 운용자산·IPS와 분리한다. */
+  homeGoalDrafts: Record<string, HomeGoalDraft>;
+  setHomeGoalDraft: (customerId: string, draft: HomeGoalDraft) => void;
   customers: Customer[];
   selectedCustomerId: string;
   selectedPortfolioId: string;
@@ -214,6 +218,10 @@ export const useDashboardStore = create<DashboardState>((set) => ({
     set((s) => ({ currentWeightsInput: { ...s.currentWeightsInput, ...patch } })),
 
   // 초기 포트폴리오는 mock(데모) — 출처를 fallback 으로 둬 배지로 명시한다.
+  homeGoalDrafts: {},
+  setHomeGoalDraft: (customerId, draft) =>
+    set((s) => ({ homeGoalDrafts: { ...s.homeGoalDrafts, [customerId]: { ...draft } } })),
+
   portfolios: PORTFOLIOS,
   basePortfolios: PORTFOLIOS,
   portfolioSource: "fallback" as DataSource,

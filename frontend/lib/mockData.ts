@@ -206,6 +206,8 @@ export const IPS_DEFAULT = {
 // ── 포트폴리오 3종 (현재 / A 베스트 / B 추천) ──────────────────
 export interface PortfolioMetrics {
   expectedReturnPct: number;
+  /** API의 기대수익률 누락을 실제 0%와 구분한다. 구형 스냅샷·데모는 생략 가능. */
+  expectedReturnAvailable?: boolean;
   volatilityPct: number;
   /** (기대수익률 − 무위험수익률) / 변동성. lib/sharpe.ts 가 단일 정의다.
    *  변동성이 0 이하면 정의되지 않아 undefined 다. */
