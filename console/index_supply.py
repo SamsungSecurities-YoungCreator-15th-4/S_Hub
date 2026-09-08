@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import os
 
 import streamlit as st
 
@@ -12,6 +13,26 @@ from engine.rag.deployment import (
 )
 
 log = logging.getLogger(__name__)
+
+#: 로컬 화면 열람 전용 스위치. 켜면 RAG 인덱스 준비를 건너뛰고, 엔진에 이미 있는
+#: ``demo_options.offline``(engine/nodes/extract_ips.py, load_inputs.py)로 실행한다.
+#: 외부 호출이 없으니 인용은 0건이고, judge가 그대로 미통과시켜 리포트는
+#: manual_review_gate에서 다운로드가 차단된 채 끝난다 — 확정 계약은 건드리지 않는다.
+#: 기본값은 꺼짐이고 배포(Streamlit Cloud secrets)에는 넣지 않는다.
+OFFLINE_CONSOLE_ENV = "SYMPHONY_OFFLINE_CONSOLE"
+OFFLINE_CONSOLE_NOTICE = (
+    "오프라인 열람 모드입니다. 외부 검색·LLM 호출 없이 화면만 확인하는 상태라 "
+    "근거 인용이 0건이며, 리포트는 수동검토로 종료되고 다운로드가 차단됩니다."
+)
+
+
+def offline_console_enabled() -> bool:
+    """환경 변수로만 켜지는 로컬 열람 모드 여부."""
+    return os.environ.get(OFFLINE_CONSOLE_ENV, "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+    }
 
 
 @st.cache_resource(show_spinner=False)
@@ -27,6 +48,10 @@ def _cached_ensure_index(
 
 
 def prepare_index_or_stop(st_module, *, ensure_index=None):
+    if offline_console_enabled():
+        # 인덱스를 준비하지 않고 통과시키되, 어떤 상태의 화면인지 항상 띄운다.
+        st_module.warning(OFFLINE_CONSOLE_NOTICE)
+        return None
     index_preparer = ensure_index or ensure_deployment_index
     try:
         try:
