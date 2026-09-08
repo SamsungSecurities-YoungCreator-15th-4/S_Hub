@@ -338,7 +338,9 @@ interface AdviceCardsProps {
 function AdviceCards({ liveCards, totalManwon }: AdviceCardsProps) {
   const [tabs, setTabs] = useState<Record<string, AdviceTab>>({});
 
-  const cards = liveCards
+  // 길이로 검사한다 — 빈 배열도 truthy 라 `liveCards ?` 로는 폴백을 타지 못하고
+  // 카드 없는 빈 그리드가 남는다(liveCards 는 liveStrategyCards?.cards ?? null, :322).
+  const cards = liveCards?.length
     ? [...liveCards]
         .sort((a, b) => a.priority_rank - b.priority_rank)
         .map((lc) => {
