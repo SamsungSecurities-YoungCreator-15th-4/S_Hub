@@ -7,6 +7,7 @@
  */
 
 import type { CalcUnitWeights } from "./assetMapping";
+import { withSharpe } from "./sharpe";
 
 // ── 헤더: 거시지표 ──────────────────────────────────────────────
 export interface MacroIndicator {
@@ -206,7 +207,9 @@ export const IPS_DEFAULT = {
 export interface PortfolioMetrics {
   expectedReturnPct: number;
   volatilityPct: number;
-  sharpe: number;
+  /** (기대수익률 − 무위험수익률) / 변동성. lib/sharpe.ts 가 단일 정의다.
+   *  변동성이 0 이하면 정의되지 않아 undefined 다. */
+  sharpe?: number;
   sortino: number;
   /** 백엔드 실계산 원화 병기. 없으면 화면이 비율×총자산으로 계산한다. */
   volatilityAmountLabel?: string;
@@ -258,14 +261,13 @@ export const PORTFOLIOS: Portfolio[] = [
       gold: 2,
       infraFund: 1,
     },
-    metrics: {
+    metrics: withSharpe({
       expectedReturnPct: 4.8,
       volatilityPct: 11.2,
-      sharpe: 0.43,
       sortino: 0.3,
       mddPct: 14.6,
       afterTaxReturnPct: 4.0,
-    },
+    }),
   },
   {
     id: "a",
@@ -284,14 +286,13 @@ export const PORTFOLIOS: Portfolio[] = [
       gold: 2,
       infraFund: 2,
     },
-    metrics: {
+    metrics: withSharpe({
       expectedReturnPct: 6.4,
       volatilityPct: 12.5,
-      sharpe: 0.61,
       sortino: 0.48,
       mddPct: 11.2,
       afterTaxReturnPct: 5.5,
-    },
+    }),
   },
   {
     id: "b",
@@ -310,14 +311,13 @@ export const PORTFOLIOS: Portfolio[] = [
       gold: 1,
       infraFund: 0,
     },
-    metrics: {
+    metrics: withSharpe({
       expectedReturnPct: 8.7,
       volatilityPct: 20.3,
-      sharpe: 0.43,
       sortino: 0.43,
       mddPct: 23.3,
       afterTaxReturnPct: 7.2,
-    },
+    }),
   },
 ];
 
