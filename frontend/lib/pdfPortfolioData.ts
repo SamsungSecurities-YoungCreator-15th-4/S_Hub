@@ -9,6 +9,7 @@
  */
 import type { Portfolio, MacroIndicator } from "@/lib/mockData";
 import type { CorrelationHeatmapResponse } from "@/lib/api/types";
+import { formatSharpe } from "@/lib/sharpe";
 import {
   BACKEND_ASSET_COLORS,
   DISPLAY_GROUP_COLORS,
@@ -139,9 +140,9 @@ export function buildPdfPerfRows(portfolios: Portfolio[]): PdfPerfRow[] {
     {
       label: "샤프 지수",
       vals: [
-        fmtN(cur.metrics.sharpe),
-        fmtN(a.metrics.sharpe),
-        fmtN(b.metrics.sharpe),
+        formatSharpe(cur.metrics.sharpe),
+        formatSharpe(a.metrics.sharpe),
+        formatSharpe(b.metrics.sharpe),
       ],
     },
     {

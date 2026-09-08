@@ -4,6 +4,7 @@
  */
 
 import { useDashboardStore } from "@/lib/store";
+import { formatSharpe } from "@/lib/sharpe";
 import {
   buildPdfAllocation,
   buildPdfMacroCell,
@@ -819,7 +820,7 @@ function PortfolioPage() {
               },
               {
                 label: "샤프지수",
-                value: cur.sharpe != null ? `${cur.sharpe}` : "-",
+                value: formatSharpe(cur.sharpe),
                 color: TEXT,
                 sub: null,
                 subColor: MUTED,
@@ -930,7 +931,7 @@ function PortfolioPage() {
               },
               {
                 label: "샤프지수",
-                value: sel.sharpe != null ? `${sel.sharpe}` : "-",
+                value: formatSharpe(sel.sharpe),
                 color: TEXT,
                 sub: null,
                 subColor: MUTED,

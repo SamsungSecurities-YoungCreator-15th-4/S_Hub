@@ -9,6 +9,7 @@ import {
 } from "@/lib/assetMapping";
 import { type Portfolio, type PortfolioMetrics } from "@/lib/mockData";
 import { pctOfAumLabel } from "@/lib/formatKrw";
+import { formatSharpe } from "@/lib/sharpe";
 import { useDashboardStore } from "@/lib/store";
 import HelpTooltip from "@/components/common/HelpTooltip";
 
@@ -225,7 +226,7 @@ function PortfolioCard({
           }
           value={m.afterTaxReturnPct}
         />
-        <Metric k="샤프지수" v={m.sharpe != null ? m.sharpe.toFixed(2) : "-"} />
+        <Metric k="샤프지수" v={formatSharpe(m.sharpe)} />
       </div>
     </Card>
   );
