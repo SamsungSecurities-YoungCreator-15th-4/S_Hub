@@ -45,7 +45,7 @@ import {
 } from "@/lib/api";
 import { useDashboardStore } from "@/lib/store";
 import { useAutoCollapse } from "@/lib/useAutoCollapse";
-import { useSttRealtime } from "@/lib/useSttRealtime";
+import { useConsultPlayback } from "@/lib/useConsultPlayback";
 
 const DEFAULT_CLIENT_TAX_PROFILE = {
   isaUsedManwon: 0,
@@ -153,7 +153,7 @@ export default function Sidebar() {
     stop: stopRealtime,
     pause: pauseRealtime,
     resume: resumeRealtime,
-  } = useSttRealtime();
+  } = useConsultPlayback();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -607,12 +607,12 @@ export default function Sidebar() {
             <button
               type="button"
               disabled={
-                !customer.clientId ||
+                !customer ||
                 realtimeStatus === "connecting" ||
                 realtimeStatus === "stopping"
               }
               onClick={() => {
-                if (!customer.clientId) return;
+                if (!customer) return;
                 if (realtimeStatus === "recording") {
                   stopRealtime();
                 } else if (
@@ -620,7 +620,7 @@ export default function Sidebar() {
                   realtimeStatus === "done" ||
                   realtimeStatus === "error"
                 ) {
-                  void startRealtime(customer.clientId);
+                  startRealtime();
                 }
               }}
               className={`flex-1 rounded-xl border-[1.5px] border-dashed px-3 py-1 text-center disabled:cursor-not-allowed disabled:opacity-50 ${
@@ -665,11 +665,7 @@ export default function Sidebar() {
                       : "실시간 녹음"}
               </span>
               <span className="mt-0.5 block text-[10px] font-semibold text-muted-foreground">
-                {realtimeStatus === "recording"
-                  ? "클릭해 종료"
-                  : customer.clientId
-                    ? "STT"
-                    : "고객 ID 필요"}
+                {realtimeStatus === "recording" ? "클릭해 종료" : "상담 기록"}
               </span>
             </button>
           </div>
@@ -691,9 +687,16 @@ export default function Sidebar() {
               )}
             </Button>
           )}
-          {(sttStatus === "done" || realtimeStatus === "done") && (
+          {sttStatus === "done" && (
             <p className="mt-1.5 text-[10px] font-semibold text-emerald-600">
               전사 완료 — 상담 내역·IPS 조율기에 반영했습니다.
+            </p>
+          )}
+          {/* 재생 경로는 상담 내역만 채운다 — 업로드 경로와 달리 setIps 를 부르지 않으므로
+              IPS 조율기까지 반영했다고 적으면 사실과 다르다. */}
+          {realtimeStatus === "done" && (
+            <p className="mt-1.5 text-[10px] font-semibold text-emerald-600">
+              상담 내역에 반영했습니다.
             </p>
           )}
           {sttStatus === "error" && (
