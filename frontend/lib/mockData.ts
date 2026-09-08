@@ -17,18 +17,25 @@ export interface MacroIndicator {
   direction: "up" | "down" | "neutral";
 }
 
+/**
+ * 헤더 거시지표 폴백 — `/api/macro` 조회가 **최초 마운트에서** 실패했을 때만 보인다.
+ * (한 번이라도 성공한 뒤의 실패는 MacroTicker 가 직전 실데이터를 그대로 유지한다.)
+ *
+ * ⚠️ 실제 시세와 너무 벌어지면 폴백이 떴을 때 화면이 티가 난다. 실제로 한 번
+ *    KOSPI 2,790 / S&P 5,640 짜리 낡은 값이 남아 있어 실데이터(6,954 / 7,686)와
+ *    두 배 이상 벌어졌었다. 가끔 아래 스냅샷을 갱신할 것.
+ *
+ * 스냅샷 기준: 2026-09-08 종가 (`/api/macro` 실측)
+ * 표기 형식은 MacroTicker 의 실시간 경로와 같게 맞춘다 — 지수는 소수점 없이,
+ * 등락은 지수 소수 2자리 · 금리 %p · 환율 원.
+ */
 export const MACRO_INDICATORS: MacroIndicator[] = [
-  {
-    label: "미국 기준금리",
-    value: "3.50%",
-    change: "0.25%p",
-    direction: "down",
-  },
-  { label: "미 10Y", value: "4.38%", change: "0.05%p", direction: "down" },
-  { label: "미국 CPI", value: "3.2%", change: "0.25%p", direction: "down" },
-  { label: "원/달러", value: "1,220", change: "20원", direction: "down" },
-  { label: "KOSPI", value: "2,790", change: "31", direction: "up" },
-  { label: "S&P500", value: "5,640", change: "18", direction: "up" },
+  { label: "미국 기준금리", value: "3.75%", change: "0.25%p", direction: "down" },
+  { label: "미 10Y", value: "4.80%", change: "0.01%p", direction: "up" },
+  { label: "미국 CPI", value: "3.4%", change: "0.10%p", direction: "down" },
+  { label: "원/달러", value: "1,341", change: "4원", direction: "down" },
+  { label: "KOSPI", value: "6,955", change: "40.87", direction: "down" },
+  { label: "S&P 500", value: "7,686", change: "32.28", direction: "down" },
 ];
 
 export const BASE_TIME = "17:20";

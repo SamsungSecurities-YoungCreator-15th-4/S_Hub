@@ -17,7 +17,6 @@ import { getSupabase } from "./supabaseClient";
 import { IS_DEMO } from "./demo/flag";
 import {
   DEMO_HISTORICAL_CRISES,
-  DEMO_MACRO_INDICATORS,
   DEMO_PORTFOLIO_PROPOSALS,
   DEMO_STRESSED_PORTFOLIOS,
   DEMO_STRESS_SCENARIOS,
@@ -146,11 +145,19 @@ async function getMarketJson<T>(path: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-// force=true면 백엔드 5분 캐시를 무시하고 강제 재조회 (새로고침 버튼용)
+/**
+ * 헤더 거시지표 — 백엔드가 아니라 이 앱의 라우트 핸들러(`app/api/macro/route.ts`)를 부른다.
+ * 그래서 IS_DEMO 로 단락하지 않는다. 데모 모드는 "백엔드를 안 부른다"는 뜻이지
+ * "실데이터를 안 쓴다"는 뜻이 아니다.
+ * 라우트가 죽으면 MacroTicker 가 목데이터로 폴백하므로 시연이 멈추지는 않는다.
+ * force=true 는 라우트 캐시를 무시하고 다시 받는다(새로고침 버튼용).
+ */
 export function fetchMacroIndicators(force = false): Promise<MacroIndicators> {
-  if (IS_DEMO) return Promise.resolve(DEMO_MACRO_INDICATORS);
-  return getMarketJson<MacroIndicators>(
-    `/api/macro-indicators${force ? "?force=true" : ""}`,
+  return fetch(`/api/macro${force ? "?force=true" : ""}`, { cache: "no-store" }).then(
+    (r) => {
+      if (!r.ok) throw new Error(`거시지표 조회 실패: HTTP ${r.status}`);
+      return r.json() as Promise<MacroIndicators>;
+    },
   );
 }
 
