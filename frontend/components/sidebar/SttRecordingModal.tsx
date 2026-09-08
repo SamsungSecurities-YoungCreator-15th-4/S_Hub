@@ -41,15 +41,20 @@ function WaveformCanvas({
       ctx.clearRect(0, 0, W, H);
 
       const analyser = analyserRef.current;
-      if (active && analyser && !isPaused) {
-        // 녹음 중: 마이크 음량 기반 ECG 심박 애니메이션
-        if (!dataArray || dataArray.length !== analyser.frequencyBinCount) {
-          dataArray = new Uint8Array(analyser.frequencyBinCount);
+      if (active && !isPaused) {
+        // 진행 중: ECG 심박 애니메이션.
+        // analyser 가 있으면 음량에 따라 진폭을 조절하고, 없으면 고정 진폭으로 그린다.
+        // 진폭만 달라지고 곡선 모양은 같다.
+        let amp = 0.65;
+        if (analyser) {
+          if (!dataArray || dataArray.length !== analyser.frequencyBinCount) {
+            dataArray = new Uint8Array(analyser.frequencyBinCount);
+          }
+          analyser.getByteFrequencyData(dataArray);
+          const data = dataArray;
+          const avgLevel = data.reduce((s: number, v: number) => s + v, 0) / data.length / 255;
+          amp = 0.3 + avgLevel * 0.7;
         }
-        analyser.getByteFrequencyData(dataArray);
-        const data = dataArray;
-        const avgLevel = data.reduce((s: number, v: number) => s + v, 0) / data.length / 255;
-        const amp = 0.3 + avgLevel * 0.7; // 음량에 따라 진폭 조절
 
         const t = Date.now() / 1000;
         const period = 1.4;
