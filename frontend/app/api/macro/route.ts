@@ -55,7 +55,10 @@ const TICKERS = {
 
 type Live = { price: number; change: number; changePct: number };
 type Cache = { at: number; body: unknown };
-const g = globalThis as unknown as { __macroCache?: Cache };
+type LastGood = Partial<Record<keyof typeof TICKERS, Live>>;
+
+// 개발 중 핫리로드로 모듈이 다시 평가돼도 남아 있게 globalThis 에 둔다.
+const g = globalThis as unknown as { __macroCache?: Cache; __macroLastGood?: LastGood };
 
 /**
  * 야후에서 한 종목의 현재가와 **전일 종가**를 가져온다.
@@ -121,19 +124,31 @@ export async function GET(request: Request) {
     return NextResponse.json(cached.body);
   }
 
+  const lastGood: LastGood = g.__macroLastGood ?? {};
+
   const entries = await Promise.all(
     (Object.entries(TICKERS) as [keyof typeof TICKERS, string][]).map(
       async ([key, ticker]) => {
         try {
-          return [key, { ...(await quote(ticker)), isFallback: false }] as const;
+          const live = await quote(ticker);
+          lastGood[key] = live;
+          return [key, { ...live, isFallback: false }] as const;
         } catch {
-          // 못 받은 것을 0 으로 채워 정상처럼 보이게 하지 않는다.
-          // price 0 이면 화면이 "—" 로 찍고, isFallback 이 "지연 시세"를 붙인다.
-          return [key, { price: 0, change: 0, changePct: 0, isFallback: true }] as const;
+          // types.ts 의 isFallback 계약: "실시간 조회 실패 → 마지막 확인값".
+          // 0 으로 채우면 화면이 "—"에 "지연 시세"를 붙여 앞뒤가 안 맞는다.
+          // 한 번도 못 받았을 때만 0 이고, 그 경우 화면은 "—" 로 찍는다.
+          const prev = lastGood[key];
+          return [
+            key,
+            prev
+              ? { ...prev, isFallback: true }
+              : { price: 0, change: 0, changePct: 0, isFallback: true },
+          ] as const;
         }
       },
     ),
   );
+  g.__macroLastGood = lastGood;
 
   const body = {
     ...Object.fromEntries(entries),
