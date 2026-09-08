@@ -121,7 +121,9 @@ export default function InsightSection() {
           type="submit"
           size="sm"
           className="font-bold"
-          disabled={loading}
+          /* 빈 질의는 handleSubmit 이 조용히 return 하므로(:56) 버튼에서 막는다 —
+             누르고도 아무 일이 없으면 고장으로 읽힌다. */
+          disabled={loading || query.trim() === ""}
         >
           {loading ? <Loader2 className="size-3.5 animate-spin" /> : "검색"}
         </Button>
