@@ -250,7 +250,13 @@ RAG 근거 문서는 `corpus/`에 카테고리별로 둔다. 상세 목록은 [`
 
 - 통합 레포는 `main` 단일 브랜치로 운영한다. `feature/*` · `fix/*` · `chore/*` 등
   목적별 브랜치에서 작업하고 **PR로만** `main`에 넣는다.
-  `main` 직접 push 금지 — ruleset이 승인 1건을 요구한다.
+- **승인 1건은 팀 합의이지 ruleset이 강제하는 것이 아니다.** 9/11 발표 준비 기간
+  동안 병목을 줄이려고 승인 요구를 의도적으로 뺐다 — 팀원이 항상 즉시 승인할 수
+  있는 것이 아닌데 그때마다 기다리면 작업이 멈추기 때문이다. 현재 ruleset
+  (`main 보호 (force push · 삭제 차단)`)이 실제로 막는 것은 **force push와 브랜치
+  삭제 둘뿐**이고, 승인 없는 머지도 `main` 직접 push도 기술적으로는 가능하다.
+  그래도 관례는 그대로다 — 브랜치를 파고 PR로 넣고, 가능하면 리뷰를 받는다.
+  발표 후 승인 요구를 되돌릴 때 이 문단도 함께 고친다.
 - 원본 두 레포(`VVIP_PB_Advisor`, `Orchestration`)의 GitFlow(`develop` 경유)는
   **여기에 적용하지 않는다.** S_Hub에는 `develop`이 없다.
 - 상세 규약은 [`.github/CONTRIBUTING.md`](.github/CONTRIBUTING.md)를 따른다.
