@@ -2,6 +2,7 @@
 
 import { Card } from "@/components/ui/card";
 import HelpTooltip from "@/components/common/HelpTooltip";
+import AsOfNote from "@/components/common/AsOfNote";
 
 import {
   STRESS_SCENARIOS,
@@ -53,9 +54,13 @@ export default function StressTestSection() {
           </p>
         </HelpTooltip>
       </div>
-      <p className="mb-3 text-[11px] font-medium text-muted-foreground">
-        과거 충격 국면을 참조한 세 가지 시나리오
-      </p>
+      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+        <p className="text-[11px] font-medium text-muted-foreground">
+          과거 충격 국면을 참조한 세 가지 시나리오
+        </p>
+        {/* 충격 상수는 lib/stressScenarios.ts 가 엔진 SSOT 를 옮겨 적은 값이다. */}
+        <AsOfNote source="engine/engine/stress.py 시나리오 상수 · KRW" />
+      </div>
 
       {!portfolio || totalKrw <= 0 ? (
         <p className="py-3 text-center text-[12px] font-semibold text-muted-foreground">
