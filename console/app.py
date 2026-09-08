@@ -38,7 +38,7 @@ from engine.state import (
 from console.branding import logo_markup
 from console.document_links import document_url
 from console.evidence_export import EvidenceDownload, build_evidence_download
-from console.index_supply import prepare_index_or_stop
+from console.index_supply import offline_console_enabled, prepare_index_or_stop
 from console.pb_approvers import approver_label, validate_pb_approver
 from console.rag_evidence import (
     RAG_EVIDENCE_SECTIONS,
@@ -1056,7 +1056,11 @@ if not report:
             payload = {
                 "raw_input": raw_input,
                 "portfolio": portfolio,
-                "demo_options": {"force_judge_fail": int(force_judge_fail)},
+                "demo_options": {
+                    "force_judge_fail": int(force_judge_fail),
+                    # 열람 모드에서는 엔진의 결정론 IPS·더미 시장데이터 경로를 탄다.
+                    "offline": offline_console_enabled(),
+                },
                 "run_config": {"observability": invocation.observability},
             }
             if invocation.trace_id:

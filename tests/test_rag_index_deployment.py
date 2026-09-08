@@ -1,6 +1,7 @@
 """Azure Blob RAG 인덱스 공급·manifest·Streamlit 중단 테스트."""
 from __future__ import annotations
 
+import contextlib
 import copy
 import json
 import shutil
@@ -25,7 +26,12 @@ from engine.rag.deployment import (
 )
 from engine.rag.ingest import COLLECTION_NAME, infer_published_at
 import console.index_supply as index_supply
-from console.index_supply import prepare_index_or_stop
+from console.index_supply import (
+    OFFLINE_CONSOLE_ENV,
+    OFFLINE_CONSOLE_NOTICE,
+    offline_console_enabled,
+    prepare_index_or_stop,
+)
 
 
 def _build_index_and_corpus(tmp_path: Path) -> tuple[Path, Path]:
@@ -419,7 +425,9 @@ def test_unsafe_zip_path_is_rejected_before_install(tmp_path: Path, monkeypatch)
     assert not (tmp_path / "escape.txt").exists()
 
 
-def test_streamlit_shows_public_error_and_stops_without_secret_leak():
+def test_streamlit_shows_public_error_and_stops_without_secret_leak(monkeypatch):
+    monkeypatch.delenv(OFFLINE_CONSOLE_ENV, raising=False)
+
     class StopExecution(Exception):
         pass
 
@@ -497,3 +505,65 @@ def test_streamlit_index_verification_is_cached_by_version_and_sha(monkeypatch):
 
     assert calls == 1
     index_supply._cached_ensure_index.clear()
+
+
+class _OfflineFakeStreamlit:
+    """열람 모드 검증용 최소 Streamlit 대역."""
+
+    secrets: dict = {}
+
+    def __init__(self):
+        self.warnings: list[str] = []
+        self.errors: list[str] = []
+        self.stopped = False
+
+    def spinner(self, _text: str):
+        # spinner 가 없으면 AttributeError 가 대신 잡혀 실패 경로를 헛검증하게 된다.
+        return contextlib.nullcontext()
+
+    def warning(self, message: str):
+        self.warnings.append(message)
+
+    def error(self, message: str):
+        self.errors.append(message)
+
+    def stop(self):
+        self.stopped = True
+
+
+def test_offline_console_switch_is_off_unless_env_set(monkeypatch):
+    monkeypatch.delenv(OFFLINE_CONSOLE_ENV, raising=False)
+    assert offline_console_enabled() is False
+    monkeypatch.setenv(OFFLINE_CONSOLE_ENV, "0")
+    assert offline_console_enabled() is False
+    monkeypatch.setenv(OFFLINE_CONSOLE_ENV, "1")
+    assert offline_console_enabled() is True
+
+
+def test_offline_console_skips_index_gate_and_always_warns(monkeypatch):
+    """열람 모드는 인덱스 준비를 건너뛰되 어떤 화면인지 반드시 알린다."""
+    monkeypatch.setenv(OFFLINE_CONSOLE_ENV, "1")
+    st = _OfflineFakeStreamlit()
+
+    def must_not_run(**_kwargs):  # pragma: no cover - 호출되면 테스트 실패
+        raise AssertionError("열람 모드에서 인덱스를 준비하면 안 된다")
+
+    assert prepare_index_or_stop(st, ensure_index=must_not_run) is None
+    assert st.warnings == [OFFLINE_CONSOLE_NOTICE]
+    assert st.stopped is False
+    assert st.errors == []
+
+
+def test_offline_console_off_still_fails_closed(monkeypatch):
+    """스위치가 꺼져 있으면 인덱스 실패는 그대로 화면을 중단시킨다."""
+    monkeypatch.delenv(OFFLINE_CONSOLE_ENV, raising=False)
+    st = _OfflineFakeStreamlit()
+
+    def fail(**_kwargs):
+        raise IndexSupplyError("boom")
+
+    prepare_index_or_stop(st, ensure_index=fail)
+
+    assert st.stopped is True
+    assert st.errors == [PUBLIC_ERROR_MESSAGE]
+    assert st.warnings == []
