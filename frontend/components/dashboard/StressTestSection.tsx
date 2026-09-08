@@ -137,7 +137,9 @@ function ScenarioCard({
         </span>
       </div>
       <p className="text-right text-[10.5px] font-semibold text-muted-foreground tabular-nums">
-        {formatKrwLoss(loss.lossKrwLow)} ~ {formatKrwLoss(loss.lossKrwHigh)}
+        {/* 위 손실 금액과 같은 부호 규약을 쓴다 — 밴드만 양수로 보이면 이익으로 읽힌다. */}
+        &minus;{formatKrwLoss(loss.lossKrwLow)} ~ &minus;
+        {formatKrwLoss(loss.lossKrwHigh)}
       </p>
       {/* 자산군별 충격은 근거라 고른 카드에서만 편다 — 세 장을 훑을 때는 이름과 금액만 보이게. */}
       {selected && (

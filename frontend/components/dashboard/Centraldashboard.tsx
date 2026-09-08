@@ -2,7 +2,7 @@
 
 import PortfolioSection from "@/components/portfolio/PortfolioSection";
 import BacktestChart from "@/components/portfolio/BacktestChart";
-import StressTestSection from "@/components/right-panel/StressTestSection";
+import StressTestSection from "@/components/dashboard/StressTestSection";
 import TaxSection from "@/components/tax/TaxSection";
 import { useDashboardStore } from "@/lib/store";
 

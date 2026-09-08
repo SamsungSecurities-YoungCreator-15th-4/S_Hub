@@ -513,7 +513,6 @@ export const SCENARIO_BASE = {
   fxStep: 10,
 };
 
-// 시나리오 슬라이더 변화 → 예상 평가손익(억원) 더미 선형 민감도.
 /**
  * AI 인사이트 하단의 출처/인용 목록 원소 타입.
  * 실제 출처는 백엔드 RAG(`/rag/insight`)의 citations 로 채운다.
