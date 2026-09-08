@@ -35,8 +35,8 @@ export default function CentralDashboard() {
       <PortfolioSection />
       {/*
         스트레스 카드는 PB 의 입력 도구가 아니라 고객과 함께 보는 결과다.
-        사이드바에 두면 "분석하기" 직후 사이드바가 접히면서(Sidebar 의 collapsePanelsSignal)
-        카드까지 함께 사라진다 — 결과를 보여줘야 하는 순간에 없어지는 셈이라 중앙에 둔다.
+        사이드바는 PB 가 직접 접을 수 있어, 카드를 거기 두면 결과를 보여줘야 하는
+        순간에 함께 사라진다 — 그래서 중앙에 둔다.
         선택한 포트폴리오 비중을 쓰므로 PortfolioSection 바로 아래가 맞는 자리다.
       */}
       <StressTestSection />

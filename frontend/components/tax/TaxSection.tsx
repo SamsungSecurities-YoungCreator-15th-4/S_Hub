@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AccountAllocation from "@/components/tax/AccountAllocation";
 import TaxGauge from "@/components/tax/TaxGauge";
 import TaxWaterfall from "@/components/tax/TaxWaterfall";
+import AsOfNote from "@/components/common/AsOfNote";
 import { TAX_ADVICE } from "@/lib/mockData";
 import { PRODUCT_LINKS } from "@/lib/productLinks";
 import { useDashboardStore } from "@/lib/store";
@@ -202,6 +203,8 @@ export default function TaxSection() {
               연동 완료
             </div>
           ) : null}
+          {/* 절세 수치는 백엔드 계산값이라 인용할 외부 출처가 없어 기준일만 적는다. */}
+          <AsOfNote source="KRW" />
         </div>
         <TabsList className="h-auto rounded-lg bg-muted p-0.5">
           <TabsTrigger

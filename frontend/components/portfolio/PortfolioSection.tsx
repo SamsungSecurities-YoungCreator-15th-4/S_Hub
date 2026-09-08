@@ -12,6 +12,7 @@ import { pctOfAumLabel } from "@/lib/formatKrw";
 import { formatSharpe } from "@/lib/sharpe";
 import { useDashboardStore } from "@/lib/store";
 import HelpTooltip from "@/components/common/HelpTooltip";
+import AsOfNote from "@/components/common/AsOfNote";
 
 const METRIC_HELP: Record<string, string> = {
   기대수익률:
@@ -38,15 +39,6 @@ export default function PortfolioSection() {
     analyzing,
   } = useDashboardStore();
 
-  const asOf = new Date()
-    .toLocaleDateString("ko-KR", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    })
-    .replace(/\. /g, ".")
-    .replace(/\.$/, "");
-
   return (
     <section>
       <div className="mb-2 flex items-center justify-between px-0.5">
@@ -64,14 +56,7 @@ export default function PortfolioSection() {
             </div>
           ) : null}
         </div>
-        {portfolioSource !== "fallback" && (
-          <span
-            className="text-[11px] font-semibold text-muted-foreground"
-            suppressHydrationWarning
-          >
-            {asOf} 기준
-          </span>
-        )}
+        {portfolioSource !== "fallback" && <AsOfNote />}
       </div>
 
       {portfolioSource === "fallback" &&
@@ -228,6 +213,8 @@ function PortfolioCard({
         />
         <Metric k="샤프지수" v={formatSharpe(m.sharpe)} />
       </div>
+      {/* 지표 타일의 기준일·통화. 백엔드 계산값이라 인용할 외부 출처가 없어 기준일만 적는다. */}
+      <AsOfNote source="KRW" className="mt-1.5 text-[10px]" />
     </Card>
   );
 }
