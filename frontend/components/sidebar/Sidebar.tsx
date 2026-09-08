@@ -43,6 +43,7 @@ import {
   saveDashboardSnapshot,
   uploadSttConsultation,
 } from "@/lib/api";
+import { RUN_STATUS } from "@/lib/runStatus";
 import { useDashboardStore } from "@/lib/store";
 import { useAutoCollapse } from "@/lib/useAutoCollapse";
 import { useConsultPlayback } from "@/lib/useConsultPlayback";
@@ -126,6 +127,7 @@ export default function Sidebar() {
     consultationId,
     portfolioSource,
     currentWeightsInput,
+    setRunStatus,
   } = useDashboardStore();
   const customer =
     customers.find((c) => c.id === selectedCustomerId) ?? customers[0];
@@ -819,7 +821,13 @@ export default function Sidebar() {
           size="lg"
           disabled={analyzing || !isCurrentWeightsInputValid(currentWeightsInput)}
           onClick={() => {
-            void handleAnalyze();
+            void (async () => {
+              await handleAnalyze();
+              // 전이 규칙은 store 의 setRunStatus 가 canTransition 으로 검증한다.
+              // 자동 분석(첫 로드·고객 전환)은 PB 가 아직 검토하지 않은 시점이라
+              // 여기(직접 클릭)에서만 상태를 올린다.
+              setRunStatus(RUN_STATUS.REVIEWED);
+            })();
           }}
           className="w-full rounded-xl py-6 text-sm font-extrabold shadow-[0_4px_14px_rgba(0,100,255,0.28)]"
         >
