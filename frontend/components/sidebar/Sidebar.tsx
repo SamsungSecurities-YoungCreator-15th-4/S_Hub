@@ -126,7 +126,6 @@ export default function Sidebar() {
     consultationId,
     portfolioSource,
     currentWeightsInput,
-    signalCollapsePanels,
   } = useDashboardStore();
   const customer =
     customers.find((c) => c.id === selectedCustomerId) ?? customers[0];
@@ -157,33 +156,6 @@ export default function Sidebar() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-
-  /**
-   * 분석하기를 "직접 눌러" 끝낸 뒤에는 사이드바를 접는다.
-   *
-   * 사이드바는 PB 의 입력 도구(상담 녹음·IPS 조율·비중 입력)라, 결과를 고객과
-   * 함께 보는 단계에서는 자리를 비켜 주는 것이 맞다. 아래 자동 분석(첫 로드·
-   * 고객 전환)에서는 접지 않는다 — PB 가 아직 아무것도 하지 않은 시점이라
-   * 화면이 저절로 바뀌면 오히려 혼란스럽다.
-   */
-  const collapseAfterAnalyzeRef = useRef(false);
-  const prevAnalyzingRef = useRef(false);
-  useEffect(() => {
-    const finished = prevAnalyzingRef.current && !analyzing;
-    prevAnalyzingRef.current = analyzing;
-    if (!finished || !collapseAfterAnalyzeRef.current) return;
-    collapseAfterAnalyzeRef.current = false;
-    signalCollapsePanels();
-  }, [analyzing, signalCollapsePanels]);
-
-  // 신호를 받으면 접는다. 우측 패널도 같은 신호를 본다.
-  const collapsePanelsSignal = useDashboardStore((s) => s.collapsePanelsSignal);
-  const seenCollapseSignalRef = useRef(collapsePanelsSignal);
-  useEffect(() => {
-    if (seenCollapseSignalRef.current === collapsePanelsSignal) return;
-    seenCollapseSignalRef.current = collapsePanelsSignal;
-    setIsOpen(false);
-  }, [collapsePanelsSignal, setIsOpen]);
 
   // 자동 분석하기: 페이지 첫 로드 또는 고객 전환 시 handleAnalyze 자동 실행
   const handleAnalyzeRef = useRef<(() => Promise<void>) | null>(null);
@@ -847,7 +819,6 @@ export default function Sidebar() {
           size="lg"
           disabled={analyzing || !isCurrentWeightsInputValid(currentWeightsInput)}
           onClick={() => {
-            collapseAfterAnalyzeRef.current = true;
             void handleAnalyze();
           }}
           className="w-full rounded-xl py-6 text-sm font-extrabold shadow-[0_4px_14px_rgba(0,100,255,0.28)]"

@@ -119,12 +119,6 @@ export interface DashboardState {
    */
   stressScenarioKey: StressScenarioKey | null;
   setStressScenarioKey: (key: StressScenarioKey | null) => void;
-  /**
-   * 분석하기를 직접 눌러 끝냈다는 신호. 좌·우 패널이 이걸 보고 스스로 접는다.
-   * 값 자체에 의미는 없고 "바뀌었다"만 쓴다 — 같은 분석을 두 번 해도 매번 접힌다.
-   */
-  collapsePanelsSignal: number;
-  signalCollapsePanels: () => void;
   /** portfolios를 basePortfolios로 복원, isStressMode: false */
   clearStressMode: () => void;
 
@@ -239,9 +233,6 @@ export const useDashboardStore = create<DashboardState>((set) => ({
   setStressPreset: (preset) => set({ stressPreset: preset }),
   stressScenarioKey: null,
   setStressScenarioKey: (key) => set({ stressScenarioKey: key }),
-  collapsePanelsSignal: 0,
-  signalCollapsePanels: () =>
-    set((s) => ({ collapsePanelsSignal: s.collapsePanelsSignal + 1 })),
   clearStressMode: () =>
     set((s) => ({ portfolios: s.basePortfolios, isStressMode: false })),
 
