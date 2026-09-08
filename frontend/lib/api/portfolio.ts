@@ -131,6 +131,13 @@ function mapLiquidity(liquidity: string): LiquidityNeed {
 // ── 자산군 매핑 (백엔드 snake_case → CalcUnitId) ────────────────
 // overseas_blue_chip(S&P500)·overseas_growth(NASDAQ) 모두 해외성장주 버킷으로 합산.
 // 두 CalcUnitId 모두 CALC_TO_DISPLAY에서 "해외성장주"로 묶이므로 도넛 표시는 동일.
+//
+// cash 는 의도적으로 매핑하지 않는다. 엔진(engine/engine/stress.py:23,40,56)에서
+// 현금은 shock 0.0 인 독립 자산군이라, 국내채권으로 접으면 고금리 시나리오에서
+// -15% 충격을 먹어 화면 손실액이 과대 계산된다. CalcUnitWeights 에 현금 칸이
+// 없으므로 여기서 버리고, lib/stressScenarios.ts 의 runStress 는 남은 위험자산
+// 비중만으로 손실을 계산한다(현금 기여분은 어차피 0이라 결과가 같다).
+// 도넛은 백엔드 원본 allocation 을 그대로 쓰므로 현금 조각은 화면에서 유지된다.
 const ASSET_TO_CALC_UNIT: Record<string, keyof CalcUnitWeights> = {
   domestic_equity:   "domesticEquity",
   overseas_dividend: "overseasDividendEquity",
@@ -143,7 +150,6 @@ const ASSET_TO_CALC_UNIT: Record<string, keyof CalcUnitWeights> = {
   gold:              "gold",
   commodity:         "infraFund",
   dollar:            "overseasBond",
-  cash:              "domesticBond",
 };
 
 function mapAllocationToWeights(allocation: BackendAllocationItem[]): CalcUnitWeights {
@@ -478,6 +484,10 @@ export async function fetchStressMetrics(
   // 같은 "현재 포트폴리오" 기준선을 보게 한다. 실입력이 없을 때만 직전 calculate 결과로 되돌아간다.
   const realCurrentWeights = mapCurrentWeightsInputToBackend(opts.currentWeights ?? {});
   const currentPortfolio = currentPortfolios.find((p) => p.id === "current");
+  // 주의(폴백 경로 한정): CalcUnitWeights 에는 현금 칸이 없고 ASSET_TO_CALC_UNIT 도
+  // 현금을 매핑하지 않으므로, 현금을 보유한 포트폴리오는 합계가 1.0 미만으로 전송돼
+  // 백엔드 normalize_weights 가 위험자산 쪽으로 재정규화한다. 실입력(realCurrentWeights)이
+  // 있으면 그쪽이 현금을 포함해 전송하므로 이 경로를 타지 않는다.
   const backendWeights =
     realCurrentWeights ??
     (currentPortfolio ? mapFrontendWeightsToBackend(currentPortfolio.weights) : undefined);

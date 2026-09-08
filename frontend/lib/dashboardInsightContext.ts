@@ -6,6 +6,7 @@ import {
   TAX_THRESHOLD,
   type Customer,
 } from "@/lib/mockData";
+import { pctOfAumLabel } from "@/lib/formatKrw";
 import type { IpsState } from "@/lib/store";
 
 type ScenarioState = { ratePct: number; fxKrw: number };
@@ -41,7 +42,18 @@ function parseManwonLabelToWon(label: string | undefined | null): number | null 
   return value == null ? null : value * 10_000;
 }
 
-function toPortfolioSummary(portfolio: (typeof PORTFOLIOS)[number]) {
+/**
+ * AI 인사이트에 넘길 포트폴리오 요약.
+ *
+ * 원화 병기 라벨은 화면(PortfolioSection)과 같은 규칙으로 만든다 — 백엔드
+ * 실계산 값이 있으면 그것을, 없으면 비율 × 고객 총자산으로 계산한다.
+ * 폴백이 없으면 화면에는 금액이 보이는데 AI 에게는 undefined 가 가서,
+ * 답변이 금액을 쓰지 못한다.
+ */
+function toPortfolioSummary(
+  portfolio: (typeof PORTFOLIOS)[number],
+  aumEokwon: number,
+) {
   const metrics = portfolio.metrics;
   return {
     api_key: portfolio.id,
@@ -55,9 +67,19 @@ function toPortfolioSummary(portfolio: (typeof PORTFOLIOS)[number]) {
       sortino_ratio: metrics.sortino,
       mdd: -pctToRatio(metrics.mddPct),
       after_tax_return: pctToRatio(metrics.afterTaxReturnPct),
-      volatility_amount_label: metrics.volatilityAmountLabel,
-      mdd_amount_label: metrics.mddAmountLabel,
-      after_tax_amount_label: metrics.afterTaxAmountLabel,
+      volatility_amount_label:
+        metrics.volatilityAmountLabel ??
+        pctOfAumLabel(metrics.volatilityPct, aumEokwon, "±"),
+      mdd_amount_label:
+        metrics.mddAmountLabel ??
+        pctOfAumLabel(metrics.mddPct, aumEokwon, "-"),
+      after_tax_amount_label:
+        metrics.afterTaxAmountLabel ??
+        pctOfAumLabel(
+          metrics.afterTaxReturnPct,
+          aumEokwon,
+          metrics.afterTaxReturnPct < 0 ? "-" : "+",
+        ),
     },
   };
 }
@@ -84,6 +106,8 @@ export function buildDashboardInsightContext({
   const portfolioA = PORTFOLIOS.find((portfolio) => portfolio.id === "a");
   const portfolioB = PORTFOLIOS.find((portfolio) => portfolio.id === "b");
   const selectedPortfolioKey = selectedPortfolio?.id ?? "a";
+  // 원화 병기 폴백의 기준. 고객이 없으면 0 이라 pctOfAumLabel 이 undefined 를 돌려준다.
+  const aumEokwon = selectedCustomer?.aumEokwon ?? 0;
 
   return {
     schema_version: "dashboard_context_v1",
@@ -115,9 +139,9 @@ export function buildDashboardInsightContext({
       unique: ips.unique,
     },
     benchmark_choice: "all",
-    current: current ? toPortfolioSummary(current) : null,
-    portfolio_a: portfolioA ? toPortfolioSummary(portfolioA) : null,
-    portfolio_b: portfolioB ? toPortfolioSummary(portfolioB) : null,
+    current: current ? toPortfolioSummary(current, aumEokwon) : null,
+    portfolio_a: portfolioA ? toPortfolioSummary(portfolioA, aumEokwon) : null,
+    portfolio_b: portfolioB ? toPortfolioSummary(portfolioB, aumEokwon) : null,
     backtest: {
       period: "최근 5년",
       index_base: 100,

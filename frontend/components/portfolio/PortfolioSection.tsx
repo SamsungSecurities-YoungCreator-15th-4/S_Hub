@@ -1,16 +1,14 @@
 "use client";
 
-import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import AssetDonut from "@/components/portfolio/AssetDonut";
-import CorrelationHeatmap from "@/components/portfolio/CorrelationHeatmap";
 import {
   BACKEND_ASSET_COLORS,
-  DISPLAY_GROUP_COLORS,
-  toDisplayAllocation,
+  toCalcUnitAllocation,
 } from "@/lib/assetMapping";
 import { type Portfolio, type PortfolioMetrics } from "@/lib/mockData";
+import { pctOfAumLabel } from "@/lib/formatKrw";
 import { useDashboardStore } from "@/lib/store";
 import HelpTooltip from "@/components/common/HelpTooltip";
 
@@ -111,7 +109,13 @@ function PortfolioCard({
   onSelect: () => void;
   selectable: boolean;
 }) {
-  const [view, setView] = useState<"donut" | "heatmap">("donut");
+  // 지표의 원화 병기 기준. 고객 총자산이 없으면 pctOfAumLabel 이 병기를 생략한다.
+  const aumEokwon = useDashboardStore(
+    (s) =>
+      (s.customers.find((c) => c.id === s.selectedCustomerId) ?? s.customers[0])
+        ?.aumEokwon ?? 0,
+  );
+
   // 백엔드 8개 자산군이 있으면 직접 사용, 없으면 구형 6분류 변환으로 폴백
   const allocation = pf.allocation
     ? pf.allocation
@@ -121,18 +125,14 @@ function PortfolioCard({
           weight: a.weight,
           color: BACKEND_ASSET_COLORS[a.asset_class] ?? "#8899AA",
         }))
-    : toDisplayAllocation(pf.weights).map((a) => ({
-        label: a.group,
-        weight: a.weight,
-        color: DISPLAY_GROUP_COLORS[a.group],
-      }));
+    : toCalcUnitAllocation(pf.weights);
   const m = pf.metrics as PortfolioMetrics & {
     afterTaxReturnRangeLabel?: string;
     mddRangeLabel?: string;
   };
 
   const portfolioType =
-    pf.id === "a" ? "수익추구형" : pf.id === "b" ? "안정추구형" : null;
+    pf.id === "a" ? "안정추구형" : pf.id === "b" ? "수익추구형" : null;
 
   return (
     <Card
@@ -167,49 +167,55 @@ function PortfolioCard({
             </span>
           )}
         </div>
-        <div
-          className="flex rounded-lg bg-muted p-0.5"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {(["donut", "heatmap"] as const).map((v) => (
-            <button
-              key={v}
-              type="button"
-              onClick={() => setView(v)}
-              className={`rounded-md px-2 py-0.5 text-[9.5px] font-bold transition-colors ${
-                view === v
-                  ? "bg-white text-brand-dark shadow-sm"
-                  : "text-muted-foreground/70 hover:text-foreground"
-              }`}
-            >
-              {v === "donut" ? "자산배분" : "상관관계"}
-            </button>
-          ))}
+      </div>
+
+      <div className="flex min-h-72 items-stretch gap-2.5">
+        <div className="flex flex-1 flex-col items-center">
+          <AssetDonut allocation={allocation} />
         </div>
       </div>
 
-      <div className="flex h-72 items-stretch gap-2.5">
-        {view === "donut" ? (
-          <div className="flex flex-1 flex-col items-center">
-            <AssetDonut allocation={allocation} />
-          </div>
-        ) : (
-          <CorrelationHeatmap portfolio={pf} />
-        )}
-      </div>
+      {/*
+        지표 순서는 "얼마나 잃을 수 있나"(윗줄) → "얼마나 벌 수 있나"(아랫줄)다.
+        쓸 날이 정해진 자금을 다루는 상담에서는 기대수익보다 낙폭이 먼저 읽혀야 한다.
+        소르티노는 하락 위험만으로 계산하는 지표라 윗줄에 둔다.
 
+        원화 병기는 백엔드 실계산 값이 있으면 그것을 쓰고, 없으면
+        pctOfAumLabel(비율 × 고객 총자산)로 만든다. 어느 경로든 값의 출처가
+        코드에서 하나로 추적된다.
+      */}
       <div className="mt-2.5 grid grid-cols-3 gap-px overflow-hidden rounded-lg bg-muted">
-        <Metric k="기대수익률" v={`${m.expectedReturnPct.toFixed(2)}%`} />
-        <Metric k="샤프지수" v={m.sharpe != null ? m.sharpe.toFixed(2) : "-"} />
+        <Metric
+          k="MDD"
+          v={`${m.mddPct.toFixed(1)}%`}
+          rangeSub={m.mddRangeLabel}
+          sub={m.mddAmountLabel ?? pctOfAumLabel(m.mddPct, aumEokwon, "-")}
+          tone={m.mddPct > 0 ? "down" : undefined}
+          value={m.mddPct}
+        />
+        <Metric
+          k="변동성"
+          v={`${m.volatilityPct.toFixed(2)}%`}
+          sub={m.volatilityAmountLabel ?? pctOfAumLabel(m.volatilityPct, aumEokwon, "±")}
+          value={m.volatilityPct}
+        />
         <Metric
           k="소르티노"
           v={m.sortino != null ? m.sortino.toFixed(2) : "-"}
         />
+        <Metric k="기대수익률" v={`${m.expectedReturnPct.toFixed(2)}%`} />
         <Metric
           k="세후수익률"
           v={`${Math.abs(m.afterTaxReturnPct).toFixed(1)}%`}
           rangeSub={m.afterTaxReturnRangeLabel}
-          sub={m.afterTaxAmountLabel}
+          sub={
+            m.afterTaxAmountLabel ??
+            pctOfAumLabel(
+              m.afterTaxReturnPct,
+              aumEokwon,
+              m.afterTaxReturnPct < 0 ? "-" : "+",
+            )
+          }
           tone={
             m.afterTaxReturnPct > 0
               ? "up"
@@ -219,20 +225,7 @@ function PortfolioCard({
           }
           value={m.afterTaxReturnPct}
         />
-        <Metric
-          k="변동성"
-          v={`${m.volatilityPct.toFixed(2)}%`}
-          sub={m.volatilityAmountLabel}
-          value={m.volatilityPct}
-        />
-        <Metric
-          k="MDD"
-          v={`${m.mddPct.toFixed(1)}%`}
-          rangeSub={m.mddRangeLabel}
-          sub={m.mddAmountLabel}
-          tone={m.mddPct > 0 ? "down" : undefined}
-          value={m.mddPct}
-        />
+        <Metric k="샤프지수" v={m.sharpe != null ? m.sharpe.toFixed(2) : "-"} />
       </div>
     </Card>
   );
@@ -275,22 +268,36 @@ function Metric({
         >
           {k}
         </div>
+        {/*
+          원화 금액을 먼저 읽히게 한다 — 매스 고객은 비율보다 금액으로 이해한다.
+          원화 병기가 없는 지표(샤프·소르티노 등)는 비율·수치가 그대로 큰 값이 된다.
+        */}
         <div
           className={`mt-1 text-[14px] font-extrabold leading-none tabular-nums ${toneCls}`}
         >
-          {arrow && <span className="mr-0.5 text-[14px]">{arrow}</span>}
-          {v}
+          {/* 금액은 부호(+ · - · ±)만 달고 삼각형은 아래 비율이 가져간다. */}
+          {sub ? (
+            value === 0 ? (
+              sub.replace(/^[+\-±]/, "")
+            ) : (
+              sub
+            )
+          ) : (
+            <>
+              {arrow && <span className="mr-0.5 text-[14px]">{arrow}</span>}
+              {v}
+            </>
+          )}
         </div>
+        {sub && (
+          <div className={`mt-0.5 text-[12px] font-bold tabular-nums ${toneCls}`}>
+            {arrow && <span className="mr-0.5">{arrow}</span>}
+            {v}
+          </div>
+        )}
         {rangeSub && (
           <div className="mt-0.5 text-[11px] font-semibold tabular-nums text-muted-foreground">
             {rangeSub}
-          </div>
-        )}
-        {sub && (
-          <div
-            className={`mt-0.5 text-[12px] font-bold tabular-nums ${toneCls}`}
-          >
-            {value === 0 ? sub.replace(/^[+\-±]/, "") : sub}
           </div>
         )}
       </div>

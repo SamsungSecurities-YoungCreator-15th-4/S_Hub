@@ -51,8 +51,8 @@ const ACCOUNT_PDF = [
 ];
 
 const PORT_TYPE_LABEL: Record<string, string> = {
-  a: "수익추구형",
-  b: "안정추구형",
+  a: "안정추구형",
+  b: "수익추구형",
 };
 
 const BRAND = "#0050D6";
@@ -1739,8 +1739,8 @@ function TaxPage() {
 
 // ── Page 5: 분산투자 & 상관관계 ────────────────────────────────────
 
-// 대시보드 CorrelationHeatmap과 동일한 데이터·색상 공식
-// 색상: rgba(0,100,255, 0.06 + v * 0.8) — CorrelationHeatmap.tsx 동일
+// 상관관계 히트맵은 이제 PDF 에만 남아 있다(대시보드 컴포넌트는 제거됨).
+// 색상 공식: rgba(0,100,255, 0.06 + v * 0.8) — 이 파일이 기준이다.
 const ASSET_CARDS = [
   {
     title: "저쿠폰 장기채",
@@ -1860,7 +1860,7 @@ function DiversificationPage() {
           </p>
         </div>
 
-        {/* 상관관계 매트릭스 — 대시보드 CorrelationHeatmap과 동일한 데이터·색상 */}
+        {/* 상관관계 매트릭스 — 백엔드 correlation_heatmap 응답 기준 */}
         <div style={{ marginBottom: 40 }}>
           <div
             style={{

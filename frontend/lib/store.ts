@@ -4,6 +4,7 @@
  */
 
 import { create } from "zustand";
+import type { StressScenarioKey } from "./stressScenarios";
 import {
   type ConsultMessage,
   type Customer,
@@ -110,6 +111,20 @@ export interface DashboardState {
   isStressMode: boolean;
   stressPreset: "current" | "crisis" | "war" | null;
   setStressPreset: (preset: "current" | "crisis" | "war" | null) => void;
+  /**
+   * 스트레스 테스트 카드에서 고른 시나리오. null 이면 미선택.
+   * 카드 손실액은 lib/stressScenarios.ts 가 엔진 상수로 직접 계산하므로
+   * 백엔드 stress 엔드포인트(stressPreset)와는 별개의 상태다 — 백엔드는
+   * crisis_2008 / crisis_ru_war 두 종류만 받아 카드 3종과 대응되지 않는다.
+   */
+  stressScenarioKey: StressScenarioKey | null;
+  setStressScenarioKey: (key: StressScenarioKey | null) => void;
+  /**
+   * 분석하기를 직접 눌러 끝냈다는 신호. 좌·우 패널이 이걸 보고 스스로 접는다.
+   * 값 자체에 의미는 없고 "바뀌었다"만 쓴다 — 같은 분석을 두 번 해도 매번 접힌다.
+   */
+  collapsePanelsSignal: number;
+  signalCollapsePanels: () => void;
   /** portfolios를 basePortfolios로 복원, isStressMode: false */
   clearStressMode: () => void;
 
@@ -222,6 +237,11 @@ export const useDashboardStore = create<DashboardState>((set) => ({
   isStressMode: false,
   stressPreset: "current",
   setStressPreset: (preset) => set({ stressPreset: preset }),
+  stressScenarioKey: null,
+  setStressScenarioKey: (key) => set({ stressScenarioKey: key }),
+  collapsePanelsSignal: 0,
+  signalCollapsePanels: () =>
+    set((s) => ({ collapsePanelsSignal: s.collapsePanelsSignal + 1 })),
   clearStressMode: () =>
     set((s) => ({ portfolios: s.basePortfolios, isStressMode: false })),
 
@@ -295,6 +315,7 @@ export const useDashboardStore = create<DashboardState>((set) => ({
         currentWeightsInput: {},
         isStressMode: false,
         stressPreset: "current",
+        stressScenarioKey: null,
         scenario: { ...s.liveBase }, // 슬라이더도 live 기준으로 초기화 → 자동분석는 항상 calculate
         // 고객 전환 시 이전 고객의 상담 내역·상담 ID·STT 상태는 신규/기존 구분 없이 항상 초기화한다.
         // (이전 고객의 transcript·consultationId가 새 고객 화면에 노출되거나, 새 고객 clientId와

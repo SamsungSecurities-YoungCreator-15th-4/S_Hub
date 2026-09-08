@@ -177,10 +177,10 @@ export function buildPdfPerfRows(portfolios: Portfolio[]): PdfPerfRow[] {
 }
 
 // ── 상관관계 히트맵 ───────────────────────────────────────────────────────────
-// 대시보드 CorrelationHeatmap.tsx 와 동일한 로직: 선택 포트폴리오의 비중>0 자산만
+// 선택 포트폴리오의 비중>0 자산만 추린다.
 // 골라 store 상관계수 행렬에서 부분행렬을 뽑는다. 실데이터가 없으면 학술 추정치 폴백.
 
-// 백엔드 heatmap asset_class(snake_case) 별 약칭 (CorrelationHeatmap.tsx 동일)
+// 백엔드 heatmap asset_class(snake_case) 별 약칭
 const ASSET_ABBR: Record<string, string> = {
   domestic_equity: "국내주",
   overseas_equity: "해외주",
@@ -198,7 +198,7 @@ const ASSET_ABBR: Record<string, string> = {
   cash: "현금",
 };
 
-// CalcUnitId(camelCase) → 백엔드 asset_class(snake_case) 역매핑 (CorrelationHeatmap.tsx 동일)
+// CalcUnitId(camelCase) → 백엔드 asset_class(snake_case) 역매핑
 const CALC_TO_BACKEND: Record<string, string[]> = {
   domesticEquity: ["domestic_equity"],
   overseasDividendEquity: ["overseas_dividend"],
@@ -235,7 +235,7 @@ export type PdfCorrHeatmap = {
 
 /**
  * correlationHeatmap(store) + 선택 포트폴리오 → 히트맵 라벨·부분행렬.
- * 대시보드 CorrelationHeatmap 과 동일하게 비중>0 자산만 추려 부분행렬을 만든다.
+ * 비중>0 자산만 추려 부분행렬을 만든다.
  * 실데이터가 없거나 매칭 자산이 없으면 학술 추정치 폴백(isFallback=true).
  */
 export function buildPdfCorrHeatmap(
@@ -286,7 +286,7 @@ export function buildPdfCorrHeatmap(
   return { labels: FALLBACK_LABELS, matrix: FALLBACK_CORR, isFallback: true };
 }
 
-/** 히트맵 셀 배경색 (CorrelationHeatmap.tsx와 동일 공식) */
+/** 히트맵 셀 배경색 */
 export function heatBg(v: number): string {
   return `rgba(0, 100, 255, ${(0.06 + v * 0.8).toFixed(2)})`;
 }

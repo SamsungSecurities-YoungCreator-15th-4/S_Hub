@@ -208,11 +208,12 @@ export interface PortfolioMetrics {
   volatilityPct: number;
   sharpe: number;
   sortino: number;
-  volatilityAmountLabel: string;
+  /** 백엔드 실계산 원화 병기. 없으면 화면이 비율×총자산으로 계산한다. */
+  volatilityAmountLabel?: string;
   mddPct: number; // 양수로 보관, 표시 시 ▼ 접두
-  mddAmountLabel: string;
+  mddAmountLabel?: string;
   afterTaxReturnPct: number;
-  afterTaxAmountLabel: string;
+  afterTaxAmountLabel?: string;
 }
 
 export interface BacktestPoint {
@@ -226,7 +227,7 @@ export interface Portfolio {
   badge: "현재" | "베스트" | "추천";
   /** 백엔드 8개 자산군 원본 allocation (도넛 차트에 직접 사용) */
   allocation?: { asset_class: string; name: string; weight: number }[];
-  /** 11종 계산 단위 비중(%). CorrelationHeatmap 필터링용 — 도넛 표시는 allocation 우선 */
+  /** 11종 계산 단위 비중(%). PDF 상관관계 히트맵 필터링용 — 도넛 표시는 allocation 우선 */
   weights: CalcUnitWeights;
   metrics: PortfolioMetrics;
   backtest?: BacktestPoint[];
@@ -260,13 +261,10 @@ export const PORTFOLIOS: Portfolio[] = [
     metrics: {
       expectedReturnPct: 4.8,
       volatilityPct: 11.2,
-      volatilityAmountLabel: "±3,200만원",
       sharpe: 0.43,
       sortino: 0.3,
       mddPct: 14.6,
-      mddAmountLabel: "-3,200만원",
       afterTaxReturnPct: 4.0,
-      afterTaxAmountLabel: "+7,200만원",
     },
   },
   {
@@ -289,13 +287,10 @@ export const PORTFOLIOS: Portfolio[] = [
     metrics: {
       expectedReturnPct: 6.4,
       volatilityPct: 12.5,
-      volatilityAmountLabel: "±3,800만원",
       sharpe: 0.61,
       sortino: 0.48,
       mddPct: 11.2,
-      mddAmountLabel: "-2,000만원",
       afterTaxReturnPct: 5.5,
-      afterTaxAmountLabel: "+9,900만원",
     },
   },
   {
@@ -318,13 +313,10 @@ export const PORTFOLIOS: Portfolio[] = [
     metrics: {
       expectedReturnPct: 8.7,
       volatilityPct: 20.3,
-      volatilityAmountLabel: "±6,100만원",
       sharpe: 0.43,
       sortino: 0.43,
       mddPct: 23.3,
-      mddAmountLabel: "-4,200만원",
       afterTaxReturnPct: 7.2,
-      afterTaxAmountLabel: "+1.29억원",
     },
   },
 ];
@@ -386,17 +378,6 @@ export const BACKTEST_SERIES = [
     sp500: 190,
     msciAcwi: 168,
   },
-];
-
-// ── 상관관계 히트맵 (6분류 기준 더미 행렬, 대칭) ────────────────
-// DISPLAY_GROUPS 순서와 동일한 6x6 행렬.
-export const CORRELATION_MATRIX: number[][] = [
-  [1.0, 0.62, 0.71, 0.18, 0.05, 0.12],
-  [0.62, 1.0, 0.68, 0.22, 0.1, 0.15],
-  [0.71, 0.68, 1.0, 0.14, 0.02, 0.09],
-  [0.18, 0.22, 0.14, 1.0, 0.74, 0.4],
-  [0.05, 0.1, 0.02, 0.74, 1.0, 0.35],
-  [0.12, 0.15, 0.09, 0.4, 0.35, 1.0],
 ];
 
 // ── 절세 최적화 시뮬레이터 ─────────────────────────────────────
@@ -530,26 +511,6 @@ export const SCENARIO_BASE = {
   fxMin: 1000,
   fxMax: 2000,
   fxStep: 10,
-};
-
-// 시나리오 슬라이더 변화 → 예상 평가손익(억원) 더미 선형 민감도.
-// 정본 시안의 표시값(금리 +1.00%p · 환율 -450원 → 현재 -1.0 / A -1.6 / B -3.2억)을
-// 재현하도록 역산한 자리표시자다. 실제 민감도는 백엔드 시뮬레이션으로 대체.
-export const SCENARIO_SENSITIVITY: Record<
-  "current" | "a" | "b",
-  { perRatePct: number; perFxKrw: number }
-> = {
-  current: { perRatePct: -0.4, perFxKrw: 0.6 / 450 },
-  a: { perRatePct: -0.6, perFxKrw: 1.0 / 450 },
-  b: { perRatePct: -1.2, perFxKrw: 2.0 / 450 },
-};
-
-// 기준 시나리오에서 이만큼 벗어나면 "큰 폭 변동" 경고를 띄운다 (UI 더미 기준)
-export const SCENARIO_WARN = {
-  rateDeltaPct: 0.75,
-  fxDeltaKrw: 300,
-  message:
-    "매우 큰 폭의 변동을 가정한 시나리오입니다. 정밀한 수치보다는 전체적인 흐름을 보시는 용도로 적합합니다.",
 };
 
 /**

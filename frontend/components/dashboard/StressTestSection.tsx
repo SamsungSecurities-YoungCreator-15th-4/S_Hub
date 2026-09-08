@@ -1,0 +1,152 @@
+"use client";
+
+import { Card } from "@/components/ui/card";
+import HelpTooltip from "@/components/common/HelpTooltip";
+
+import {
+  STRESS_SCENARIOS,
+  formatKrwLoss,
+  runStress,
+  type StressScenario,
+} from "@/lib/stressScenarios";
+import { useDashboardStore } from "@/lib/store";
+
+const STRESS_TEST_HELP =
+  "과거에 실제로 있었던 시장 충격 국면을 참조해, 지금 포트폴리오가 그런 상황을 다시 만나면 " +
+  "얼마를 잃을 수 있는지 보여줍니다. 충격 크기는 미리 정해져 있어 매번 같은 결과가 나옵니다. " +
+  "정밀한 재현이 아니라 방향과 크기를 맞춘 대표 시나리오입니다.";
+
+/** 우측 상단: Stress Test — 시나리오 카드 3장 */
+export default function StressTestSection() {
+  const {
+    customers,
+    selectedCustomerId,
+    portfolios,
+    selectedPortfolioId,
+    stressScenarioKey,
+    setStressScenarioKey,
+    helpMode,
+  } = useDashboardStore();
+
+  const customer =
+    customers.find((c) => c.id === selectedCustomerId) ?? customers[0];
+  // 총자산: 억원 단위 입력을 원 단위로 환산한다.
+  const totalKrw = (customer?.aumEokwon ?? 0) * 100_000_000;
+
+  const portfolio =
+    portfolios.find((p) => p.id === selectedPortfolioId) ?? portfolios[0];
+
+  return (
+    <Card className="gap-0 p-3.5">
+      <div className="mb-0.5">
+        <HelpTooltip text={STRESS_TEST_HELP} placement="bottom">
+          <p className="cursor-default text-[14px] font-bold">
+            <span
+              className={
+                helpMode
+                  ? "rounded border border-brand/40 bg-brand/[0.06] px-1"
+                  : ""
+              }
+            >
+              Stress Test
+            </span>
+          </p>
+        </HelpTooltip>
+      </div>
+      <p className="mb-3 text-[11px] font-medium text-muted-foreground">
+        과거 충격 국면을 참조한 세 가지 시나리오
+      </p>
+
+      {!portfolio || totalKrw <= 0 ? (
+        <p className="py-3 text-center text-[12px] font-semibold text-muted-foreground">
+          고객 자산과 포트폴리오가 정해지면 계산됩니다.
+        </p>
+      ) : (
+        /* 중앙 대시보드의 넓은 컬럼에서는 네 개를 한 줄로, 좁아지면 2열 → 1열. */
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          {/*
+            "현재" 는 충격을 적용하지 않은 상태다. 대시보드의 다른 지표는 어차피
+            늘 현재 기준이라 계산상 바뀌는 것은 없지만, 고른 카드를 되돌릴 방법이
+            보이지 않아 상태로 노출한다.
+          */}
+          <button
+            type="button"
+            onClick={() => setStressScenarioKey(null)}
+            aria-pressed={stressScenarioKey === null}
+            className={`flex items-baseline justify-between rounded-xl border px-2.5 py-2 text-left transition-colors ${
+              stressScenarioKey === null
+                ? "border-brand bg-brand/[0.04]"
+                : "border-border hover:border-brand/40"
+            }`}
+          >
+            <span className="text-[13px] font-extrabold">현재</span>
+            <span className="text-[11px] font-semibold text-muted-foreground">
+              충격 없음
+            </span>
+          </button>
+          {STRESS_SCENARIOS.map((scenario) => (
+            <ScenarioCard
+              key={scenario.key}
+              scenario={scenario}
+              weights={portfolio.weights}
+              totalKrw={totalKrw}
+              selected={stressScenarioKey === scenario.key}
+              onSelect={() =>
+                setStressScenarioKey(
+                  stressScenarioKey === scenario.key ? null : scenario.key,
+                )
+              }
+            />
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function ScenarioCard({
+  scenario,
+  weights,
+  totalKrw,
+  selected,
+  onSelect,
+}: {
+  scenario: StressScenario;
+  weights: Parameters<typeof runStress>[0];
+  totalKrw: number;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  const loss = runStress(weights, totalKrw, scenario);
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-pressed={selected}
+      className={`rounded-xl border p-2.5 text-left transition-colors ${
+        selected
+          ? "border-brand bg-brand/[0.04]"
+          : "border-border hover:border-brand/40"
+      }`}
+    >
+      <div className="flex items-baseline justify-between gap-1.5">
+        <span className="text-[13px] font-extrabold">{scenario.label}</span>
+        <span className="text-[17px] font-extrabold text-down tabular-nums">
+          &minus;{formatKrwLoss(loss.lossKrw)}
+        </span>
+      </div>
+      <p className="text-right text-[10.5px] font-semibold text-muted-foreground tabular-nums">
+        {/* 위 손실 금액과 같은 부호 규약을 쓴다 — 밴드만 양수로 보이면 이익으로 읽힌다. */}
+        &minus;{formatKrwLoss(loss.lossKrwLow)} ~ &minus;
+        {formatKrwLoss(loss.lossKrwHigh)}
+      </p>
+      {/* 자산군별 충격은 근거라 고른 카드에서만 편다 — 세 장을 훑을 때는 이름과 금액만 보이게. */}
+      {selected && (
+        <p className="mt-1.5 border-t border-border pt-1.5 text-[10.5px] font-semibold leading-snug text-muted-foreground">
+          {scenario.shockSummary}
+        </p>
+      )}
+    </button>
+  );
+}
