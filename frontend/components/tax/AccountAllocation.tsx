@@ -12,6 +12,7 @@ import {
 import { TAX_EFFECT, PORTFOLIOS } from "@/lib/mockData";
 import { toDisplayAllocation, DISPLAY_GROUP_COLORS } from "@/lib/assetMapping";
 import { useDashboardStore } from "@/lib/store";
+import { useViewedPortfolio } from "@/lib/viewedPortfolio";
 import type { AccountSlot } from "@/lib/types";
 
 // 출처: 조세특례제한법 §91의18(ISA), 소득세법 §59의3(연금·IRP)
@@ -65,11 +66,13 @@ export default function AccountAllocation({
    * 비중을 입력해도(demoPortfolioCalc 의 withCurrentWeights) 이 막대만 따라오지
    * 않았다. 같은 화면의 도넛·스트레스는 store 를 읽는데 여기만 상수였다.
    */
-  const { selectedPortfolioId, portfolios } = useDashboardStore();
-  const portfolio =
-    portfolios.find((p) => p.id === selectedPortfolioId) ??
-    portfolios[1] ??
-    PORTFOLIOS[1];
+  const portfolios = useDashboardStore((s) => s.portfolios);
+  /*
+   * 확정 대상 안을 따른다 — PB 가 제안 조정으로 비중을 손보면 이 막대도 같이
+   * 움직여야 한다. PDF(PB·고객) 의 같은 막대도 같은 훅을 읽는다.
+   */
+  const { viewed } = useViewedPortfolio();
+  const portfolio = viewed ?? portfolios[1] ?? PORTFOLIOS[1];
   const allocation = toDisplayAllocation(portfolio.weights).filter(
     ({ weight }) => weight > 0,
   );
