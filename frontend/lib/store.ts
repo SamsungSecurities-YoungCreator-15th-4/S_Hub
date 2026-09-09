@@ -355,8 +355,25 @@ export const useDashboardStore = create<DashboardState>((set) => ({
       portfolioNote: note,
       isStressMode: false,
       weightsTab: "proposed",
-      proposedWeightsInput: seedFromProposal(portfolios, s.selectedPortfolioId),
-      proposedWeightsDirty: false,
+      /*
+        이미 손본 조정안은 그대로 둔다.
+
+        전에는 분석 결과가 올 때마다 선택한 제안의 값으로 다시 심고 dirty 를
+        내렸다. 그러면 조정 → 승인 → 조정값 소멸이 되어, 조정한 안을 확정하려고
+        승인했는데 그 안이 사라졌다. 조정을 할 이유가 없어지는 동작이었다.
+
+        손대지 않은 상태에서는 종전대로 선택한 제안을 심는다 — 그때의 조정안은
+        선택한 제안과 같은 안이라 심어 둬야 출발점이 생긴다.
+      */
+      ...(s.proposedWeightsDirty
+        ? {}
+        : {
+            proposedWeightsInput: seedFromProposal(
+              portfolios,
+              s.selectedPortfolioId,
+            ),
+            proposedWeightsDirty: false,
+          }),
     })),
   setStressPortfolios: (portfolios) => set({ portfolios, isStressMode: true }),
 
