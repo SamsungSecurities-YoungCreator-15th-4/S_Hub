@@ -289,7 +289,11 @@ export default function TaxSection() {
           <div className="flex items-center gap-3 rounded-xl border border-brand/20 bg-brand/5 px-3.5 py-2">
             <div className="flex-1">
               <div className="flex items-center gap-2">
-                <span className="rounded-full border border-brand/20 bg-white px-2 py-0.5 text-[13px] font-bold text-muted-foreground">
+                {/*
+                  이 배지가 왼쪽 칸에 홀로 남는다(절세 효과 금액이 없을 때).
+                  오른쪽 지표 카드와 무게를 맞추려면 이 정도는 되어야 한다.
+                */}
+                <span className="rounded-full border border-brand/20 bg-white px-3 py-1 text-[15px] font-extrabold text-brand-dark">
                   {baseLabel}
                 </span>
               </div>
