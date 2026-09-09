@@ -1,11 +1,14 @@
 "use client";
 
+import { useState } from "react";
 import {
   CALC_UNITS,
   type CalcUnitId,
+  type CurrentWeightsInput,
   isCurrentWeightsInputValid,
   sumCurrentWeightsInput,
 } from "@/lib/assetMapping";
+import { isTrusted } from "@/lib/api/result";
 import { useDashboardStore } from "@/lib/store";
 
 type FieldId = CalcUnitId | "cash";
@@ -24,6 +27,8 @@ const LABELS: Record<FieldId, string> = {
   cash: "현금",
 } as Record<FieldId, string>;
 
+const ALL_FIELD_IDS: FieldId[] = [...CALC_UNITS.map((u) => u.id), "cash"];
+
 // assetMapping.ts의 TODO(팀 확정 필요) — 11종 계산단위 중 3개는 백엔드 자산군과
 // 라벨이 어긋난 채로 매핑돼 있다(mapFrontendWeightsToBackend 참조). 계좌 배치
 // 패널(AccountAllocation 등)에서는 이 값이 항상 표시 전용이라 무해했지만, 여기서는
@@ -35,47 +40,102 @@ const PROXY_NOTE: Partial<Record<FieldId, string>> = {
   infraFund: "원자재(DBC) 대리",
 };
 
+type WeightTab = "current" | "proposed";
+
 /**
- * 고객이 지금 실제로 들고 있는 자산 비중 입력 — "현재 포트폴리오"의 실데이터 기준선.
- * 미입력 시 백엔드는 현금 100%로 계산한다(중앙 대시보드 "현재" 카드·절세 효과·
- * 스트레스 테스트가 전부 이 값을 공유하므로, 여기 값이 세 화면 모두에 반영된다).
+ * 자산 비중 입력 — 탭 2개.
+ *
+ *   현재 보유 : 고객이 지금 실제로 들고 있는 비중. 계산 요청에 그대로 실린다.
+ *   제안 조정 : 제안 포트폴리오를 PB가 손보는 값. 분석 결과가 있어야 연다 —
+ *               비교 대상이 없는 상태에서 "제안을 조정"한다는 말이 성립하지 않는다.
+ *
+ * 어느 탭이든 값이 바뀌면 store 의 setter 가 실행 상태를 draft 로 되돌린다
+ * (`lib/store.ts`의 unlockOnWeightChange). 승인은 그때 그 비중에 대한 것이라,
+ * 입력이 바뀐 뒤에도 확정이 남아 있으면 승인받지 않은 내용이 확정본으로 나간다.
  *
  * 합계가 100이 아니면 분석하기를 막는다(Sidebar.tsx의 isCurrentWeightsInputValid
  * 게이트) — 백엔드가 조용히 100%로 재정규화해버리면 "화면 합계 ≠ 실제 계산에 쓰인
  * 비중"이 되어 추적성이 깨지기 때문에, 여기서 정직하게 막는 쪽을 택했다.
  */
 export default function CurrentPortfolioInput() {
-  const { currentWeightsInput, setCurrentWeightsInput } = useDashboardStore();
-  const total = sumCurrentWeightsInput(currentWeightsInput);
+  const currentWeightsInput = useDashboardStore((s) => s.currentWeightsInput);
+  const setCurrentWeightsInput = useDashboardStore(
+    (s) => s.setCurrentWeightsInput,
+  );
+  const proposedWeightsInput = useDashboardStore((s) => s.proposedWeightsInput);
+  const setProposedWeightsInput = useDashboardStore(
+    (s) => s.setProposedWeightsInput,
+  );
+  const portfolioSource = useDashboardStore((s) => s.portfolioSource);
+  const runStatusReason = useDashboardStore((s) => s.runStatusReason);
+
+  const [tab, setTab] = useState<WeightTab>("current");
+
+  // 제안 조정은 분석 결과가 있을 때만 연다. live·demo 둘 다 결과가 있는 상태다.
+  const proposedEnabled = isTrusted(portfolioSource);
+  // 결과가 사라지면(고객 전환 등) 열어둔 제안 탭에 머물지 않게 되돌린다.
+  const active: WeightTab = tab === "proposed" && !proposedEnabled ? "current" : tab;
+
+  const value = active === "current" ? currentWeightsInput : proposedWeightsInput;
+  const setValue =
+    active === "current" ? setCurrentWeightsInput : setProposedWeightsInput;
+
+  const total = sumCurrentWeightsInput(value);
   const hasAnyInput = total > 0;
-  const isValid = isCurrentWeightsInputValid(currentWeightsInput);
+  const isValid = isCurrentWeightsInputValid(value);
 
   const handleChange = (id: FieldId, raw: string) => {
     const cleaned = raw.replace(/[^0-9.]/g, "");
     if (cleaned === "") {
-      setCurrentWeightsInput({ [id]: undefined });
+      setValue({ [id]: undefined });
       return;
     }
     const parsed = Number(cleaned);
-    setCurrentWeightsInput({ [id]: Number.isFinite(parsed) ? parsed : undefined });
+    setValue({ [id]: Number.isFinite(parsed) ? parsed : undefined });
   };
+
+  const handleReset = () =>
+    setValue(
+      Object.fromEntries(
+        ALL_FIELD_IDS.map((id) => [id, undefined]),
+      ) as CurrentWeightsInput,
+    );
 
   return (
     <div className="rounded-xl border p-3">
       <div className="mb-2 flex items-center justify-between">
-        <p className="text-[14px] font-bold">현재 보유 자산 비중</p>
+        <div className="flex items-center gap-0.5 rounded-lg bg-muted p-0.5">
+          <TabButton
+            active={active === "current"}
+            onClick={() => setTab("current")}
+          >
+            현재 보유
+          </TabButton>
+          <TabButton
+            active={active === "proposed"}
+            onClick={() => setTab("proposed")}
+            disabled={!proposedEnabled}
+            reason="분석 후 활성"
+          >
+            제안 조정
+          </TabButton>
+        </div>
         {hasAnyInput && (
           <button
             type="button"
-            onClick={() => setCurrentWeightsInput(Object.fromEntries(
-              [...CALC_UNITS.map((u) => u.id), "cash"].map((id) => [id, undefined]),
-            ))}
+            onClick={handleReset}
             className="text-[11px] font-semibold text-muted-foreground hover:text-foreground"
           >
             초기화
           </button>
         )}
       </div>
+
+      {!proposedEnabled && (
+        <p className="mb-2 text-[10px] font-semibold text-muted-foreground">
+          제안 조정은 분석 후 열립니다
+        </p>
+      )}
 
       <div className="grid grid-cols-2 gap-x-3 gap-y-2">
         {GROUPS.map(({ group, ids }) => (
@@ -98,7 +158,7 @@ export default function CurrentPortfolioInput() {
                       <input
                         type="text"
                         inputMode="decimal"
-                        value={currentWeightsInput[id] ?? ""}
+                        value={value[id] ?? ""}
                         onChange={(e) => handleChange(id, e.target.value)}
                         placeholder="0"
                         className="h-6 w-12 rounded-md border border-input bg-card px-1.5 text-right text-[12px] font-bold tabular-nums outline-none focus-visible:ring-1 focus-visible:ring-ring"
@@ -128,10 +188,45 @@ export default function CurrentPortfolioInput() {
           합계가 100%가 아닙니다. 맞춰야 분석하기를 실행할 수 있습니다.
         </p>
       )}
+      {/* 확정이 풀린 이유 — 왜 PDF가 다시 잠겼는지 여기서만 보인다. */}
+      {runStatusReason && (
+        <p className="mt-1 text-[11px] font-semibold text-down">{runStatusReason}</p>
+      )}
       <p className="mt-1 text-[10px] leading-snug text-muted-foreground">
         * 자산 매핑 확정 전이라 신흥국주식·해외채권·인프라펀드는 각각 나스닥·달러인덱스·원자재로
         계산됩니다.
       </p>
     </div>
+  );
+}
+
+/** 탭 버튼. 비활성일 때도 왜 못 누르는지 이유를 띄운다(무반응 금지). */
+function TabButton({
+  active,
+  onClick,
+  disabled,
+  reason,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  disabled?: boolean;
+  reason?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={disabled ? reason : undefined}
+      className={`rounded-md px-2 py-1 text-[12px] font-bold transition-colors ${
+        active
+          ? "bg-card text-foreground shadow-sm"
+          : "text-muted-foreground hover:text-foreground"
+      } disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-muted-foreground`}
+    >
+      {children}
+    </button>
   );
 }

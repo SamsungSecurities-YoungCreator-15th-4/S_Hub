@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import PdfPreviewModal from "@/components/pdf/PdfPreviewModal";
-import { RUN_STATUS_EXPORT_ALLOWED, RUN_STATUS_LABEL } from "@/lib/runStatus";
+import { RUN_STATUS_EXPORT_ALLOWED } from "@/lib/runStatus";
 import { useDashboardStore, useRunStatus } from "@/lib/store";
 
 // SSR 비활성화 — new Date() hydration mismatch 방지
@@ -34,7 +34,7 @@ function getFileName(type: PdfType, name: string): string {
     .replace(/\. /g, "")
     .replace(/\.$/, "");
   const label = type === "pb" ? "PB용" : "고객용";
-  return `VVIP_상담리포트_${label}_${name}_${date}.pdf`;
+  return `상담리포트_${label}_${name}_${date}.pdf`;
 }
 
 export default function PdfExportButton() {
@@ -43,13 +43,9 @@ export default function PdfExportButton() {
 
   // 확정(locked)에서만 고객에게 나갈 수 있다 — 허용 여부의 출처는 lib/runStatus.ts.
   const runStatus = useRunStatus();
-  const runStatusReason = useDashboardStore((s) => s.runStatusReason);
   const exportAllowed = RUN_STATUS_EXPORT_ALLOWED[runStatus];
-  const lockReason = exportAllowed
-    ? ""
-    : `${RUN_STATUS_LABEL[runStatus]} 상태에서는 추출할 수 없습니다. 리포트 상세 화면에서 PB 확정 승인을 받으세요.${
-        runStatusReason ? ` (${runStatusReason})` : ""
-      }`;
+  // 원페이지라 툴팁도 한 줄로 둔다. 확정이 풀린 사유는 좌측 비중 입력에 표시된다.
+  const lockReason = exportAllowed ? "" : "PB 승인 후 추출";
 
   // 파일명은 PDF 표지·헤더와 동일하게 현재 선택된 고객을 따른다.
   const customers = useDashboardStore((s) => s.customers);

@@ -12,14 +12,11 @@ export default function Header() {
     <header className="flex h-14.5 items-center gap-3 rounded-2xl border bg-card px-4 shadow-sm">
       {/* 로고 — 항상 표시 */}
       <div className="flex shrink-0 items-center gap-3 border-r pr-4">
-        <Image src="/logo.png" alt="S.upervisor" width={36} height={36} className="rounded-lg object-cover" />
+        <Image src="/logo.png" alt="S.ymphony" width={36} height={36} className="rounded-lg object-cover" />
         <div>
           <h1 className="text-[15px] font-extrabold leading-tight">
-            S.upervisor
+            S.ymphony
           </h1>
-          <p className="text-[9px] font-bold tracking-[0.12em] text-muted-foreground">
-            VVIP PB Advisor
-          </p>
         </div>
       </div>
 
