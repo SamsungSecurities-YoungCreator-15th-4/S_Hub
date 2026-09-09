@@ -1,7 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import ReportDetailModal from "@/components/dashboard/ReportDetailModal";
 import AssetDonut from "@/components/portfolio/AssetDonut";
 import {
   BACKEND_ASSET_COLORS,
@@ -38,6 +41,11 @@ export default function PortfolioSection() {
     portfolioNote,
     analyzing,
   } = useDashboardStore();
+  const [detailOpen, setDetailOpen] = useState(false);
+
+  // 분석 전(=빈 상태)에는 볼 리포트가 없으므로 자세히도 내보내지 않는다.
+  const isEmpty =
+    portfolioSource === "fallback" && portfolioNote === undefined && !analyzing;
 
   return (
     <section>
@@ -56,12 +64,22 @@ export default function PortfolioSection() {
             </div>
           ) : null}
         </div>
-        {portfolioSource !== "fallback" && <AsOfNote />}
+        <div className="flex items-center gap-2">
+          {portfolioSource !== "fallback" && <AsOfNote />}
+          {!isEmpty && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setDetailOpen(true)}
+              className="h-7 text-[12px] font-bold"
+            >
+              자세히
+            </Button>
+          )}
+        </div>
       </div>
 
-      {portfolioSource === "fallback" &&
-      portfolioNote === undefined &&
-      !analyzing ? (
+      {isEmpty ? (
         <div className="flex min-h-[240px] items-center justify-center rounded-2xl border border-dashed border-muted-foreground/20 bg-muted/30">
           <p className="text-[14px] font-semibold text-muted-foreground">
             분석 결과가 존재하지 않습니다
@@ -80,6 +98,8 @@ export default function PortfolioSection() {
           ))}
         </div>
       )}
+
+      {detailOpen && <ReportDetailModal onClose={() => setDetailOpen(false)} />}
     </section>
   );
 }

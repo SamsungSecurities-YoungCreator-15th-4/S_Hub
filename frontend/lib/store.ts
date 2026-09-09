@@ -150,7 +150,8 @@ export interface DashboardState {
 
   // ── 실행 상태(확정 수명주기) ──
   // 값·전이 규칙의 출처는 lib/runStatus.ts 하나뿐이다(엔진 계약을 그대로 옮긴 것).
-  // 아직 어느 화면에도 연결하지 않았다 — PDF 확정 게이트가 이 필드를 읽을 예정이다.
+  // 읽는 곳: 헤더 상태 칩·PDF 추출 잠금. 쓰는 곳: 분석 승인 게이트(Sidebar)·
+  // IPS 반영 승인(RightPanel)·확정 승인(ReportDetailModal)뿐이다.
   /** 현재 상담의 실행 상태. 초기값 draft. */
   runStatus: RunStatus;
   /** blocked 사유(엔진 governance.confirmation_blocked_reason에 대응). 없으면 빈 문자열. */
@@ -309,6 +310,9 @@ export const useDashboardStore = create<DashboardState>((set) => ({
         stressScenarioKey: null,
         scenario: { ...s.liveBase }, // 슬라이더도 live 기준으로 초기화 → 자동분석는 항상 calculate
         // 실행 상태도 초기화 — 이전 고객의 상태 칩이 새 고객 화면에 남지 않게 한다.
+        // 승인은 "이 고객의 이 리포트"에 대한 것이라 고객과 함께 폐기한다. 분석 결과·
+        // IPS·비중을 전부 지우는데 확정만 남으면, 아무도 승인하지 않은 새 고객의
+        // 리포트가 곧바로 추출 가능해진다.
         runStatus: INITIAL_RUN_STATUS,
         runStatusReason: "",
         // 고객 전환 시 이전 고객의 상담 내역·상담 ID·STT 상태는 신규/기존 구분 없이 항상 초기화한다.
