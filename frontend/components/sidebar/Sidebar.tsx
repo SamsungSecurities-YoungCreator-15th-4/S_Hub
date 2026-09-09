@@ -45,6 +45,12 @@ import {
   uploadSttConsultation,
 } from "@/lib/api";
 import { RUN_STATUS } from "@/lib/runStatus";
+
+/**
+ * 분석 승인 거절 사유. setRunStatus 에 넘기는 값과 화면에 찍는 값이 같은 문장이라
+ * 한 곳에서만 적는다 — 두 벌로 두면 한쪽만 고쳐 화면에 같은 말이 두 줄로 남는다.
+ */
+const ANALYZE_REJECT_REASON = "분석 승인을 거절했습니다";
 import { useDashboardStore } from "@/lib/store";
 import { useAutoCollapse } from "@/lib/useAutoCollapse";
 import { useConsultPlayback } from "@/lib/useConsultPlayback";
@@ -375,7 +381,7 @@ export default function Sidebar() {
   const handleGateReject = () => {
     setGateOpen(false);
     setAnalyzeRejected(true);
-    setRunStatus(RUN_STATUS.BLOCKED, "분석 승인을 거절했습니다");
+    setRunStatus(RUN_STATUS.BLOCKED, ANALYZE_REJECT_REASON);
   };
 
   if (!customer) return null;
@@ -875,10 +881,15 @@ export default function Sidebar() {
             )}
             {analyzeRejected && (
               <p className="text-[11px] font-semibold text-destructive">
-                분석 승인을 거절했습니다
+                {ANALYZE_REJECT_REASON}
               </p>
             )}
-            {runStatusReason && (
+            {/*
+              거절이 reviewed·locked 에서 일어나면 전이가 성사돼 runStatusReason 에도
+              같은 문장이 들어간다. 그대로 두면 한 사건이 두 줄로 찍히므로 여기서 건너뛴다.
+              (draft 에서는 전이가 무시돼 reason 이 비거나 직전 사유가 남는다.)
+            */}
+            {runStatusReason && runStatusReason !== ANALYZE_REJECT_REASON && (
               <p className="text-[11px] font-semibold text-destructive">
                 {runStatusReason}
               </p>
