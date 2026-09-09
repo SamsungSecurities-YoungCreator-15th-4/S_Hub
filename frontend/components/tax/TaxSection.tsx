@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AccountAllocation from "@/components/tax/AccountAllocation";
 import TaxWaterfall from "@/components/tax/TaxWaterfall";
 import AsOfNote from "@/components/common/AsOfNote";
+import HelpTooltip from "@/components/common/HelpTooltip";
 // 계좌별 활용도 막대(AccountAllocation)와 이름이 헷갈리지 않도록 "납입 배분"으로 둔다.
 import ContributionSplit from "@/components/tax/ContributionSplit";
 import { TAX_ADVICE } from "@/lib/mockData";
@@ -363,7 +364,8 @@ export default function TaxSection() {
   );
 }
 
-type AdviceTab = "제안설명" | "상품추천";
+/** 탭 이름. 제도 설명은 가이드 툴팁으로 옮겨서, 이 탭에는 배분 숫자만 남는다. */
+type AdviceTab = "배분내역" | "상품추천";
 
 /**
  * 절감액 표기(만원). 148.5만원을 149만원으로 반올림하면 세액공제 한도 900만 × 16.5%
@@ -410,10 +412,19 @@ function AdviceCards({ liveCards, plan }: AdviceCardsProps) {
       : card.key === "irp"
         ? plan.irpManwon
         : plan.pensionSavingsManwon;
+    // 연금저축과 IRP 는 합산 한도를 공유하지만 연금저축에는 단독 한도가 따로 있다.
+    // 카드마다 자기에게 걸리는 한도를 말해야 두 장이 같은 900만원을 보여주지 않는다.
+    const cap = isIsa
+      ? { manwon: plan.isa.headroomManwon, label: "잔여 한도" }
+      : card.key === "irp"
+        ? { manwon: plan.pension.headroomManwon, label: "연금계좌 합산 잔여" }
+        : { manwon: plan.pensionSavingsRoomManwon, label: "연금저축 단독 잔여" };
     return {
       applicable: account.eligible,
       reason: account.reason,
       allocatedManwon: allocated,
+      capManwon: cap.manwon,
+      capLabel: cap.label,
       headroomManwon: account.headroomManwon,
       savingManwon: isIsa ? plan.isaSavingManwon : plan.pensionSavingManwon,
       note: isIsa
@@ -434,21 +445,35 @@ function AdviceCards({ liveCards, plan }: AdviceCardsProps) {
     const reason = live?.reason ?? live?.ineligibleReason ?? calc?.reason ?? null;
     const transferManwon = live?.transferableManwon ?? calc?.headroomManwon ?? null;
 
-    let body = copy.body;
+    /*
+     * 카드에는 이 고객의 숫자와 결론만 두고, 제도 설명은 가이드 툴팁으로 보낸다.
+     * 세 장이 나란히 서는 자리라 제도 문장까지 본문에 두면 읽히지 않는다.
+     * 가이드가 OFF 여도 숫자는 남아야 하므로 둘을 섞지 않는다.
+     *
+     *   summary — 잔여 한도·배분액 (항상 카드에 보인다)
+     *   explain — 제도 설명·판정 근거 (가이드 ON 일 때 hover 로 뜬다)
+     */
+    let summary: string;
+    let explain = copy.body;
+
     if (!applicable && reason) {
-      body = reason;
+      summary = "적용 불가";
+      explain = reason;
     } else if (calc) {
-      body =
+      summary =
         calc.allocatedManwon > 0
-          ? `${copy.body} 잔여 한도 ${calc.headroomManwon.toLocaleString()}만원 중 ` +
-            `${calc.allocatedManwon.toLocaleString()}만원을 배분했습니다. ${calc.note}`
-          : `${copy.body} 잔여 한도는 ${calc.headroomManwon.toLocaleString()}만원입니다. ${calc.note}`;
+          ? `${calc.capLabel} ${calc.capManwon.toLocaleString()}만원 중 ` +
+            `${calc.allocatedManwon.toLocaleString()}만원 배분`
+          : `${calc.capLabel} ${calc.capManwon.toLocaleString()}만원`;
+      // 판정 근거(일반형/서민형, 연금저축 단독 한도)도 설명 쪽이다.
+      explain = `${copy.body} ${calc.note}`;
     } else if (transferManwon != null) {
-      const capacityLabel = transferManwon.toLocaleString();
-      body =
+      summary =
         copy.sourceKey === "isa"
-          ? `${copy.body} 현재 계산상 이전 가능액은 ${capacityLabel}만원입니다.`
-          : `${copy.body} 현재 계산상 합산 잔여 활용 가능액은 ${capacityLabel}만원입니다.`;
+          ? `이전 가능액 ${transferManwon.toLocaleString()}만원`
+          : `합산 잔여 활용 가능액 ${transferManwon.toLocaleString()}만원`;
+    } else {
+      summary = "";
     }
 
     /*
@@ -475,7 +500,7 @@ function AdviceCards({ liveCards, plan }: AdviceCardsProps) {
           ? `+${fmtSaving(shownManwon)}만원`
           : "";
 
-    return { ...copy, body, saving, applicable };
+    return { ...copy, summary, explain, saving, applicable };
   });
 
   // 기존 6종 combined_total에는 화면에서 제외한 전략도 들어 있다. 표시 총액은
@@ -501,8 +526,8 @@ function AdviceCards({ liveCards, plan }: AdviceCardsProps) {
             // 연계 상품 목록이 비면 "상품추천" 탭 자체를 감춘다 — 빈 탭·빈 박스를 남기지 않는다.
             const hasProducts = card.products.length > 0;
             const active = hasProducts
-              ? (tabs[card.title] ?? "제안설명")
-              : "제안설명";
+              ? (tabs[card.title] ?? "배분내역")
+              : "배분내역";
             return (
               <div
                 key={card.title}
@@ -514,7 +539,7 @@ function AdviceCards({ liveCards, plan }: AdviceCardsProps) {
                   </span>
                   {hasProducts && (
                     <div className="flex shrink-0 rounded-md bg-muted p-0.5">
-                      {(["제안설명", "상품추천"] as AdviceTab[]).map((t) => (
+                      {(["배분내역", "상품추천"] as AdviceTab[]).map((t) => (
                         <button
                           key={t}
                           type="button"
@@ -534,30 +559,34 @@ function AdviceCards({ liveCards, plan }: AdviceCardsProps) {
                   )}
                 </div>
 
-                {active === "제안설명" ? (
-                  <div className="flex h-[132px] flex-col overflow-y-auto pr-0.5">
-                    <p className="pt-1.5 text-[13px] font-semibold leading-snug text-muted-foreground">
-                      {card.body}
-                    </p>
-                    <div className="mt-auto pt-1">
-                      <p className="text-[13px] font-bold text-muted-foreground/60">
-                        {card.tag}
+                {active === "배분내역" ? (
+                  /* 카드 전체가 아니라 본문만 감싼다 — 탭 버튼·상품 링크 위에서
+                     툴팁이 떠 카드를 덮으면 누르기 거슬린다. */
+                  <HelpTooltip text={card.explain} className="h-[104px]" wide>
+                    <div className="flex h-full flex-col overflow-y-auto pr-0.5">
+                      <p className="pt-1.5 text-[13px] font-semibold leading-snug text-muted-foreground">
+                        {card.summary}
                       </p>
-                      {card.saving && (
-                        <p
-                          className={`text-[13px] font-extrabold tabular-nums ${
-                            card.savingRole === "included"
-                              ? "text-muted-foreground"
-                              : "text-up"
-                          }`}
-                        >
-                          {card.saving}
+                      <div className="mt-auto pt-1">
+                        <p className="text-[13px] font-bold text-muted-foreground/60">
+                          {card.tag}
                         </p>
-                      )}
+                        {card.saving && (
+                          <p
+                            className={`text-[13px] font-extrabold tabular-nums ${
+                              card.savingRole === "included"
+                                ? "text-muted-foreground"
+                                : "text-up"
+                            }`}
+                          >
+                            {card.saving}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  </HelpTooltip>
                 ) : (
-                  <div className="h-[132px] overflow-y-auto pr-0.5">
+                  <div className="h-[104px] overflow-y-auto pr-0.5">
                     <div className="flex flex-col gap-1.5">
                       {card.products.map((p) => {
                         const url = PRODUCT_LINKS[p.name] ?? "";
