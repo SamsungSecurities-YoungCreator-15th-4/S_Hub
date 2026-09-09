@@ -47,6 +47,15 @@ export const MACRO_INDICATORS: MacroIndicator[] = [
 export const BASE_TIME = "17:20";
 
 // ── 고객 ───────────────────────────────────────────────────────
+
+/** 단기 필요자금의 목적. 시점을 못 미루는 정도가 종류마다 다르다. */
+export type NearTermNeedKind =
+  | "lease" // 전세·월세 보증금 — 계약일에 묶인다
+  | "homePurchase" // 주택 계약금 — 계약일·대출 실행일에 묶인다
+  | "startup" // 창업 자금 — 시점을 조절할 여지가 있다
+  | "education" // 학자금 — 학기 일정에 묶인다
+  | "other"; // 그 밖 — 시점 경직성을 단정하지 않는다
+
 export interface Customer {
   id: string;
   name: string;
@@ -77,6 +86,14 @@ export interface Customer {
   horizonYears: number; // 투자기간(년) — ISA 3년·연금 lock-up 게이팅 (IPS Time)
   nearTermNeedManwon: number; // 단기 필요자금(만원) — 묶이는 금액에서 제외 (IPS Unique)
   nearTermNeedYears: number | null; // 단기 필요자금 필요 시점(년)
+  /**
+   * 단기 필요자금의 **목적**. 금액과 시점만으로는 "왜 이 돈을 못 미루는지"를 말할 수
+   * 없다 — 전세 보증금은 계약일에 묶이고 창업 자금은 시점을 조절할 여지가 있어,
+   * 같은 금액이라도 조언이 달라진다. 화면의 근거 문장이 이 값으로 갈린다.
+   */
+  nearTermNeedKind?: NearTermNeedKind;
+  /** 목적의 표기명. IPS Unique 의 표현을 그대로 쓴다. */
+  nearTermNeedLabel?: string;
   isaOpened: boolean; // ISA 기존 개설 여부(시나리오: 다들 옛날 개설=true)
   /**
    * ISA 의무보유 3년 중 남은 기간(년). 의무보유는 납입분별이 아니라 계좌 단위라
@@ -135,6 +152,8 @@ export const CUSTOMERS: Customer[] = [
     // 이 돈이 모자란다 — 납입 배분 화면이 보여 주는 것이 그 트레이드오프다.
     nearTermNeedManwon: 3000,
     nearTermNeedYears: 3,
+    nearTermNeedKind: "education", // 학기 일정에 묶여 시점을 미룰 수 없다
+    nearTermNeedLabel: "자녀 대학 등록금",
     isaOpened: true,
     lastConsultedAt: "2026-08-21",
     ips: {
@@ -188,6 +207,10 @@ export const CUSTOMERS: Customer[] = [
     // 10%를 3년 내 인출한다고 본다. 0 으로 두면 Unique 와 어긋난다.
     nearTermNeedManwon: 5000,
     nearTermNeedYears: 3,
+    // IPS Unique 에 "3년 내 인출 계획"이라고만 적혀 있어 용도를 모른다. 목적을
+    // 모르면 시점 경직성을 단정하지 않는다 — 화면이 상담에서 확인하라고 적는다.
+    nearTermNeedKind: "other",
+    nearTermNeedLabel: "인출 예정 자금",
     isaOpened: true,
     lastConsultedAt: "2026-07-30",
     ips: {
@@ -236,6 +259,8 @@ export const CUSTOMERS: Customer[] = [
     horizonYears: 22, // 만 55세 연금 수령까지 남은 기간과 같다 — 적합성 경계
     nearTermNeedManwon: 2000, // 3년 내 전세 보증금 인상분
     nearTermNeedYears: 3,
+    nearTermNeedKind: "lease",
+    nearTermNeedLabel: "전세 보증금 인상분",
     isaOpened: true,
     isaYearsUntilLiquid: 2, // 작년 개설 — 2년 뒤 해제, 전세 시점(3년)보다 이르다
     isNew: true,
