@@ -149,9 +149,15 @@ function CoverPage() {
       selectedPortfolioId,
     ),
   );
-  const selectedPortfolioName =
-    storePortfolios.find((p) => p.id === selectedPortfolioId)?.name ??
-    "안정 추구";
+  /*
+    표지의 "선택 포트폴리오"도 확정 대상을 따른다 — 본문은 조정안인데 표지만
+    조정 전 제안 이름이면 같은 문서 안에서 두 안을 가리키게 된다.
+  */
+  const { base: viewedBase, isAdjusted } = useViewedPortfolio();
+  const selectedPortfolioName = isAdjusted
+    ? `${viewedBase?.name ?? "안정 추구"} (조정)`
+    : (storePortfolios.find((p) => p.id === selectedPortfolioId)?.name ??
+      "안정 추구");
   return (
     <div
       data-pdf-page=""
