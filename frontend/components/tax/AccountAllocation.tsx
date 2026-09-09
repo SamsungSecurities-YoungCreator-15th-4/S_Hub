@@ -83,7 +83,7 @@ export default function AccountAllocation({
       : buildData(TAX_EFFECT.accounts);
 
   return (
-    <div className="flex flex-col">
+    <div className="flex min-h-0 flex-1 flex-col">
       <p className="mb-2 flex items-center gap-1.5 text-[13px] font-extrabold">
         계좌 배치 활용도
       </p>
@@ -123,7 +123,8 @@ export default function AccountAllocation({
       </div>
 
       {/* ISA / 연금저축+IRP 바 차트 */}
-      <div className="h-32">
+      {/* 흐름 차트와 같은 규칙 — 상한은 종전 높이, 모자라면 하한까지 줄어든다. */}
+      <div className="min-h-20 max-h-28 flex-1">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={data}

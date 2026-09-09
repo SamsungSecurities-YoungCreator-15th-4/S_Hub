@@ -248,7 +248,13 @@ export default function TaxSection() {
   }
 
   return (
-    <Tabs defaultValue="effect">
+    /*
+      제목 줄과 카드 위치는 그대로 두고 카드 상자만 아래로 늘려 중앙 열 바닥을
+      메운다. 안쪽 내용은 자연 높이 그대로라 남는 높이는 카드 안쪽 여백이 된다 —
+      차트에 flex-1 을 흘려보내면 막대 세 개가 흩어져 오히려 성겨 보였다.
+      min-h-0 이 없으면 flex 자식이 내용 높이 아래로 줄지 않아 세로 스크롤이 생긴다.
+    */
+    <Tabs defaultValue="effect" className="flex min-h-0 flex-1 flex-col">
       <div className="mb-2 flex items-center justify-between px-0.5">
         <div className="flex items-center gap-2.5">
           <h2 className="text-lg font-extrabold">절세 최적화 시뮬레이터</h2>
@@ -280,9 +286,9 @@ export default function TaxSection() {
         </TabsList>
       </div>
 
-      <Card className="gap-0 p-3">
+      <Card className="min-h-0 flex-1 gap-0 p-3">
         {/* 탭 1: 절세 효과 */}
-        <TabsContent value="effect" className="flex flex-col gap-2">
+        <TabsContent value="effect" className="flex min-h-0 flex-1 flex-col gap-2">
           {/*
             절세 효과 금액이 없는 상태에서는 왼쪽이 배지 한 줄뿐이라 박스가 비어
             보인다. 세로 여백과 지표 카드를 줄여 내용만큼만 차지하게 한다.
@@ -353,32 +359,42 @@ export default function TaxSection() {
             )}
           </div>
 
-          <div className="grid grid-cols-2 items-start gap-4">
-            <TaxWaterfall
-              waterfallData={isStressMode ? null : waterfallData}
-              liveHeadline={isStressMode ? (taxSource?.headline ?? null) : null}
-              liveAumEokwon={customer?.aumEokwon}
-              flow={waterfallFlow}
-            />
-            <AccountAllocation
-              accounts={[
-                {
-                  key: "isa",
-                  usedManwon: isaUsedManwon,
-                  limitManwon: isaLimitManwon,
-                },
-                {
-                  key: "pension",
-                  usedManwon: pensionUsedManwon,
-                  limitManwon: pensionLimitManwon,
-                },
-              ]}
-            />
+          {/*
+            두 그림을 위아래로 쌓는다. 좌우로 놓으면 폭이 절반이라 막대가 짧고
+            오른쪽 금액 라벨이 붙어 읽혔는데, 그러면서 카드 아래는 비었다.
+            세로로 쌓으면 남는 높이가 두 그림의 폭으로 바뀐다.
+            각각 테두리로 묶어 어디까지가 한 그림인지 경계를 준다.
+          */}
+          <div className="flex min-h-0 flex-1 flex-col gap-2.5">
+            <div className="flex min-h-0 flex-1 flex-col rounded-xl border p-3">
+              <TaxWaterfall
+                waterfallData={isStressMode ? null : waterfallData}
+                liveHeadline={isStressMode ? (taxSource?.headline ?? null) : null}
+                liveAumEokwon={customer?.aumEokwon}
+                flow={waterfallFlow}
+              />
+            </div>
+            <div className="flex min-h-0 flex-1 flex-col rounded-xl border p-3">
+              <AccountAllocation
+                accounts={[
+                  {
+                    key: "isa",
+                    usedManwon: isaUsedManwon,
+                    limitManwon: isaLimitManwon,
+                  },
+                  {
+                    key: "pension",
+                    usedManwon: pensionUsedManwon,
+                    limitManwon: pensionLimitManwon,
+                  },
+                ]}
+              />
+            </div>
           </div>
         </TabsContent>
 
         {/* 탭 2: 절세 제안 */}
-        <TabsContent value="advice" className="flex flex-col gap-2.5">
+        <TabsContent value="advice" className="flex min-h-0 flex-1 flex-col gap-2.5">
           {plan &&
             customer &&
             (customer.annualContributionManwon ?? 0) > 0 &&
@@ -578,8 +594,13 @@ function AdviceCards({ liveCards, plan }: AdviceCardsProps) {
       : TAX_ADVICE.totalSaving;
 
   return (
-    <>
-      <div className="max-h-[520px] overflow-y-auto">
+    /*
+      총합 바만 카드 바닥에 붙인다. 납입안 카드는 내용만큼만 차지한다 — 함께
+      늘리면 본문이 h-[104px] 로 고정이라 절감액 줄 아래가 하얗게 빈다.
+      남는 높이는 카드 목록과 총합 바 사이의 여백이 된다.
+    */
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="mb-2 max-h-[520px] overflow-y-auto">
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
           {cards.map((card) => {
             // 연계 상품 목록이 비면 "상품추천" 탭 자체를 감춘다 — 빈 탭·빈 박스를 남기지 않는다.
@@ -684,7 +705,7 @@ function AdviceCards({ liveCards, plan }: AdviceCardsProps) {
           })}
         </div>
       </div>
-      <div className="mt-2 flex items-center justify-between rounded-xl bg-brand/10 px-3 py-2">
+      <div className="mt-auto flex shrink-0 items-center justify-between rounded-xl bg-brand/10 px-3 py-2">
         <span className="text-[13px] font-bold text-brand-dark">
           {TAX_ADVICE.totalLabel}
         </span>
@@ -692,7 +713,7 @@ function AdviceCards({ liveCards, plan }: AdviceCardsProps) {
           {totalSaving}
         </span>
       </div>
-    </>
+    </div>
   );
 }
 

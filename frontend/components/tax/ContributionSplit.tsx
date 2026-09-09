@@ -121,7 +121,7 @@ export default function ContributionSplit({
     <div className="rounded-xl border p-3.5">
       <div className="flex items-baseline justify-between">
         <p className="text-[13px] font-extrabold">
-          연 납입여력 {fmt(budgetManwon)}만원을 어디에 넣을까
+          연 납입여력 {fmt(budgetManwon)}만원
         </p>
         <span className="text-[11px] font-semibold text-muted-foreground">
           연금은 만 55세까지 {plan.pension.lockupYears}년 잠깁니다

@@ -21,6 +21,14 @@ const FLOW_TAX_COLORS = ["#F04452", "#F04452", "#F4A8AE"];
 /** 연금 세액공제. 근로소득세에서 돌려받는 돈이라 금융소득세(빨강)와 세목이 달라 색을 나눈다. */
 const CREDIT_COLOR = "#16B47A";
 
+/*
+  머리말 분해 줄에 쓰는 부호 표기. 세 항이 그대로 더해져 금융소득이 되므로
+  각 항의 부호는 "금융소득에 얼마를 더하고 빼는가"를 뜻한다 — 전환 세금은
+  나가는 돈이라 음수로 적힌다.
+*/
+const signed = (v: number) =>
+  `${v >= 0 ? "+" : "−"}${Math.abs(v).toLocaleString()}`;
+
 /** 만원 값 표기. 1억 미만을 "0.04억"으로 적으면 읽히지 않는다. */
 const money = (manwon: number) =>
   manwon >= 10000 ? `${(manwon / 10000).toFixed(2)}억` : `${Math.round(manwon).toLocaleString()}만`;
@@ -97,6 +105,20 @@ export default function TaxWaterfall({
   let pretaxLabel: string;
   let totalLabel: string;
   let domainMax: number;
+  /*
+   * 총액을 세목으로 쪼갠 줄. 금융소득세에서 아낀 돈과 근로소득세에서 돌려받는
+   * 돈은 다른 세목인데 합계만 적으면 한 덩어리로 읽힌다. 세금이 얼마나 늘었는지도
+   * 이 줄에서만 보인다 — 막대는 세후 기준이라 증가분이 이미 안에 녹아 있다.
+   */
+  let breakdown: {
+    financialManwon: number;
+    pretaxGainManwon: number;
+    /** 전환으로 늘어난 금융소득세 — 금융소득에서 빠지는 몫이라 부호가 뒤집힌다. */
+    switchTaxManwon: number;
+    /** ISA 가 도로 깎은 금융소득세. switchTax − isaCut 이 실제 세금 증가분이다. */
+    isaCutManwon: number;
+    refundManwon: number;
+  } | null = null;
 
   if (waterfallData) {
     // /portfolio/calculate tax.waterfall 실데이터
@@ -168,15 +190,35 @@ export default function TaxWaterfall({
     totalSavingManwon = gainFromSwitch + gainFromTax;
     pretaxLabel = `${selected.name} 기준 · 자산 ${(aum / 10000).toFixed(1)}억`;
     /*
-     * 절세를 ISA 와 세액공제로 쪼개 적는다. 세액공제는 초록 조각으로 보이지만
-     * ISA 절감은 조각이 없다 — 금융소득세를 직접 깎아 세후 수익 안으로 들어가기
-     * 때문이다(세후 +18 · 금융소득세 −18). 합계만 적으면 화면에 보이는 79 와
-     * 머리말의 97 이 어긋난 것처럼 읽힌다.
+     * "손에 남는 돈" 은 세후 수익 전체로 읽혀 총액처럼 보였다. 이 값은 현재
+     * 포트폴리오를 그대로 뒀을 때와 견준 1년치 차이다.
+     *
+     * 고객 앞에서 그대로 읽는 화면이라 다른 라벨과 같은 명사구·존대 어투로
+     * 맞춘다("연간 절세 효과", "3대 절세계좌 활용 시 예상 추가 절감").
+     * "따지면" 은 따져 묻는 말로 들리고 "남는 돈"·"순증" 은 총액으로 읽히거나
+     * 어려웠다. "세후 기준" 이 이 카드의 핵심을, "기대" 가 추정치임을 말한다 —
+     * 위 지표 카드가 이미 "세후 수익률" 이라 용어도 이어진다.
+     *
+     * "연간" 은 빼지 않는다 — 금융소득도 세액공제도 매년 되풀이되는 금액인데
+     * 기간이 없으면 한 번 받는 돈으로 읽힌다.
      */
-    totalLabel =
-      `제안 적용 시 손에 남는 돈 ` +
-      `(전환 +${gainFromSwitch.toLocaleString()} · ISA +${isaSaving.toLocaleString()}` +
-      ` · 세액공제 +${refund.toLocaleString()})`;
+    totalLabel = "세후 기준 연간 기대 효과";
+    /*
+     * 세 값을 막대에서 직접 뺀다. 전환 이익과 ISA 절감을 따로 더하면 세금 조각에
+     * 걸린 하한(Math.max(selTax - isaSaving, 0))을 지나쳐 화면과 어긋날 수 있다.
+     * 이렇게 두면 세전 = 세후 + 세금 이 막대와 항상 같은 값으로 맞는다.
+     */
+    const financialManwon = rows[2].afterTax - rows[0].afterTax;
+    const taxDeltaManwon = rows[2].tax - rows[0].tax;
+    const switchTaxManwon = rows[1].tax - rows[0].tax;
+    breakdown = {
+      financialManwon,
+      pretaxGainManwon: financialManwon + taxDeltaManwon,
+      switchTaxManwon,
+      // 차액으로 구한다. 이렇게 두면 세전 − 전환세금 + ISA 가 늘 금융소득과 맞는다.
+      isaCutManwon: switchTaxManwon - taxDeltaManwon,
+      refundManwon: refund,
+    };
     domainMax =
       Math.max(...data.map((d) => d.afterTax + (d.taxPlot ?? 0) + (d.refund ?? 0))) *
       1.1;
@@ -242,6 +284,11 @@ export default function TaxWaterfall({
     "전환은 절세가 아니라 수익 증가 — 수익이 커지면 세금도 는다",
     "ISA 절감은 금융소득세를 직접 깎아 세후 수익 쪽으로 넘어간다",
     "세액공제는 근로소득세 환급이라 세목이 달라 막대 밖에 붙인다",
+    ...(breakdown
+      ? [
+          `전환으로 금융소득세가 ${breakdown.switchTaxManwon.toLocaleString()}만원 늘고 ISA 가 ${breakdown.isaCutManwon.toLocaleString()}만원을 도로 깎는다`,
+        ]
+      : []),
     ...(taxScale > 1.05
       ? [
           `금융소득세 막대는 보이도록 ${taxScale.toFixed(1)}배로 늘려 그렸다 (적힌 금액은 실제 값)`,
@@ -250,7 +297,7 @@ export default function TaxWaterfall({
   ];
 
   return (
-    <div className="flex flex-col">
+    <div className="flex min-h-0 flex-1 flex-col">
       {/*
         막대 길이를 손본 사실과 세목 구분을 가이드 툴팁에 둔다. 화면에 늘 띄우면
         차트보다 주석이 길어지는데, 근거 없이 지우면 2배로 늘려 그린 막대에 아무
@@ -265,9 +312,39 @@ export default function TaxWaterfall({
         </p>
       </HelpTooltip>
       <div className="mb-2 flex items-center justify-between gap-2 rounded-lg bg-muted/60 px-2.5 py-1.5">
-        <span className="text-[12px] font-semibold text-muted-foreground">
-          {totalLabel}
-        </span>
+        <div className="min-w-0">
+          <span className="text-[12px] font-semibold text-muted-foreground">
+            {totalLabel}
+          </span>
+          {breakdown && (
+            /*
+              세목을 나눠 적는다. 왼쪽은 금융소득세를 덜 내서 남는 돈, 오른쪽은
+              근로소득세에서 돌려받는 돈이다. 괄호 안의 세전·세금은 왼쪽 금액이
+              어떻게 나왔는지를 보인다 — 더 벌면 세금도 는다는 사실이 여기서만
+              드러난다(막대는 세후 기준이라 증가분이 이미 녹아 있다).
+            */
+            <div className="mt-0.5 flex flex-wrap items-baseline gap-x-1.5 text-[11px] font-semibold leading-tight">
+              <span className="text-brand-dark">
+                금융소득 +{breakdown.financialManwon.toLocaleString()}만
+              </span>
+              <span className="text-muted-foreground">
+                {/*
+                  전환이 세금을 줄이는 안도 있다(채권 비중이 늘면 그렇다).
+                  그때 "전환 세금 +20" 은 세금이 20 늘었다는 말로 읽히므로
+                  말 자체를 바꾼다. 부호는 금융소득에 더하고 빼는 몫이다.
+                */}
+                (세전 {signed(breakdown.pretaxGainManwon)} ·{" "}
+                {breakdown.switchTaxManwon >= 0 ? "전환 세금 " : "전환 세금 절감 "}
+                {signed(-breakdown.switchTaxManwon)} · ISA 절감{" "}
+                {signed(breakdown.isaCutManwon)})
+              </span>
+              <span className="text-muted-foreground/60">·</span>
+              <span style={{ color: CREDIT_COLOR }}>
+                근로소득세 환급 +{breakdown.refundManwon.toLocaleString()}만
+              </span>
+            </div>
+          )}
+        </div>
         <span
           className={`shrink-0 whitespace-nowrap text-[13px] font-extrabold tabular-nums ${
             flow ? "text-brand-dark" : "text-up"
@@ -277,13 +354,18 @@ export default function TaxWaterfall({
         </span>
       </div>
 
-      <div className={flow ? "h-40" : "h-32"}>
+      {/*
+        고정 높이 대신 상한·하한 사이에서 남거나 모자란 높이를 흡수한다. 좌측
+        사이드바가 행 높이를 정하므로 이쪽이 따라 줄어야 카드가 그 아래로
+        비어져 나오지 않는다. 상한은 종전 높이라 더 커지지는 않는다.
+      */}
+      <div className={flow ? "min-h-24 max-h-40 flex-1" : "h-32"}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={data}
             layout="vertical"
             margin={{ top: 0, right: flow ? 108 : 52, bottom: 0, left: 0 }}
-            barSize={flow ? 34 : 28}
+            barSize={flow ? 40 : 28}
           >
             <XAxis type="number" hide domain={[0, domainMax]} />
             <YAxis
@@ -358,12 +440,6 @@ export default function TaxWaterfall({
           <LegendDot color={CREDIT_COLOR} label="세액공제" />
         )}
       </div>
-      {/* 길이를 손봤으면 손봤다고 말한다. 라벨의 숫자는 실제 값이다. */}
-      {flow && (
-        <p className="mt-1 text-[10px] font-semibold leading-relaxed text-muted-foreground">
-          세액공제는 근로소득세에서 돌려받는 돈이라 금융소득세와 세목이 다릅니다.
-        </p>
-      )}
     </div>
   );
 }
