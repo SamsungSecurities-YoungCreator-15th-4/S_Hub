@@ -359,27 +359,37 @@ export default function TaxSection() {
             )}
           </div>
 
-          <div className="grid grid-cols-2 items-start gap-4">
-            <TaxWaterfall
-              waterfallData={isStressMode ? null : waterfallData}
-              liveHeadline={isStressMode ? (taxSource?.headline ?? null) : null}
-              liveAumEokwon={customer?.aumEokwon}
-              flow={waterfallFlow}
-            />
-            <AccountAllocation
-              accounts={[
-                {
-                  key: "isa",
-                  usedManwon: isaUsedManwon,
-                  limitManwon: isaLimitManwon,
-                },
-                {
-                  key: "pension",
-                  usedManwon: pensionUsedManwon,
-                  limitManwon: pensionLimitManwon,
-                },
-              ]}
-            />
+          {/*
+            두 그림을 위아래로 쌓는다. 좌우로 놓으면 폭이 절반이라 막대가 짧고
+            오른쪽 금액 라벨이 붙어 읽혔는데, 그러면서 카드 아래는 비었다.
+            세로로 쌓으면 남는 높이가 두 그림의 폭으로 바뀐다.
+            각각 테두리로 묶어 어디까지가 한 그림인지 경계를 준다.
+          */}
+          <div className="flex flex-col gap-2.5">
+            <div className="rounded-xl border p-3">
+              <TaxWaterfall
+                waterfallData={isStressMode ? null : waterfallData}
+                liveHeadline={isStressMode ? (taxSource?.headline ?? null) : null}
+                liveAumEokwon={customer?.aumEokwon}
+                flow={waterfallFlow}
+              />
+            </div>
+            <div className="rounded-xl border p-3">
+              <AccountAllocation
+                accounts={[
+                  {
+                    key: "isa",
+                    usedManwon: isaUsedManwon,
+                    limitManwon: isaLimitManwon,
+                  },
+                  {
+                    key: "pension",
+                    usedManwon: pensionUsedManwon,
+                    limitManwon: pensionLimitManwon,
+                  },
+                ]}
+              />
+            </div>
           </div>
         </TabsContent>
 

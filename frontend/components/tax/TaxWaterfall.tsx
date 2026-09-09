@@ -277,13 +277,14 @@ export default function TaxWaterfall({
         </span>
       </div>
 
-      <div className={flow ? "h-40" : "h-32"}>
+      {/* 폭이 두 배가 되면서 막대가 얇아 보인다 — 두께와 높이를 함께 올린다. */}
+      <div className={flow ? "h-44" : "h-32"}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={data}
             layout="vertical"
             margin={{ top: 0, right: flow ? 108 : 52, bottom: 0, left: 0 }}
-            barSize={flow ? 34 : 28}
+            barSize={flow ? 40 : 28}
           >
             <XAxis type="number" hide domain={[0, domainMax]} />
             <YAxis
