@@ -599,6 +599,11 @@ export default function Sidebar() {
               </div>
               <div className="mt-0.5 flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground">
                 <span>{customer.aumLabel}</span>
+                <span className="text-muted-foreground/70">
+                  {customer.lastConsultedAt
+                    ? `최근 상담 ${customer.lastConsultedAt}`
+                    : "상담 이력 없음"}
+                </span>
                 {customer.persisted === false && (
                   <DataSourceBadge
                     source="fallback"
@@ -968,6 +973,12 @@ export default function Sidebar() {
                   </div>
                   <div className="text-[10px] font-semibold text-muted-foreground">
                     {c.aumLabel}
+                    {/* 상담 이력은 운용자산과 다른 사실이라 칸을 따로 쓴다. */}
+                    <span className="ml-1.5 text-muted-foreground/70">
+                      {c.lastConsultedAt
+                        ? `· 최근 상담 ${c.lastConsultedAt}`
+                        : "· 상담 이력 없음"}
+                    </span>
                   </div>
                 </div>
                 {c.id === selectedCustomerId && (

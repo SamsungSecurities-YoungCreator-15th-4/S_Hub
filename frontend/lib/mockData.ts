@@ -62,7 +62,12 @@ export interface Customer {
   /** 자산 규모 구분. 1억원대 직장인 고객이 들어오면서 VVIP 단일 값에서 넓혔다. */
   grade: "VVIP" | "일반";
   pbCode: string;
-  aumLabel: string; // 표시용
+  /**
+   * 운용자산 표기. PDF 의 "운용 자산" 항목이 이 값을 그대로 쓴다 —
+   * 상담 이력 유무 같은 다른 사실을 여기 적으면 리포트에 그 문장이 찍힌다.
+   * 상담 이력은 lastConsultedAt 이 따로 말한다.
+   */
+  aumLabel: string;
   aumEokwon: number; // 계산용 (억원)
   /**
    * 연간 총급여(만원). 연금계좌 세액공제율이 총급여 5,500만원(종합소득금액
@@ -245,8 +250,7 @@ export const CUSTOMERS: Customer[] = [
     name: "김성삼",
     grade: "일반",
     pbCode: "PB-100482",
-    // 분석 전이라 운용자산을 단정하지 않는다. 목록에는 이 자리에 상담 이력을 적는다.
-    aumLabel: "상담 이력 없음",
+    aumLabel: "운용자산 1억원",
     aumEokwon: 1,
     salaryManwon: 5200, // 총급여 5,500만원 이하 → 연금 세액공제율 16.5%
     annualContributionManwon: 1500, // 연 납입여력
