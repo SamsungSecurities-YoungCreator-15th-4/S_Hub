@@ -877,7 +877,7 @@ export default function Sidebar() {
             "확정 차단 · 수동검토 대기" 이고 그쪽은 Judge 미통과라 다른 상태다. */}
         {analyzeRejected && (
           <p className="rounded-xl border border-destructive/40 bg-destructive/5 px-3 py-2 text-[12px] font-semibold leading-snug text-destructive">
-            승인하지 않음 · 분석 미실행
+            분석 취소됨
           </p>
         )}
       </aside>

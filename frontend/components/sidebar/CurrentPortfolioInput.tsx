@@ -148,9 +148,12 @@ export default function CurrentPortfolioInput() {
         </TabButton>
       </div>
 
-      <div className="grid grid-cols-2 gap-x-3 gap-y-4">
-        {GROUPS.map(({ group, ids }) => (
-          <div key={group} className="col-span-2">
+      <div className="grid grid-cols-2 gap-x-3">
+        {GROUPS.map(({ group, ids }, gi) => (
+          <div
+            key={group}
+            className={`col-span-2 ${gi > 0 ? "mt-3 border-t border-muted pt-3" : ""}`}
+          >
             <p className="mb-2 text-[10px] font-bold text-muted-foreground">{group}</p>
             <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
               {ids.map((id) => {
