@@ -151,6 +151,14 @@ export default function PortfolioSection() {
                   : undefined
               }
               header={
+                <>
+                {/*
+                  왼쪽 카드에는 "현재" 라는 이름이 있는데 오른쪽에는 세그먼트만
+                  있어 무엇을 보는 화면인지 드러나지 않았다. 같은 무게의 라벨을
+                  붙여 현재 ↔ 제안으로 짝을 맞춘다. 세그먼트가 이미 쓰던 줄이라
+                  높이는 늘지 않는다.
+                */}
+                <span className="text-[13px] font-extrabold">제안</span>
                 <div className="flex rounded-lg bg-muted p-0.5">
                   {proposals.map((pf) => {
                     const active = !isCustom && selectedProposal?.id === pf.id;
@@ -186,6 +194,7 @@ export default function PortfolioSection() {
                     사용자 정의
                   </button>
                 </div>
+                </>
               }
             />
           )}
