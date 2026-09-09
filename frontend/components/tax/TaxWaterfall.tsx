@@ -427,12 +427,6 @@ export default function TaxWaterfall({
           <LegendDot color={CREDIT_COLOR} label="세액공제" />
         )}
       </div>
-      {/* 길이를 손봤으면 손봤다고 말한다. 라벨의 숫자는 실제 값이다. */}
-      {flow && (
-        <p className="mt-1 text-[10px] font-semibold leading-relaxed text-muted-foreground">
-          세액공제는 근로소득세에서 돌려받는 돈이라 금융소득세와 세목이 다릅니다.
-        </p>
-      )}
     </div>
   );
 }
