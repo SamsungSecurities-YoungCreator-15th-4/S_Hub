@@ -12,6 +12,8 @@ import ContributionSplit from "@/components/tax/ContributionSplit";
 import { TAX_ADVICE } from "@/lib/mockData";
 import { PRODUCT_LINKS } from "@/lib/productLinks";
 import { useDashboardStore } from "@/lib/store";
+// LLM 자리의 시연 대역. 엔드포인트가 생기면 이 import 만 fetch 로 바뀐다.
+import { demoContributionRationale } from "@/lib/demo/fixtures/api";
 import {
   allocationPlan,
   maxPensionKeepingNeed as calcMaxPensionKeepingNeed,
@@ -196,6 +198,33 @@ export default function TaxSection() {
         )
       : null;
 
+  /**
+   * 백엔드가 없을 때 세금 흐름을 프론트에서 잇는다. 위에서 고른 포트폴리오의
+   * 지표와 아래 절세 제안의 계산을 그대로 쓰므로 한 화면 안에서 숫자가 어긋나지
+   * 않는다. 예전에는 mock 이 자산 18억 기준(세전 2.59억)을 그려, 1억원 고객
+   * 화면에도 그대로 나왔다.
+   *
+   * 절감액을 두 갈래로 나눠 넘긴다. ISA 는 금융소득세를 직접 깎지만 연금
+   * 세액공제는 근로소득세에서 돌려받는 돈이라 같은 막대에 못 쌓는다.
+   */
+  const waterfallFlow =
+    customer && plan && selectedPortfolio && currentPortfolio
+      ? {
+          aumManwon: customer.aumEokwon * 10000,
+          current: {
+            expectedReturnPct: currentPortfolio.metrics.expectedReturnPct,
+            afterTaxReturnPct: currentPortfolio.metrics.afterTaxReturnPct,
+          },
+          selected: {
+            name: selectedPortfolio.name,
+            expectedReturnPct: selectedPortfolio.metrics.expectedReturnPct,
+            afterTaxReturnPct: selectedPortfolio.metrics.afterTaxReturnPct,
+          },
+          financialTaxSavingManwon: plan.isaSavingManwon,
+          creditRefundManwon: plan.pensionSavingManwon,
+        }
+      : null;
+
   const baseLabel = selectedPortfolio?.name ?? "포트폴리오";
 
   if (
@@ -320,6 +349,7 @@ export default function TaxSection() {
               waterfallData={isStressMode ? null : waterfallData}
               liveHeadline={isStressMode ? (taxSource?.headline ?? null) : null}
               liveAumEokwon={customer?.aumEokwon}
+              flow={waterfallFlow}
             />
             <AccountAllocation
               accounts={[
@@ -354,6 +384,15 @@ export default function TaxSection() {
               maxPensionKeepingNeed={pensionCeilingForNeed}
               targetReturnPct={ips.returnPct}
               horizonYears={customer.horizonYears}
+              rationale={demoContributionRationale(
+                {
+                  manwon: customer.nearTermNeedManwon,
+                  years: customer.nearTermNeedYears ?? 0,
+                  kind: customer.nearTermNeedKind,
+                  label: customer.nearTermNeedLabel,
+                },
+                plan.pension.lockupYears,
+              )}
             />
           )}
           <AdviceCards liveCards={liveStrategyCards?.cards ?? null} plan={plan} />
@@ -363,18 +402,26 @@ export default function TaxSection() {
   );
 }
 
-/** 탭 이름. 제도 설명은 가이드 툴팁으로 옮겨서, 이 탭에는 배분 숫자만 남는다. */
-type AdviceTab = "배분내역" | "상품추천";
+/**
+ * 탭 이름. 제도 설명은 가이드 툴팁으로 옮겨서 이 탭에는 배분 숫자만 남는다.
+ * 상품추천이 "무엇을 살까"라면 이쪽은 "얼마를 넣을까"다.
+ */
+type AdviceTab = "납입안" | "상품추천";
 
 /**
- * 절감액 표기(만원). 148.5만원을 149만원으로 반올림하면 세액공제 한도 900만 × 16.5%
- * 라는 근거가 화면에서 사라진다. 소수 첫째 자리는 살리고 .0 만 떨어뜨린다.
+ * 절감액 표기(만원). 만원 단위로 반올림하고 "약"을 붙인다.
+ *
+ * 소수 첫째 자리까지 적으면(148.5만원) 900만 × 16.5% 라는 유도가 화면에 남지만,
+ * PB 가 고객에게 그렇게 말하지 않고 ISA 절감액은 애초에 이자·배당 3% **가정** 위에
+ * 얹힌 값이라 그 자리에 의미가 없다. 없는 정밀도를 주장하지 않는다.
+ * 유도는 가이드 툴팁이 "배분액 × 공제율"로 들고 있다.
+ *
+ * "약"을 빼면 반올림한 값이 정확한 값처럼 읽히므로 접두는 호출부에서 반드시 붙인다.
  */
 const fmtSaving = (n: number) => {
-  const r = Math.round(n * 10) / 10;
-  const whole = Math.trunc(r);
-  const frac = Math.round(Math.abs(r - whole) * 10);
-  return frac === 0 ? whole.toLocaleString("ko-KR") : `${whole.toLocaleString("ko-KR")}.${frac}`;
+  const r = Math.round(n);
+  // 5천원짜리를 "약 0만원"으로 적을 수는 없다.
+  return r === 0 && n > 0 ? "1만원 미만" : r.toLocaleString("ko-KR");
 };
 
 interface AdviceCardsProps {
@@ -514,7 +561,7 @@ function AdviceCards({ liveCards, plan }: AdviceCardsProps) {
           ? copy.saving
           : ""
         : shownManwon > 0
-          ? `+${fmtSaving(shownManwon)}만원`
+          ? `약 +${fmtSaving(shownManwon)}만원`
           : "";
 
     return { ...copy, summary, explain, saving, applicable };
@@ -532,7 +579,7 @@ function AdviceCards({ liveCards, plan }: AdviceCardsProps) {
     : (plan?.totalSavingManwon ?? null);
   const totalSaving =
     massTotalManwon != null
-      ? `+${fmtSaving(massTotalManwon)}만원`
+      ? `약 +${fmtSaving(massTotalManwon)}만원`
       : TAX_ADVICE.totalSaving;
 
   return (
@@ -543,8 +590,8 @@ function AdviceCards({ liveCards, plan }: AdviceCardsProps) {
             // 연계 상품 목록이 비면 "상품추천" 탭 자체를 감춘다 — 빈 탭·빈 박스를 남기지 않는다.
             const hasProducts = card.products.length > 0;
             const active = hasProducts
-              ? (tabs[card.title] ?? "배분내역")
-              : "배분내역";
+              ? (tabs[card.title] ?? "납입안")
+              : "납입안";
             return (
               <div
                 key={card.title}
@@ -556,7 +603,7 @@ function AdviceCards({ liveCards, plan }: AdviceCardsProps) {
                   </span>
                   {hasProducts && (
                     <div className="flex shrink-0 rounded-md bg-muted p-0.5">
-                      {(["배분내역", "상품추천"] as AdviceTab[]).map((t) => (
+                      {(["납입안", "상품추천"] as AdviceTab[]).map((t) => (
                         <button
                           key={t}
                           type="button"
@@ -576,7 +623,7 @@ function AdviceCards({ liveCards, plan }: AdviceCardsProps) {
                   )}
                 </div>
 
-                {active === "배분내역" ? (
+                {active === "납입안" ? (
                   /* 카드 전체가 아니라 본문만 감싼다 — 탭 버튼·상품 링크 위에서
                      툴팁이 떠 카드를 덮으면 누르기 거슬린다. */
                   <HelpTooltip text={card.explain} className="h-[104px]" wide>
