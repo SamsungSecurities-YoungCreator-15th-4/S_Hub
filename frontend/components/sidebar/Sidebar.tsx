@@ -870,14 +870,12 @@ export default function Sidebar() {
           )}
         </Button>
 
-        {/* 거절 직후 — 분석을 돌리지 않았다는 사실을 좌측에 남긴다.
-            중앙의 직전 결과는 그대로 두므로 화면이 비지 않는다.
-
-            "검토 대기" 라는 말은 쓰지 않는다 — runStatus 의 blocked 라벨이
-            "확정 차단 · 수동검토 대기" 이고 그쪽은 Judge 미통과라 다른 상태다. */}
+        {/* 거절 후 — 남길 사실은 "거절했다" 가 아니라 "지금 입력이 아직 분석되지
+            않았다" 다. 거절은 아무것도 바꾸지 않아 상태는 draft 그대로이고 막힌
+            것도 없으므로, 오류색을 쓰지 않는다. 중앙의 직전 결과는 그대로 둔다. */}
         {analyzeRejected && (
-          <p className="-mt-1 text-center text-[11px] font-semibold text-destructive">
-            분석 취소됨
+          <p className="-mt-1 text-center text-[11px] font-semibold text-muted-foreground">
+            아직 분석하지 않음
           </p>
         )}
       </aside>
