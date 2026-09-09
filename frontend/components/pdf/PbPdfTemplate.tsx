@@ -748,11 +748,11 @@ function PortfolioPage() {
     보여주게 된다. 손댔을 때만 넷째 열을 세운다.
   */
   const cols = [
-    { p: current, alloc: buildPdfAllocation(current), label: "현재 포트폴리오", badge: "", badgeColor: "#6B7280", headerColor: "#6B7280", selected: false },
-    { p: portA, alloc: buildPdfAllocation(portA), label: "안정추구", badge: "", badgeColor: BRAND, headerColor: BRAND, selected: !isAdjusted && selId === "a" },
-    { p: portB, alloc: buildPdfAllocation(portB), label: "수익추구", badge: "", badgeColor: "#2C7BFF", headerColor: "#2C7BFF", selected: !isAdjusted && selId === "b" },
+    { key: "current", p: current, alloc: buildPdfAllocation(current), label: "현재 포트폴리오", badge: "", badgeColor: "#6B7280", headerColor: "#6B7280", selected: false },
+    { key: "a", p: portA, alloc: buildPdfAllocation(portA), label: "안정추구", badge: "", badgeColor: BRAND, headerColor: BRAND, selected: !isAdjusted && selId === "a" },
+    { key: "b", p: portB, alloc: buildPdfAllocation(portB), label: "수익추구", badge: "", badgeColor: "#2C7BFF", headerColor: "#2C7BFF", selected: !isAdjusted && selId === "b" },
     ...(adjusted
-      ? [{ p: adjusted, alloc: buildPdfAllocation(adjusted), label: "제안 조정", badge: "", badgeColor: BRAND_DARK, headerColor: BRAND_DARK, selected: true }]
+      ? [{ key: "adjusted", p: adjusted, alloc: buildPdfAllocation(adjusted), label: "제안 조정", badge: "", badgeColor: BRAND_DARK, headerColor: BRAND_DARK, selected: true }]
       : []),
   ];
 
@@ -857,9 +857,9 @@ function PortfolioPage() {
         </div>
 
         <div style={{ display: "flex", gap: isAdjusted ? 8 : 12, marginBottom: 22 }}>
-          {cols.map(({ p, alloc, label, badge, badgeColor, selected }) => (
+          {cols.map(({ key, alloc, label, badge, badgeColor, selected }) => (
             <div
-              key={p.id}
+              key={key}
               style={{
                 flex: 1,
                 border: selected ? `2px solid ${BRAND}` : `1px solid ${BORDER}`,
@@ -927,7 +927,7 @@ function PortfolioPage() {
           <colgroup>
             <col style={{ width: 150 }} />
             {cols.map((c) => (
-              <col key={c.p.id} />
+              <col key={c.key} />
             ))}
           </colgroup>
           <thead>
@@ -946,7 +946,7 @@ function PortfolioPage() {
               </th>
               {cols.map((c) => (
                 <th
-                  key={c.p.id}
+                  key={c.key}
                   style={{
                     padding: "8px 10px",
                     textAlign: "center",
