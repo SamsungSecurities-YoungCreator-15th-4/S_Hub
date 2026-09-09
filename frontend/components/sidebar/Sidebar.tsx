@@ -27,6 +27,8 @@ import DataSourceBadge from "@/components/common/DataSourceBadge";
 import { isTrusted } from "@/lib/api/result";
 import CurrentPortfolioInput from "@/components/sidebar/CurrentPortfolioInput";
 import SttRecordingModal from "@/components/sidebar/SttRecordingModal";
+import AnalyzeGateDialog from "@/components/sidebar/AnalyzeGateDialog";
+import { RUN_STATUS } from "@/lib/runStatus";
 import { isCurrentWeightsInputValid } from "@/lib/assetMapping";
 import { type Customer, CUSTOMERS } from "@/lib/mockData";
 import {
@@ -127,6 +129,8 @@ export default function Sidebar() {
     portfolioSource,
     currentWeightsInput,
     signalCollapsePanels,
+    setRunStatus,
+    resetRunStatus,
   } = useDashboardStore();
   const customer =
     customers.find((c) => c.id === selectedCustomerId) ?? customers[0];
@@ -138,6 +142,9 @@ export default function Sidebar() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [loadingId, setLoadingId] = useState<string | null>(null);
+  /** 분석 승인 게이트 — 열림 여부와, 직전에 거절당했는지. */
+  const [gateOpen, setGateOpen] = useState(false);
+  const [analyzeRejected, setAnalyzeRejected] = useState(false);
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [newName, setNewName] = useState("");
   const [newAum, setNewAum] = useState("");
@@ -364,6 +371,35 @@ export default function Sidebar() {
   useEffect(() => {
     handleAnalyzeRef.current = handleAnalyze;
   });
+
+  /**
+   * 게이트 승인 — 계산은 여기서만 시작된다.
+   *
+   * 재분석은 직전 확정(locked)을 먼저 푼다. 좌측 입력이 바뀐 채로 확정이 남아 있으면
+   * 승인받지 않은 내용이 확정본으로 나간다. reviewed·locked → draft 는 전이표
+   * (lib/runStatus.ts:47)에 없는 전이라, 전이가 아니라 초기화(resetRunStatus)로 되돌린다.
+   */
+  const handleGateApprove = () => {
+    setGateOpen(false);
+    setAnalyzeRejected(false);
+    resetRunStatus();
+    setRunStatus(RUN_STATUS.REVIEWED);
+    collapseAfterAnalyzeRef.current = true;
+    void handleAnalyze();
+  };
+
+  /**
+   * 게이트 거절 — 계산을 시작하지 않는다. 화면의 직전 분석 결과는 그대로 둔다
+   * (지우면 승인을 거절했을 뿐인데 화면이 비어 버린다).
+   *
+   * draft 에서는 draft → blocked 전이가 전이표에 없어 상태가 draft 로 남는다.
+   * 어느 쪽이든 확정이 아니므로 PDF 는 계속 잠긴다.
+   */
+  const handleGateReject = () => {
+    setGateOpen(false);
+    setAnalyzeRejected(true);
+    setRunStatus(RUN_STATUS.BLOCKED, "PB가 분석 승인을 거절했습니다");
+  };
 
   if (!customer) return null;
 
@@ -846,10 +882,7 @@ export default function Sidebar() {
         <Button
           size="lg"
           disabled={analyzing || !isCurrentWeightsInputValid(currentWeightsInput)}
-          onClick={() => {
-            collapseAfterAnalyzeRef.current = true;
-            void handleAnalyze();
-          }}
+          onClick={() => setGateOpen(true)}
           className="w-full rounded-xl py-6 text-sm font-extrabold shadow-[0_4px_14px_rgba(0,100,255,0.28)]"
         >
           {analyzing ? (
@@ -861,7 +894,23 @@ export default function Sidebar() {
             "분석하기"
           )}
         </Button>
+
+        {/* 거절 직후 — 분석을 돌리지 않았다는 사실을 좌측에 남긴다.
+            중앙의 직전 결과는 그대로 두므로 화면이 비지 않는다. */}
+        {analyzeRejected && (
+          <p className="rounded-xl border border-dashed border-muted-foreground/30 bg-muted/40 px-3 py-2 text-[12px] font-semibold text-muted-foreground">
+            PB 검토 대기 — 승인을 거절해 분석을 실행하지 않았습니다. 입력을
+            확인한 뒤 분석하기를 다시 눌러 승인하세요.
+          </p>
+        )}
       </aside>
+
+      <AnalyzeGateDialog
+        open={gateOpen}
+        onOpenChange={setGateOpen}
+        onApprove={handleGateApprove}
+        onReject={handleGateReject}
+      />
 
       {/* ── 고객 드롭다운 (Card overflow-hidden 밖에 fixed로 렌더링) ── */}
       {dropdownOpen && dropdownRect && (
