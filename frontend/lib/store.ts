@@ -80,6 +80,10 @@ export interface DashboardState {
    *  기준선으로 그대로 전송된다. 미입력 시 백엔드가 현금 100%로 폴백한다. */
   currentWeightsInput: CurrentWeightsInput;
   setCurrentWeightsInput: (patch: CurrentWeightsInput) => void;
+  /** 제안 포트폴리오를 PB가 손본 비중(%) — 분석 결과가 있을 때만 입력할 수 있다.
+   *  현재 보유 비중과 달리 계산 요청에 실리지 않는다(표시·검토용). */
+  proposedWeightsInput: CurrentWeightsInput;
+  setProposedWeightsInput: (patch: CurrentWeightsInput) => void;
 
   // ── STT/상담 연동 상태 ──
   /** 화면에 표시하는 상담 전사. 초기값은 mock(CONSULT_LOG). */
@@ -192,6 +196,24 @@ export interface DashboardState {
   setSttStatus: (status: SttStatus, note?: string) => void;
 }
 
+/**
+ * 비중이 바뀌면 직전 승인은 무효다.
+ *
+ * 승인은 "그때 그 비중으로 계산한 리포트"에 대한 것이라, 입력이 바뀌면 확정을
+ * 그대로 둘 수 없다 — 승인받지 않은 내용이 확정본으로 나간다. 되돌리는 방향이
+ * reviewed·locked → draft 라 전이표에 없는 전이이므로, 전이가 아니라 초기화로 처리한다.
+ * 이미 draft 면 바꿀 것이 없어 사유도 남기지 않는다.
+ */
+function unlockOnWeightChange(
+  s: DashboardState,
+): Partial<DashboardState> {
+  if (s.runStatus === INITIAL_RUN_STATUS) return {};
+  return {
+    runStatus: INITIAL_RUN_STATUS,
+    runStatusReason: "비중 변경 · 재분석 필요",
+  };
+}
+
 export const useDashboardStore = create<DashboardState>((set) => ({
   customers: [...CUSTOMERS],
   selectedCustomerId: CUSTOMERS[0].id,
@@ -212,7 +234,16 @@ export const useDashboardStore = create<DashboardState>((set) => ({
   otherIncomeManwon: TAX_THRESHOLD.otherIncomeDefault,
   currentWeightsInput: {},
   setCurrentWeightsInput: (patch) =>
-    set((s) => ({ currentWeightsInput: { ...s.currentWeightsInput, ...patch } })),
+    set((s) => ({
+      currentWeightsInput: { ...s.currentWeightsInput, ...patch },
+      ...unlockOnWeightChange(s),
+    })),
+  proposedWeightsInput: {},
+  setProposedWeightsInput: (patch) =>
+    set((s) => ({
+      proposedWeightsInput: { ...s.proposedWeightsInput, ...patch },
+      ...unlockOnWeightChange(s),
+    })),
 
   // 초기 포트폴리오는 mock(데모) — 출처를 fallback 으로 둬 배지로 명시한다.
   portfolios: PORTFOLIOS,
@@ -305,6 +336,7 @@ export const useDashboardStore = create<DashboardState>((set) => ({
         taxOptimizer: null,
         insightResult: null,
         currentWeightsInput: {},
+        proposedWeightsInput: {},
         isStressMode: false,
         stressPreset: "current",
         stressScenarioKey: null,
