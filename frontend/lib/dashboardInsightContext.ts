@@ -3,7 +3,6 @@ import {
   PORTFOLIOS,
   TAX_ADVICE,
   TAX_EFFECT,
-  TAX_THRESHOLD,
   type Customer,
 } from "@/lib/mockData";
 import { pctOfAumLabel } from "@/lib/formatKrw";
@@ -17,7 +16,6 @@ export interface DashboardInsightContextInput {
   ips: IpsState;
   scenario: ScenarioState;
   liveBase: ScenarioState;
-  otherIncomeManwon: number;
 }
 
 export type DashboardInsightContext = Record<string, unknown>;
@@ -96,7 +94,6 @@ export function buildDashboardInsightContext({
   ips,
   scenario,
   liveBase,
-  otherIncomeManwon,
 }: DashboardInsightContextInput): DashboardInsightContext {
   const selectedPortfolio =
     PORTFOLIOS.find((portfolio) => portfolio.id === selectedPortfolioId) ??
@@ -171,10 +168,6 @@ export function buildDashboardInsightContext({
         },
       },
       effect: TAX_EFFECT,
-      threshold: {
-        ...TAX_THRESHOLD,
-        other_income_manwon: otherIncomeManwon,
-      },
       advice_cards: TAX_ADVICE.cards,
       total_label: TAX_ADVICE.totalLabel,
       total_saving: TAX_ADVICE.totalSaving,

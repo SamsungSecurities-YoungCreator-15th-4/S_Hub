@@ -5,7 +5,6 @@ import { ExternalLink, Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AccountAllocation from "@/components/tax/AccountAllocation";
-import TaxGauge from "@/components/tax/TaxGauge";
 import TaxWaterfall from "@/components/tax/TaxWaterfall";
 import AsOfNote from "@/components/common/AsOfNote";
 import { TAX_ADVICE } from "@/lib/mockData";
@@ -119,15 +118,6 @@ export default function TaxSection() {
       }
     : null;
 
-  // 종합과세 게이지: 스트레스 모드면 포트폴리오별 taxOptEntry gauge 우선, 아니면 calculate gauge
-  const gaugeData =
-    (isStressMode
-      ? (taxOptEntry?.financial_income_tax_gauge ??
-        stressTax?.stressed?.financial_income_tax_gauge)
-      : null) ??
-    selectedTax?.gauge ??
-    null;
-
   // 실시간 추출/계산된 계좌 잔여 한도 및 사용액 반영 (IPS 실시간 연동)
   const isaLiveUsed = toFiniteNumber(taxSource?.account_cards?.isa?.used_capacity);
   const isaLiveRemaining = toFiniteNumber(taxSource?.account_cards?.isa?.remaining_capacity);
@@ -193,12 +183,6 @@ export default function TaxSection() {
             className="rounded-md px-2.5 py-0.5 text-[12px] font-bold data-[state=active]:bg-white data-[state=active]:text-brand-dark data-[state=active]:shadow-sm"
           >
             절세 효과
-          </TabsTrigger>
-          <TabsTrigger
-            value="threshold"
-            className="rounded-md px-2.5 py-0.5 text-[12px] font-bold data-[state=active]:bg-white data-[state=active]:text-brand-dark data-[state=active]:shadow-sm"
-          >
-            종합과세 임계선
           </TabsTrigger>
           <TabsTrigger
             value="advice"
@@ -295,12 +279,7 @@ export default function TaxSection() {
           </div>
         </TabsContent>
 
-        {/* 탭 2: 종합과세 임계선 */}
-        <TabsContent value="threshold">
-          <TaxGauge gaugeData={gaugeData} portfolioLabel={baseLabel} />
-        </TabsContent>
-
-        {/* 탭 3: 절세 제안 */}
+        {/* 탭 2: 절세 제안 */}
         <TabsContent value="advice">
           <AdviceCards liveCards={liveStrategyCards?.cards ?? null} />
         </TabsContent>

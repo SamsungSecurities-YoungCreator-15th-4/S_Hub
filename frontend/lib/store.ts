@@ -16,7 +16,6 @@ import {
   MACRO_INDICATORS,
   PORTFOLIOS,
   SCENARIO_BASE,
-  TAX_THRESHOLD,
 } from "./mockData";
 import type {
   ApiResult,
@@ -74,8 +73,6 @@ export interface DashboardState {
    *  백엔드 /api/macro-indicators 로드 전엔 목 기준값으로 시작한다. */
   liveBase: { ratePct: number; fxKrw: number };
   liveBaseLoaded: boolean;
-  /** 고객의 다른 금융소득(연 이자·배당, 만원) — 종합과세 기준선 점검 입력값 */
-  otherIncomeManwon: number;
   /** 고객이 지금 실제로 들고 있는 자산 비중(%) — calculate·stress-metrics의 "현재 포트폴리오"
    *  기준선으로 그대로 전송된다. 미입력 시 백엔드가 현금 100%로 폴백한다. */
   currentWeightsInput: CurrentWeightsInput;
@@ -205,7 +202,6 @@ export interface DashboardState {
   resetScenario: () => void;
   /** 실시간 현재값 주입 — 최초 1회는 슬라이더(scenario)도 실시간 값으로 맞춘다. */
   setLiveBase: (base: { ratePct: number; fxKrw: number }) => void;
-  setOtherIncome: (manwon: number) => void;
 
   setTranscript: (transcript: ConsultMessage[], source: DataSource) => void;
   setConsultationId: (id: string) => void;
@@ -247,7 +243,6 @@ export const useDashboardStore = create<DashboardState>((set) => ({
   scenario: { ratePct: SCENARIO_BASE.ratePct, fxKrw: SCENARIO_BASE.fxKrw },
   liveBase: { ratePct: SCENARIO_BASE.ratePct, fxKrw: SCENARIO_BASE.fxKrw },
   liveBaseLoaded: false,
-  otherIncomeManwon: TAX_THRESHOLD.otherIncomeDefault,
   currentWeightsInput: {},
   setCurrentWeightsInput: (patch) =>
     set((s) => ({
@@ -411,8 +406,6 @@ export const useDashboardStore = create<DashboardState>((set) => ({
         liveBaseLoaded: true,
       };
     }),
-  setOtherIncome: (manwon) => set({ otherIncomeManwon: Math.max(0, manwon) }),
-
   setTranscript: (transcript, source) =>
     set({ transcript, transcriptSource: source }),
   setConsultationId: (id) => set({ consultationId: id }),
