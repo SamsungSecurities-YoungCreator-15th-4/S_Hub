@@ -30,9 +30,9 @@ export interface InsightData {
   asOf?: string; // ISO datetime
 }
 
-/** mock INSIGHT → UI 데이터(폴백 표시용). */
-function mockInsight(): InsightData {
-  return demoInsight();
+/** mock INSIGHT → UI 데이터(폴백 표시용). 폴백도 질문에 맞는 응답을 고른다. */
+function mockInsight(query: string): InsightData {
+  return demoInsight(query);
 }
 
 function mapResponse(res: RagInsightResponse): InsightData {
@@ -71,7 +71,7 @@ export async function fetchRagInsight(
   query: string,
   options: FetchInsightOptions = {},
 ): Promise<ApiResult<InsightData>> {
-  if (IS_DEMO) return demo({ ...demoInsight(), question: query });
+  if (IS_DEMO) return demo({ ...demoInsight(query), question: query });
 
   const body: RagInsightRequest = {
     // consultation_id 는 백엔드 필수(UUID)이나 존재검증은 라우터 TODO 상태.
@@ -100,6 +100,6 @@ export async function fetchRagInsight(
       err instanceof ApiError && err.isTimeout
         ? "응답 시간 초과로 예시 데이터를 표시합니다."
         : "백엔드 연결 실패로 예시 데이터를 표시합니다.";
-    return fallback({ ...mockInsight(), question: query }, note);
+    return fallback({ ...mockInsight(query), question: query }, note);
   }
 }
