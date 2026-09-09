@@ -90,6 +90,7 @@ export default function CurrentPortfolioInput() {
   const total = sumCurrentWeightsInput(value);
   const hasAnyInput = total > 0;
   const isValid = isCurrentWeightsInputValid(value);
+  const helpMode = useDashboardStore((s) => s.helpMode);
 
   const handleChange = (id: FieldId, raw: string) => {
     const cleaned = raw.replace(/[^0-9.]/g, "");
@@ -117,7 +118,19 @@ export default function CurrentPortfolioInput() {
       */}
       <div className="mb-2 flex items-center justify-between">
         <HelpTooltip text={PROXY_HELP} placement="bottom">
-          <p className="cursor-default text-[14px] font-bold">자산 비중 조절기</p>
+          {/* 도움말 모드에서 제목에 표시를 남긴다 — 백테스트·지표 등 다른 도움말
+              대상과 같은 규격이라, 어디에 설명이 붙어 있는지 한눈에 보인다. */}
+          <p className="cursor-default text-[14px] font-bold">
+            <span
+              className={
+                helpMode
+                  ? "rounded border border-brand/40 bg-brand/[0.06] px-1"
+                  : ""
+              }
+            >
+              자산 비중 조절기
+            </span>
+          </p>
         </HelpTooltip>
         {hasAnyInput && (
           <button
