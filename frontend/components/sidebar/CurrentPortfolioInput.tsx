@@ -148,11 +148,11 @@ export default function CurrentPortfolioInput() {
         </TabButton>
       </div>
 
-      <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+      <div className="grid grid-cols-2 gap-x-3 gap-y-4">
         {GROUPS.map(({ group, ids }) => (
           <div key={group} className="col-span-2">
-            <p className="mb-1 text-[10px] font-bold text-muted-foreground">{group}</p>
-            <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
+            <p className="mb-2 text-[10px] font-bold text-muted-foreground">{group}</p>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
               {ids.map((id) => {
                 const proxyNote = PROXY_NOTE[id];
                 return (
