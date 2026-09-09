@@ -12,6 +12,26 @@ function equityShare(weights: Portfolio["weights"]): number {
 }
 
 /**
+ * 조정 강도 t — 현재를 0, 제안을 1로 놓았을 때 조정안이 놓인 자리.
+ *
+ * 지표·백테스트가 같은 축을 쓰도록 여기 한 번만 정의한다. 둘이 각자 다른 식을
+ * 쓰면 "지표는 제안보다 공격적인데 곡선은 더 완만한" 화면이 나온다.
+ */
+export function adjustmentRatio(
+  current: Portfolio,
+  base: Portfolio,
+  adjustedWeights: Portfolio["weights"],
+): number {
+  const curEq = equityShare(current.weights);
+  const baseEq = equityShare(base.weights);
+  const span = baseEq - curEq;
+  // 두 안의 주식 비중이 같으면 축이 서지 않는다. 이때는 제안 자리에 둔다.
+  const raw = Math.abs(span) < 0.01 ? 1 : (equityShare(adjustedWeights) - curEq) / span;
+  // 관측 구간 밖으로 멀리 나간 외삽은 신뢰할 수 없어 양끝을 조금만 열어 둔다.
+  return Math.min(1.5, Math.max(-0.5, raw));
+}
+
+/**
  * 조정안의 지표를 현재↔제안 사이 보간으로 유도한다.
  *
  * 자산군별 수익률·변동성 계열이 아직 없어 실제 재계산은 불가능하다. 그렇다고
@@ -29,14 +49,7 @@ export function deriveAdjustedMetrics(
   base: Portfolio,
   adjustedWeights: Portfolio["weights"],
 ): Portfolio["metrics"] {
-  const curEq = equityShare(current.weights);
-  const baseEq = equityShare(base.weights);
-  const adjEq = equityShare(adjustedWeights);
-  const span = baseEq - curEq;
-  // 두 안의 주식 비중이 같으면 축이 서지 않는다. 이때는 제안 지표를 그대로 둔다.
-  const rawT = Math.abs(span) < 0.01 ? 1 : (adjEq - curEq) / span;
-  // 관측 구간 밖으로 멀리 나간 외삽은 신뢰할 수 없어 양끝을 조금만 열어 둔다.
-  const t = Math.min(1.5, Math.max(-0.5, rawT));
+  const t = adjustmentRatio(current, base, adjustedWeights);
 
   const lerp = (a: number, b: number) => a + (b - a) * t;
   const c = current.metrics;

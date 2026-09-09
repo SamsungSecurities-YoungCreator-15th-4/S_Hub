@@ -164,7 +164,6 @@ export default function PortfolioSection() {
             // 래퍼 span 이 대신 받아 왜 못 누르는지를 보여 준다.
             <span title={detailBlockReason || "리포트 전체를 확인합니다."}>
               <Button
-                variant="outline"
                 size="sm"
                 onClick={() => setDetailOpen(true)}
                 disabled={!!detailBlockReason}

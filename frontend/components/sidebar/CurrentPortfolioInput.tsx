@@ -187,7 +187,7 @@ export default function CurrentPortfolioInput() {
             key={group}
             className={`col-span-2 ${gi > 0 ? "mt-3 border-t border-muted pt-3" : ""}`}
           >
-            <p className="mb-2 text-[10px] font-bold text-muted-foreground">{group}</p>
+            <p className="mb-2 text-[11px] font-extrabold text-foreground">{group}</p>
             <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
               {ids.map((id) => {
                 const proxyNote = PROXY_NOTE[id];

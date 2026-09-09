@@ -12,9 +12,11 @@ import {
   YAxis,
 } from "recharts";
 import { Card } from "@/components/ui/card";
-import { BACKTEST_SERIES } from "@/lib/mockData";
+import { BACKTEST_SERIES, type Portfolio } from "@/lib/mockData";
+import { CALC_UNITS } from "@/lib/assetMapping";
+import { adjustmentRatio } from "@/lib/viewedPortfolio";
 import HelpTooltip from "@/components/common/HelpTooltip";
-import { useDashboardStore } from "@/lib/store";
+import { selectViewedPlanKey, useDashboardStore } from "@/lib/store";
 
 const BACKTEST_HELP = [
   "5년 전 이 비중으로 투자했다면의 결과",
@@ -36,12 +38,17 @@ const BENCHMARK_KEY: Record<Benchmark, string> = {
  * 제안 카드가 세그먼트 한 장으로 합쳐져 화면에 제안이 하나씩만 보이므로,
  * 백테스트도 A·B 를 동시에 긋지 않는다. 선택한 안만 따라간다.
  */
-function linesFor(proposalKey: "a" | "b") {
+function linesFor(proposalKey: "a" | "b", adjusted: boolean) {
   return [
     { key: "current", name: "현재", color: "#8B95A1", width: 2 },
-    { key: proposalKey, name: "제안", color: "#0064FF", width: 2.6 },
+    adjusted
+      ? { key: ADJUSTED_SERIES_KEY, name: "제안 조정", color: "#003FA8", width: 2.6 }
+      : { key: proposalKey, name: "제안", color: "#0064FF", width: 2.6 },
   ];
 }
+
+/** 조정안 곡선의 데이터 키. 실데이터 경로의 포트폴리오 id 와 겹치지 않는 이름이다. */
+const ADJUSTED_SERIES_KEY = "adjusted";
 
 const BENCHMARK_COLOR = "#DC2626";
 
@@ -60,10 +67,13 @@ export default function BacktestChart() {
   const portfolioNote = useDashboardStore((s) => s.portfolioNote);
   const analyzing = useDashboardStore((s) => s.analyzing);
   const selectedPortfolioId = useDashboardStore((s) => s.selectedPortfolioId);
+  const proposedWeightsInput = useDashboardStore((s) => s.proposedWeightsInput);
+  const viewedPlanKey = useDashboardStore(selectViewedPlanKey);
 
-  // 제안 카드의 선택과 같은 값을 본다. "제안 조정" 은 백테스트 시계열이 없으므로
-  // 그때도 마지막으로 고른 제안(a·b)을 그대로 따라간다.
-  const lines = linesFor(selectedPortfolioId === "b" ? "b" : "a");
+  const proposalKey: "a" | "b" = selectedPortfolioId === "b" ? "b" : "a";
+  const isAdjusted = viewedPlanKey === "proposed";
+  // 제안 카드의 선택과 같은 값을 본다 — 카드와 곡선이 다른 안을 가리키면 안 된다.
+  const lines = linesFor(proposalKey, isAdjusted);
 
   const displayPortfolios = portfolios;
 
@@ -100,11 +110,41 @@ export default function BacktestChart() {
     }
   }
 
-  const chartData: Record<string, number | string>[] = hasRealData
+  const baseChartData: Record<string, number | string>[] = hasRealData
     ? Array.from(pfByDate.entries())
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([date, vals]) => ({ date, ...vals }))
     : BACKTEST_SERIES;
+
+  /*
+    조정안에는 자체 시계열이 없다. 지표와 같은 축(주식 비중으로 잰 조정 강도 t)
+    으로 현재 곡선과 제안 곡선 사이를 보간해 한 줄을 만든다 — 비중을 제안보다
+    공격적으로 잡으면 곡선도 제안 바깥으로 나가고, 되돌리면 현재 쪽으로 붙는다.
+    실데이터가 붙으면 조정 비중으로 실제 시계열을 다시 돌려 이 보간을 걷어낸다.
+  */
+  const adjustBase = portfolios.find((p) => p.id === "current");
+  const adjustProposal = portfolios.find((p) => p.id === proposalKey);
+  const t =
+    isAdjusted && adjustBase && adjustProposal
+      ? adjustmentRatio(
+          adjustBase,
+          adjustProposal,
+          CALC_UNITS.reduce(
+            (acc, u) => ({ ...acc, [u.id]: proposedWeightsInput[u.id] ?? 0 }),
+            {} as Portfolio["weights"],
+          ),
+        )
+      : null;
+
+  const chartData =
+    t === null
+      ? baseChartData
+      : baseChartData.map((row) => {
+          const cur = row.current;
+          const prop = row[proposalKey];
+          if (typeof cur !== "number" || typeof prop !== "number") return row;
+          return { ...row, [ADJUSTED_SERIES_KEY]: cur + (prop - cur) * t };
+        });
 
   const xKey = hasRealData ? "date" : "year";
   const xTicks = hasRealData
