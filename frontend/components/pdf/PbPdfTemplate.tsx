@@ -101,7 +101,7 @@ function PageFooter({ page, total }: { page: number; total: number }) {
         }}
       >
         <span style={{ fontSize: 10, color: MUTED }}>
-          VVIP PB Advisor · 내부 기밀 자료
+          내부 기밀 자료
         </span>
         <span
           style={{
@@ -301,16 +301,7 @@ function CoverPage() {
                   letterSpacing: 0.5,
                 }}
               >
-                S.upervisor
-              </div>
-              <div
-                style={{
-                  fontSize: 10,
-                  color: "rgba(255,255,255,0.7)",
-                  marginTop: 1,
-                }}
-              >
-                VVIP PB ADVISOR
+                S.ymphony
               </div>
             </div>
           </div>
@@ -387,7 +378,7 @@ function CoverPage() {
             {customer.name} 고객
           </div>
           <div style={{ fontSize: 12, color: MUTED, fontWeight: 500 }}>
-            {customer.pbCode} · {customer.grade} 등급 · {customer.aumLabel}
+            {customer.pbCode} · {customer.aumLabel}
           </div>
         </div>
         <div style={{ display: "flex" }}>

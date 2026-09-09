@@ -34,7 +34,7 @@ function getFileName(type: PdfType, name: string): string {
     .replace(/\. /g, "")
     .replace(/\.$/, "");
   const label = type === "pb" ? "PB용" : "고객용";
-  return `VVIP_상담리포트_${label}_${name}_${date}.pdf`;
+  return `상담리포트_${label}_${name}_${date}.pdf`;
 }
 
 export default function PdfExportButton() {

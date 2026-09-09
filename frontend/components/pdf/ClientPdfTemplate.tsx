@@ -221,16 +221,7 @@ function CoverPage() {
                 letterSpacing: 0.5,
               }}
             >
-              S.upervisor
-            </div>
-            <div
-              style={{
-                fontSize: 10,
-                color: "rgba(255,255,255,0.7)",
-                marginTop: 1,
-              }}
-            >
-              VVIP PB ADVISOR
+              S.ymphony
             </div>
           </div>
         </div>
@@ -298,7 +289,7 @@ function CoverPage() {
             {C.name} 고객님
           </div>
           <div style={{ fontSize: 12, color: MUTED, fontWeight: 500 }}>
-            {C.grade} 등급 · {C.aumLabel} · {C.pbCode}
+            {C.aumLabel} · {C.pbCode}
           </div>
         </div>
 
