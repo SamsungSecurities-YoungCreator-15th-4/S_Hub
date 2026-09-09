@@ -4,6 +4,14 @@
  * 빈 문자열("")이면 버튼이 비활성(클릭 불가) 상태로 표시됩니다.
  */
 export const PRODUCT_LINKS: Record<string, string> = {
+  // ── Mass 고객 3대 절세계좌 ───────────────────────────────────
+  "삼성증권 중개형 ISA":
+    "https://www.samsungpop.com/ux/kor/finance/isa/isainfo/intro.do",
+  "삼성증권 연금저축계좌":
+    "https://www.samsungpop.com/ux/kor/customer/guide/workproductguide/personalAnnuity.do",
+  "삼성증권 개인형 IRP":
+    "https://www.samsungpop.com/mbw/finance/pensionAccount.do?cmd=guide&tab=DIRP",
+
   // ── ISA 계좌 활용 ────────────────────────────────────────────
   "삼성증권 ISA 계좌 소개":
     "https://www.samsungpop.com/mbw/finance/isa.do?cmd=guide",

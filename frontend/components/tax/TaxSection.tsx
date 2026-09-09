@@ -20,26 +20,7 @@ const ID_TO_KIND: Record<string, string> = {
   b: "B",
 };
 
-// 백엔드 strategy key → 프론트 고정 카피 (spec §4)
-type StrategyKey =
-  | "isa"
-  | "pension_credit"
-  | "separate_bond"
-  | "low_tax_dividend"
-  | "overseas_exemption"
-  | "tax_loss";
-
-const STRATEGY_COPY: Record<
-  StrategyKey,
-  { body: string; tag: string; products: { name: string }[] }
-> = {
-  isa: TAX_ADVICE.cards[0]!,
-  pension_credit: TAX_ADVICE.cards[1]!,
-  separate_bond: TAX_ADVICE.cards[2]!,
-  low_tax_dividend: TAX_ADVICE.cards[3]!,
-  overseas_exemption: TAX_ADVICE.cards[4]!,
-  tax_loss: TAX_ADVICE.cards[5]!,
-};
+const MASS_TAX_SOURCE_KEYS = ["isa", "pension_credit"] as const;
 
 /** 중앙 하단: 절세 최적화 시뮬레이터 */
 // 백엔드 값이 문자열로 와도 산술 더하기가 문자열 연결로 변질되지 않도록 숫자로 강제
@@ -321,10 +302,7 @@ export default function TaxSection() {
 
         {/* 탭 3: 절세 제안 */}
         <TabsContent value="advice">
-          <AdviceCards
-            liveCards={liveStrategyCards?.cards ?? null}
-            totalManwon={liveStrategyCards?.combined_total_manwon ?? null}
-          />
+          <AdviceCards liveCards={liveStrategyCards?.cards ?? null} />
         </TabsContent>
       </Card>
     </Tabs>
@@ -335,53 +313,64 @@ type AdviceTab = "제안설명" | "상품추천";
 
 interface AdviceCardsProps {
   liveCards: StressTaxStrategyCard[] | null;
-  totalManwon: number | null;
 }
 
-function AdviceCards({ liveCards, totalManwon }: AdviceCardsProps) {
+function AdviceCards({ liveCards }: AdviceCardsProps) {
   const [tabs, setTabs] = useState<Record<string, AdviceTab>>({});
 
-  // 길이로 검사한다 — 빈 배열도 truthy 라 `liveCards ?` 로는 폴백을 타지 못하고
-  // 카드 없는 빈 그리드가 남는다(liveCards 는 liveStrategyCards?.cards ?? null, :322).
-  const cards = liveCards?.length
-    ? [...liveCards]
-        .sort((a, b) => a.priority_rank - b.priority_rank)
-        .map((lc) => {
-          const copy = STRATEGY_COPY[lc.key as StrategyKey];
-          // 백엔드가 계산한 이전/납입 가능 금액(이미 만원 단위로 반환됨)
-          const transferManwon = lc.transferableManwon ?? null;
+  const liveByKey = new Map(liveCards?.map((card) => [card.key, card]) ?? []);
 
-          // ISA·연금 카드는 잔여 한도를 동적으로 표시
-          let body = copy?.body ?? "";
-          if (lc.key === "isa" && transferManwon != null) {
-            body = `이자·배당 자산 ${transferManwon.toLocaleString()}만원을 ISA 잔여 한도로 이전 — 비과세 200만 + 초과분 9.9% 분리과세, 종합과세 합산 제외.`;
-          } else if (lc.key === "pension_credit" && transferManwon != null) {
-            body = `연금저축+IRP 잔여 한도 ${transferManwon.toLocaleString()}만원 납입 시 13.2% 세액공제 — 만 55세 이후 연금 수령.`;
-          }
+  // 화면은 Mass 고객의 3대 절세계좌만 보여 준다. 연금저축·IRP는 현재 백엔드의
+  // pension_credit 합산 계산을 공유하므로 연금저축 카드에만 금액을 표시한다.
+  const cards = TAX_ADVICE.cards.map((copy) => {
+    const live = liveByKey.get(copy.sourceKey);
+    const transferManwon = live?.transferableManwon ?? null;
+    const reason = live?.reason ?? live?.ineligibleReason ?? null;
+    const applicable = live?.applicable ?? true;
+    let body = copy.body;
 
-          return {
-            title: lc.title,
-            body,
-            tag: copy?.tag ?? "",
-            saving:
-              lc.applicable && lc.combined_contribution_manwon > 0
-                ? `+${lc.combined_contribution_manwon.toLocaleString()}만원`
-                : "",
-            products: copy?.products ?? [],
-            applicable: lc.applicable,
-          };
-        })
-    : TAX_ADVICE.cards.map((c) => ({ ...c, applicable: true }));
+    if (live && !applicable && reason) {
+      body = reason;
+    } else if (transferManwon != null) {
+      const capacityLabel = transferManwon.toLocaleString();
+      body =
+        copy.sourceKey === "isa"
+          ? `${copy.body} 현재 계산상 이전 가능액은 ${capacityLabel}만원입니다.`
+          : `${copy.body} 현재 계산상 합산 잔여 활용 가능액은 ${capacityLabel}만원입니다.`;
+    }
 
+    const saving =
+      copy.savingRole === "included"
+        ? applicable && (live?.combined_contribution_manwon ?? 0) > 0
+          ? copy.saving
+          : ""
+        : live?.applicable && live.combined_contribution_manwon > 0
+          ? `+${live.combined_contribution_manwon.toLocaleString()}만원`
+          : live
+            ? ""
+            : copy.saving;
+
+    return { ...copy, body, saving, applicable };
+  });
+
+  // 기존 6종 combined_total에는 화면에서 제외한 전략도 들어 있다. 표시 총액은
+  // ISA와 pension_credit을 각각 한 번만 합산해 3개 카드와 계산 범위를 맞춘다.
+  const massTotalManwon = liveCards?.length
+    ? MASS_TAX_SOURCE_KEYS.reduce(
+        (sum, key) =>
+          sum + (liveByKey.get(key)?.combined_contribution_manwon ?? 0),
+        0,
+      )
+    : null;
   const totalSaving =
-    totalManwon != null
-      ? `+${totalManwon.toLocaleString()}만원`
+    massTotalManwon != null
+      ? `+${massTotalManwon.toLocaleString()}만원`
       : TAX_ADVICE.totalSaving;
 
   return (
     <>
       <div className="max-h-[520px] overflow-y-auto">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
           {cards.map((card) => {
             // 연계 상품 목록이 비면 "상품추천" 탭 자체를 감춘다 — 빈 탭·빈 박스를 남기지 않는다.
             const hasProducts = card.products.length > 0;
@@ -420,7 +409,7 @@ function AdviceCards({ liveCards, totalManwon }: AdviceCardsProps) {
                 </div>
 
                 {active === "제안설명" ? (
-                  <div className="flex h-[108px] flex-col overflow-y-auto pr-0.5">
+                  <div className="flex h-[132px] flex-col overflow-y-auto pr-0.5">
                     <p className="pt-1.5 text-[13px] font-semibold leading-snug text-muted-foreground">
                       {card.body}
                     </p>
@@ -429,14 +418,20 @@ function AdviceCards({ liveCards, totalManwon }: AdviceCardsProps) {
                         {card.tag}
                       </p>
                       {card.saving && (
-                        <p className="text-[13px] font-extrabold tabular-nums text-up">
+                        <p
+                          className={`text-[13px] font-extrabold tabular-nums ${
+                            card.savingRole === "included"
+                              ? "text-muted-foreground"
+                              : "text-up"
+                          }`}
+                        >
                           {card.saving}
                         </p>
                       )}
                     </div>
                   </div>
                 ) : (
-                  <div className="h-[108px] overflow-y-auto pr-0.5">
+                  <div className="h-[132px] overflow-y-auto pr-0.5">
                     <div className="flex flex-col gap-1.5">
                       {card.products.map((p) => {
                         const url = PRODUCT_LINKS[p.name] ?? "";
@@ -456,8 +451,13 @@ function AdviceCards({ liveCards, totalManwon }: AdviceCardsProps) {
                             }`}
                           >
                             <ExternalLink className="size-3 shrink-0 text-brand" />
-                            <span className="text-[12px] font-extrabold text-brand-dark">
-                              {p.name}
+                            <span className="flex flex-col">
+                              <span className="text-[12px] font-extrabold text-brand-dark">
+                                {p.name}
+                              </span>
+                              <span className="text-[10px] font-semibold leading-snug text-muted-foreground">
+                                {p.desc}
+                              </span>
                             </span>
                           </button>
                         );
