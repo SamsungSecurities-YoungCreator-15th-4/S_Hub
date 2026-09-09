@@ -14,7 +14,8 @@ import {
 import { type Portfolio, type PortfolioMetrics } from "@/lib/mockData";
 import { pctOfAumLabel } from "@/lib/formatKrw";
 import { formatSharpe } from "@/lib/sharpe";
-import { useDashboardStore } from "@/lib/store";
+import { RUN_STATUS } from "@/lib/runStatus";
+import { useDashboardStore, useRunStatus } from "@/lib/store";
 import HelpTooltip from "@/components/common/HelpTooltip";
 import AsOfNote from "@/components/common/AsOfNote";
 
@@ -72,10 +73,15 @@ export default function PortfolioSection() {
     analyzing,
   } = useDashboardStore();
   const [detailOpen, setDetailOpen] = useState(false);
+  const runStatus = useRunStatus();
 
   // 분석 전(=빈 상태)에는 볼 리포트가 없으므로 자세히도 내보내지 않는다.
   const isEmpty =
     portfolioSource === "fallback" && portfolioNote === undefined && !analyzing;
+  // draft 는 분석 승인 전(또는 거절·IPS 반영으로 되돌아온 뒤)이라 확정할 리포트가
+  // 아직 없다. 버튼을 숨기지 않고 비활성으로 두어 이유가 보이게 한다.
+  const detailBlockReason =
+    runStatus === RUN_STATUS.DRAFT ? "분석 후 확인할 수 있습니다." : "";
 
   const current = portfolios.find((pf) => pf.id === "current");
   const proposals = portfolios.filter((pf) => pf.id !== "current");
@@ -124,14 +130,19 @@ export default function PortfolioSection() {
         <div className="flex items-center gap-2">
           {portfolioSource !== "fallback" && <AsOfNote />}
           {!isEmpty && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setDetailOpen(true)}
-              className="h-7 text-[12px] font-bold"
-            >
-              자세히
-            </Button>
+            // disabled 버튼은 hover 이벤트를 받지 못해 title 이 뜨지 않는다 —
+            // 래퍼 span 이 대신 받아 왜 못 누르는지를 보여 준다.
+            <span title={detailBlockReason || "리포트 전체를 확인합니다."}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setDetailOpen(true)}
+                disabled={!!detailBlockReason}
+                className="h-7 text-[12px] font-bold"
+              >
+                자세히
+              </Button>
+            </span>
           )}
         </div>
       </div>

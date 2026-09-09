@@ -12,8 +12,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import PdfPreviewModal from "@/components/pdf/PdfPreviewModal";
-import { RUN_STATUS_EXPORT_ALLOWED } from "@/lib/runStatus";
-import { useDashboardStore, useRunStatus } from "@/lib/store";
+import {
+  selectExportAllowed,
+  selectExportBlockReason,
+  useDashboardStore,
+} from "@/lib/store";
 
 // SSR 비활성화 — new Date() hydration mismatch 방지
 const PbPdfTemplate = dynamic(() => import("@/components/pdf/PbPdfTemplate"), {
@@ -41,11 +44,11 @@ export default function PdfExportButton() {
   const [preview, setPreview] = useState<PdfType | null>(null);
   const [exporting, setExporting] = useState<PdfType | null>(null);
 
-  // 확정(locked)에서만 고객에게 나갈 수 있다 — 허용 여부의 출처는 lib/runStatus.ts.
-  const runStatus = useRunStatus();
-  const exportAllowed = RUN_STATUS_EXPORT_ALLOWED[runStatus];
-  // 원페이지라 툴팁도 한 줄로 둔다. 확정이 풀린 사유는 좌측 비중 입력에 표시된다.
-  const lockReason = exportAllowed ? "" : "PB 승인 후 추출";
+  // 추출 가능 = runStatus === locked AND 지금 보는 안 === 확정 스냅샷.
+  // 두 조건의 판정은 lib/store.ts 의 selectExportAllowed 하나에 모여 있다.
+  const exportAllowed = useDashboardStore(selectExportAllowed);
+  // 원페이지라 툴팁도 한 줄로 둔다.
+  const lockReason = useDashboardStore(selectExportBlockReason);
 
   // 파일명은 PDF 표지·헤더와 동일하게 현재 선택된 고객을 따른다.
   const customers = useDashboardStore((s) => s.customers);
@@ -59,7 +62,7 @@ export default function PdfExportButton() {
   async function handleExport(type: PdfType) {
     // 버튼을 막는 것과 별개로 실행 지점에서도 막는다 — 확정 전 파일이 나가는 것은
     // 화면 상태가 아니라 여기서 최종적으로 차단돼야 한다.
-    if (!RUN_STATUS_EXPORT_ALLOWED[useDashboardStore.getState().runStatus]) {
+    if (!selectExportAllowed(useDashboardStore.getState())) {
       return;
     }
     const container = type === "pb" ? pbRef.current : clientRef.current;

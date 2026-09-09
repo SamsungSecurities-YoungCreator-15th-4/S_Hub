@@ -26,14 +26,45 @@ import type {
   PortfolioTaxResponse,
   StressTaxData,
 } from "./api";
-import type { CurrentWeightsInput } from "./assetMapping";
+import { CALC_UNITS, type CurrentWeightsInput } from "./assetMapping";
 import {
   INITIAL_RUN_STATUS,
+  RUN_STATUS,
+  RUN_STATUS_EXPORT_ALLOWED,
   canTransition,
   type RunStatus,
 } from "./runStatus";
 
 export type { CurrentWeightsInput };
+
+/**
+ * 확정 스냅샷 — PB가 확정 승인한 시점에 화면이 보여 주던 안.
+ *
+ * 승인은 "그 안, 그 비중으로 계산한 리포트"에 대한 것이라, 확정 이후 보는 안이
+ * 바뀌면 확정본과 다른 내용이 PDF로 나간다. 그래서 지금 보는 안을 이 스냅샷과
+ * 대조해 다르면 추출을 잠근다(runStatus 는 locked 그대로 둔다 — 확정한 사실
+ * 자체는 남아 있고, 확정한 안으로 돌아오면 재승인 없이 다시 열린다).
+ */
+export interface LockedSnapshot {
+  /** 확정 당시 보던 안의 키. "a" | "b" | "proposed". */
+  planKey: string;
+  /** 그 안의 비중(%). SNAPSHOT_KEYS 순서로 고정한 배열이라 그대로 비교할 수 있다. */
+  weights: number[];
+  /** 확정 당시의 현재 보유 비중(%). 분석 입력이 바뀌어도 확정본이 그대로 나가는 것을 막는다. */
+  currentWeights: number[];
+}
+
+/** 비중 비교의 축. 순서를 고정해야 배열 비교가 성립한다. */
+const SNAPSHOT_KEYS: string[] = [...CALC_UNITS.map((u) => u.id), "cash"];
+
+/** 미입력을 0으로 채워 고정 길이 배열로 만든다. 소수 2자리에서 끊어 부동소수 오차를 없앤다. */
+function normalizeWeights(w: Record<string, number | undefined>): number[] {
+  return SNAPSHOT_KEYS.map((k) => Math.round((w[k] ?? 0) * 100) / 100);
+}
+
+function sameWeights(a: number[], b: number[]): boolean {
+  return a.length === b.length && a.every((v, i) => v === b[i]);
+}
 
 export interface IpsState {
   returnPct: number;
@@ -180,6 +211,13 @@ export interface DashboardState {
   setRunStatus: (next: RunStatus, reason?: string) => void;
   /** 초기 상태(draft)로 되돌린다. 재실행·상담 전환 시 사용. */
   resetRunStatus: () => void;
+  /** 확정 승인 시점의 안. 승인 전·초기화 후에는 null. */
+  lockedSnapshot: LockedSnapshot | null;
+  /**
+   * 확정 승인 — locked 전이와 스냅샷 기록을 한 번에 한다.
+   * 전이가 거부되면(전이표에 없는 경로) 스냅샷도 남기지 않는다.
+   */
+  lockReport: () => void;
 
   // ── 상단바 실시간 시장 지표 ──
   // MacroTicker 가 /api/macro-indicators 로 받은 실데이터를 여기에 올려, PDF 등
@@ -213,20 +251,22 @@ export interface DashboardState {
 }
 
 /**
- * 비중이 바뀌면 직전 승인은 무효다.
+ * 지금 화면이 보여 주는 안 — 확정 스냅샷과 같은 형태로 뽑는다.
  *
- * 승인은 "그때 그 비중으로 계산한 리포트"에 대한 것이라, 입력이 바뀌면 확정을
- * 그대로 둘 수 없다 — 승인받지 않은 내용이 확정본으로 나간다. 되돌리는 방향이
- * reviewed·locked → draft 라 전이표에 없는 전이이므로, 전이가 아니라 초기화로 처리한다.
- * 이미 draft 면 바꿀 것이 없어 사유도 남기지 않는다.
+ * 안의 키는 두 상태에 나뉘어 있다. 제안 조정 탭이면 weightsTab 이, 그렇지 않으면
+ * selectedPortfolioId("a"|"b")가 정한다(components/portfolio/PortfolioSection.tsx
+ * 의 세그먼트와 같은 규칙이다).
  */
-function unlockOnWeightChange(
-  s: DashboardState,
-): Partial<DashboardState> {
-  if (s.runStatus === INITIAL_RUN_STATUS) return {};
+function viewedPlan(s: DashboardState): LockedSnapshot {
+  const isProposedEdit = s.weightsTab === "proposed";
+  const planKey = isProposedEdit ? "proposed" : s.selectedPortfolioId;
+  const weights = isProposedEdit
+    ? s.proposedWeightsInput
+    : (s.portfolios.find((pf) => pf.id === planKey)?.weights ?? {});
   return {
-    runStatus: INITIAL_RUN_STATUS,
-    runStatusReason: "비중 변경 · 재분석 필요",
+    planKey,
+    weights: normalizeWeights(weights),
+    currentWeights: normalizeWeights(s.currentWeightsInput),
   };
 }
 
@@ -253,7 +293,6 @@ export const useDashboardStore = create<DashboardState>((set) => ({
     set((s) => ({
       currentWeightsInput: { ...s.currentWeightsInput, ...patch },
       analyzeRejected: false,
-      ...unlockOnWeightChange(s),
     })),
   analyzeRejected: false,
   setAnalyzeRejected: (v) => set({ analyzeRejected: v }),
@@ -264,7 +303,6 @@ export const useDashboardStore = create<DashboardState>((set) => ({
     set((s) => ({
       proposedWeightsInput: { ...s.proposedWeightsInput, ...patch },
       analyzeRejected: false,
-      ...unlockOnWeightChange(s),
     })),
 
   // 초기 포트폴리오는 mock(데모) — 출처를 fallback 으로 둬 배지로 명시한다.
@@ -313,10 +351,30 @@ export const useDashboardStore = create<DashboardState>((set) => ({
       // 실패 폐쇄: 규칙에 없는 전이는 조용히 무시하고 현재 상태를 유지한다.
       // 잘못된 전이로 확정(locked)이나 차단 해제가 일어나는 것을 막는 것이 목적이다.
       if (!canTransition(s.runStatus, next)) return s;
-      return { runStatus: next, runStatusReason: reason ?? "" };
+      // 확정에서 벗어나면 스냅샷도 함께 버린다 — 남겨 두면 나중에 locked 로
+      // 돌아왔을 때 승인한 적 없는 안이 확정본으로 취급된다.
+      return {
+        runStatus: next,
+        runStatusReason: reason ?? "",
+        lockedSnapshot: next === RUN_STATUS.LOCKED ? s.lockedSnapshot : null,
+      };
     }),
   resetRunStatus: () =>
-    set({ runStatus: INITIAL_RUN_STATUS, runStatusReason: "" }),
+    set({
+      runStatus: INITIAL_RUN_STATUS,
+      runStatusReason: "",
+      lockedSnapshot: null,
+    }),
+  lockedSnapshot: null,
+  lockReport: () =>
+    set((s) => {
+      if (!canTransition(s.runStatus, RUN_STATUS.LOCKED)) return s;
+      return {
+        runStatus: RUN_STATUS.LOCKED,
+        runStatusReason: "",
+        lockedSnapshot: viewedPlan(s),
+      };
+    }),
 
   macroIndicators: MACRO_INDICATORS,
   setMacroIndicators: (rows) => set({ macroIndicators: rows }),
@@ -371,6 +429,7 @@ export const useDashboardStore = create<DashboardState>((set) => ({
         // 리포트가 곧바로 추출 가능해진다.
         runStatus: INITIAL_RUN_STATUS,
         runStatusReason: "",
+        lockedSnapshot: null,
         // 고객 전환 시 이전 고객의 상담 내역·상담 ID·STT 상태는 신규/기존 구분 없이 항상 초기화한다.
         // (이전 고객의 transcript·consultationId가 새 고객 화면에 노출되거나, 새 고객 clientId와
         //  이전 consultationId 조합으로 스냅샷이 잘못 저장되는 것을 방지)
@@ -433,3 +492,31 @@ export const selectRunStatusReason = (s: DashboardState): string =>
 /** 컴포넌트용 구독 훅 — `const status = useRunStatus();` */
 export const useRunStatus = (): RunStatus =>
   useDashboardStore(selectRunStatus);
+
+/**
+ * 고객 제공(PDF 추출) 허용 여부.
+ *
+ *   추출 가능 = runStatus === locked  AND  지금 보는 안 === 확정 스냅샷
+ *
+ * 앞 절의 출처는 lib/runStatus.ts 의 RUN_STATUS_EXPORT_ALLOWED 이고, 뒤 절은
+ * 확정 승인 때 기록한 스냅샷과의 대조다. 탭을 바꾸거나 비중을 손대면 뒤 절이
+ * 깨져 잠기고, 확정한 안으로 돌아오면 재승인 없이 다시 열린다.
+ */
+export const selectExportAllowed = (s: DashboardState): boolean => {
+  if (!RUN_STATUS_EXPORT_ALLOWED[s.runStatus]) return false;
+  const snap = s.lockedSnapshot;
+  if (!snap) return false;
+  const now = viewedPlan(s);
+  return (
+    now.planKey === snap.planKey &&
+    sameWeights(now.weights, snap.weights) &&
+    sameWeights(now.currentWeights, snap.currentWeights)
+  );
+};
+
+/** 추출이 막힌 이유. 허용 상태면 빈 문자열. */
+export const selectExportBlockReason = (s: DashboardState): string => {
+  if (selectExportAllowed(s)) return "";
+  if (!RUN_STATUS_EXPORT_ALLOWED[s.runStatus]) return "PB 승인 후 추출";
+  return "확정한 안과 달라 다시 잠겼습니다";
+};
