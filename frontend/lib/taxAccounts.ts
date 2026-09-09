@@ -240,6 +240,9 @@ export function isaAccount(input: TaxAccountInput): AccountState {
     a.isaAccrualYearsCap,
   );
   const accrued = a.isaAnnualLimitManwon * (1 + elapsed);
+  // 두 캡은 같은 것의 다른 표현이다 — 경과연수가 4에서 멈추므로 accrued 는 최대
+  // 2,000 × 5 = 10,000 이라 총한도 캡이 실제로 선택되는 경우는 없다. 상수 중 하나가
+  // 바뀌었을 때 조용히 어긋나지 않도록 방어로 남긴다.
   const headroom = Math.max(
     Math.min(accrued - used, a.isaTotalLimitManwon - used),
     0,
@@ -367,4 +370,38 @@ export function allocationPlan(
     pension,
     isa,
   };
+}
+
+/**
+ * 목표 시점의 필요액을 지키면서 연금에 넣을 수 있는 최대 납입액(만원).
+ *
+ * 닫힌 식으로 풀지 않고 allocationPlan 을 그대로 호출해 탐색한다. 유동액 규칙이
+ * 한 곳에만 있어야 하기 때문이다 — 상한을 따로 유도하면 ISA 의무보유가 목표 시점
+ * 뒤에 풀리는 고객에서 두 계산이 갈린다. 그때 "연금을 N만원으로 낮추면 맞춰집니다"가
+ * 맞출 수 없는 수치가 되고, PB 가 그대로 고객에게 말하게 된다.
+ *
+ * 어떤 배분으로도 필요액을 못 채우면 null 이다. 연금을 0으로 해도 모자라는 경우가
+ * 실제로 있다 — 남는 돈이 목표 시점에 안 풀리는 ISA 로 흘러갈 때가 그렇다.
+ */
+export function maxPensionKeepingNeed(
+  input: TaxAccountInput,
+  annualContributionManwon: number,
+  needManwon: number,
+  targetYears: number,
+  stepManwon = 10,
+): number | null {
+  const budget = Math.max(annualContributionManwon, 0);
+  const ceiling = Math.min(pensionAccount(input).headroomManwon, budget);
+  const step = Math.max(stepManwon, 1);
+
+  const meetsNeed = (p: number) =>
+    allocationPlan(input, budget, p, targetYears).liquidAtTargetManwon + 1e-9 >= needManwon;
+
+  let best: number | null = null;
+  for (let p = 0; p <= ceiling + 1e-9; p += step) {
+    if (meetsNeed(p)) best = p;
+  }
+  // 한도가 step 의 배수가 아니면 끝점이 빠진다. 끝점도 확인한다.
+  if (ceiling % step !== 0 && meetsNeed(ceiling)) best = ceiling;
+  return best;
 }

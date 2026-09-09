@@ -25,6 +25,16 @@ interface Props {
   /** 단기 필요자금(만원)과 시점(년) — IPS Unique */
   needManwon: number;
   needYears: number;
+  /**
+   * 목표 시점 필요액을 지키면서 연금에 넣을 수 있는 최대 납입액(만원).
+   * 유동액과 같은 규칙으로 구해야 해서 lib/taxAccounts.ts 가 계산하고 여기는 받기만
+   * 한다. 어떤 배분으로도 못 맞추면 null 이다.
+   */
+  maxPensionKeepingNeed: number | null;
+  /** IPS 목표수익률(%) — 화면 문구가 IPS 조율기 값을 따라가야 한다. */
+  targetReturnPct: number;
+  /** IPS 투자기간(년) */
+  horizonYears: number;
 }
 
 /**
@@ -38,22 +48,19 @@ interface Props {
  * 평가손익에 좌우되는 값이라 "3년 뒤 확보된다"고 단정할 수 없기 때문이다.
  * 이 고객은 IPS 상 국내 반도체주 비중이 커서 특히 그렇다.
  */
-export default function TaxAllocation({
+export default function ContributionSplit({
   plan,
   budgetManwon,
   pensionRequestManwon,
   onPensionRequestChange,
   needManwon,
   needYears,
+  maxPensionKeepingNeed,
+  targetReturnPct,
+  horizonYears,
 }: Props) {
   const sliderMax = Math.min(plan.pension.headroomManwon, budgetManwon);
   const shortfall = Math.max(needManwon - plan.liquidAtTargetManwon, 0);
-
-  // 필요액을 지키면서 연금에 넣을 수 있는 최대치. (budget − pension) × years ≥ need
-  const maxPensionKeepingNeed = Math.max(
-    Math.floor((budgetManwon - needManwon / Math.max(needYears, 1)) / 10) * 10,
-    0,
-  );
 
   return (
     <div className="rounded-xl border p-3.5">
@@ -155,13 +162,25 @@ export default function TaxAllocation({
           shortfall > 0 ? "bg-[#FEECEE]" : "bg-brand/5"
         }`}
       >
-        {shortfall > 0 ? (
+        {shortfall > 0 && maxPensionKeepingNeed == null ? (
+          // 연금을 0으로 해도 못 맞추는 경우. 남는 돈이 목표 시점에 안 풀리는 ISA 로
+          // 흘러갈 때 생긴다. 이때 "N만원으로 낮추면 된다"고 말하면 거짓이 된다.
+          <>
+            <b className="text-up">
+              배분을 어떻게 바꿔도 {needYears}년 뒤 {fmt(needManwon)}만원을 만들 수
+              없습니다.
+            </b>{" "}
+            연금 납입을 0으로 해도 {fmt(shortfall)}만원 모자랍니다 — ISA 의무보유가{" "}
+            {plan.isa.lockupYears}년이라 그쪽으로 넣은 돈도 목표 시점에 풀리지 않기
+            때문입니다. 납입여력을 늘리거나 목표 시점을 미루는 쪽을 함께 봐야 합니다.
+          </>
+        ) : shortfall > 0 ? (
           <>
             <b className="text-up">전세 자금이 {fmt(shortfall)}만원 모자랍니다.</b>{" "}
-            연금 납입을 <b>{fmt(maxPensionKeepingNeed)}만원</b>으로 낮추면 {needYears}
+            연금 납입을 <b>{fmt(maxPensionKeepingNeed!)}만원</b>으로 낮추면 {needYears}
             년 뒤 {fmt(needManwon)}만원이 맞춰집니다. 세액공제는{" "}
             {fmtSaving(plan.pensionSavingManwon)}만원에서{" "}
-            {fmtSaving(maxPensionKeepingNeed * plan.pensionRate)}만원으로 줄어듭니다 —
+            {fmtSaving(maxPensionKeepingNeed! * plan.pensionRate)}만원으로 줄어듭니다 —
             한도를 꽉 채우는 것이 이 고객에게는 답이 아닙니다.
           </>
         ) : (
@@ -170,16 +189,21 @@ export default function TaxAllocation({
               {needYears}년 뒤 {fmt(needManwon)}만원을 확보합니다.
             </b>{" "}
             연금 한도까지는 {fmt(sliderMax - plan.pensionManwon)}만원 남았지만, 더
-            넣으면 전세 자금이 모자랍니다. 이 고객의 상한은{" "}
-            <b>{fmt(maxPensionKeepingNeed)}만원</b>입니다.
+            넣으면 전세 자금이 모자랍니다.
+            {maxPensionKeepingNeed != null && (
+              <>
+                {" "}이 고객의 상한은 <b>{fmt(maxPensionKeepingNeed)}만원</b>입니다.
+              </>
+            )}
           </>
         )}
       </div>
 
       <p className="mt-2 text-[10px] font-semibold leading-relaxed text-muted-foreground">
         {needYears}년 뒤 가용액은 <b>납입 원금만</b> 센 값입니다 — 운용수익을 더하지
-        않았습니다. 목표수익률 {"7%"}는 22년짜리 은퇴자산에 대한 것이고, {needYears}년
-        뒤 써야 할 돈을 그 수익률로 미리 세면 시장이 나빴을 때 계획이 무너집니다.
+        않았습니다. 목표수익률 {targetReturnPct}%는 {horizonYears}년짜리 은퇴자산에
+        대한 것이고, {needYears}년 뒤 써야 할 돈을 그 수익률로 미리 세면 시장이 나빴을
+        때 계획이 무너집니다.
         기존 보유자산도 매도 시점의 평가손익에 좌우되므로 확보된 것으로 보지
         않았습니다(IPS 상 국내 반도체주 비중이 큼). 연금계좌 배분은 연금저축 단독
         한도 600만원을 채운 뒤 나머지를 IRP 로 보낸 것입니다 — 연금저축에만 900만원을
@@ -187,7 +211,8 @@ export default function TaxAllocation({
         {(ASSUMPTIONS.isaAssumedIncomeYield * 100).toFixed(1)}%의 이자·배당을 낸다는{" "}
         <b>가정</b>이며 법정 수치가 아닙니다(국내 상장주식 매매차익은 원래 비과세라
         실제 실익은 이보다 작을 수 있습니다). 납입한도·세액공제율·의무보유기간·비과세
-        한도는 2026년 법정 기준입니다.
+        한도는 2026년 법정 기준입니다. 세액공제는 산출세액을 넘을 수 없는데 그 한도는
+        보지 않았습니다 — 낼 세금이 공제액보다 적은 고객에서는 절감액이 과대계산됩니다.
       </p>
     </div>
   );

@@ -7,11 +7,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AccountAllocation from "@/components/tax/AccountAllocation";
 import TaxWaterfall from "@/components/tax/TaxWaterfall";
 import AsOfNote from "@/components/common/AsOfNote";
-import TaxAllocation from "@/components/tax/TaxAllocation";
+// 계좌별 활용도 막대(AccountAllocation)와 이름이 헷갈리지 않도록 "납입 배분"으로 둔다.
+import ContributionSplit from "@/components/tax/ContributionSplit";
 import { TAX_ADVICE } from "@/lib/mockData";
 import { PRODUCT_LINKS } from "@/lib/productLinks";
 import { useDashboardStore } from "@/lib/store";
-import { allocationPlan, pensionAccount, type AllocationPlan } from "@/lib/taxAccounts";
+import {
+  allocationPlan,
+  maxPensionKeepingNeed as calcMaxPensionKeepingNeed,
+  pensionAccount,
+  type AllocationPlan,
+} from "@/lib/taxAccounts";
 import type { StressTaxStrategyCard } from "@/lib/api";
 
 // portfolio id → backend kind key
@@ -45,6 +51,7 @@ export default function TaxSection() {
     taxOptimizer,
     customers,
     selectedCustomerId,
+    ips,
     analyzing,
     isStressMode,
   } = useDashboardStore();
@@ -173,6 +180,18 @@ export default function TaxSection() {
           accountInput,
           customer.annualContributionManwon ?? 0,
           pensionRequest,
+          customer.nearTermNeedYears ?? 0,
+        )
+      : null;
+
+  // 유동액과 같은 규칙으로 구해야 해서 계산 모듈에 맡긴다. 화면에서 따로 유도하면
+  // ISA 의무보유가 목표 시점 뒤에 풀리는 고객에서 두 값이 갈린다.
+  const pensionCeilingForNeed =
+    accountInput && customer
+      ? calcMaxPensionKeepingNeed(
+          accountInput,
+          customer.annualContributionManwon ?? 0,
+          customer.nearTermNeedManwon,
           customer.nearTermNeedYears ?? 0,
         )
       : null;
@@ -325,13 +344,16 @@ export default function TaxSection() {
             customer &&
             (customer.annualContributionManwon ?? 0) > 0 &&
             (customer.nearTermNeedYears ?? 0) > 0 && (
-            <TaxAllocation
+            <ContributionSplit
               plan={plan}
               budgetManwon={customer.annualContributionManwon ?? 0}
               pensionRequestManwon={pensionRequest}
               onPensionRequestChange={setPensionRequest}
               needManwon={customer.nearTermNeedManwon}
               needYears={customer.nearTermNeedYears ?? 0}
+              maxPensionKeepingNeed={pensionCeilingForNeed}
+              targetReturnPct={ips.returnPct}
+              horizonYears={customer.horizonYears}
             />
           )}
           <AdviceCards liveCards={liveStrategyCards?.cards ?? null} plan={plan} />
@@ -364,6 +386,13 @@ function AdviceCards({ liveCards, plan }: AdviceCardsProps) {
   const [tabs, setTabs] = useState<Record<string, AdviceTab>>({});
 
   const liveByKey = new Map(liveCards?.map((card) => [card.key, card]) ?? []);
+
+  /*
+   * 카드마다 따로 폴백하면 백엔드가 일부만 내려줄 때 한 줄에 백엔드 숫자와 프론트
+   * 계산이 나란히 뜨는데 화면에는 구분이 없다. 어느 하나라도 오면 전부 백엔드 경로로
+   * 간다 — 출처가 섞이느니 비어 있는 편이 추적 가능하다.
+   */
+  const useLive = (liveCards?.length ?? 0) > 0;
 
   /**
    * 백엔드 응답이 없을 때(데모·연결 실패) 프론트 계산을 같은 모양으로 돌려준다.
@@ -399,7 +428,7 @@ function AdviceCards({ liveCards, plan }: AdviceCardsProps) {
   // 합산 계산을 공유하므로 연금저축 카드에만 금액을 표시한다.
   const cards = TAX_ADVICE.cards.map((copy) => {
     const live = liveByKey.get(copy.sourceKey);
-    const calc = live ? null : fromPlan(copy);
+    const calc = useLive ? null : fromPlan(copy);
 
     const applicable = live?.applicable ?? calc?.applicable ?? true;
     const reason = live?.reason ?? live?.ineligibleReason ?? calc?.reason ?? null;
@@ -422,19 +451,28 @@ function AdviceCards({ liveCards, plan }: AdviceCardsProps) {
           : `${copy.body} 현재 계산상 합산 잔여 활용 가능액은 ${capacityLabel}만원입니다.`;
     }
 
-    const savingManwon = live
-      ? live.applicable
-        ? live.combined_contribution_manwon
-        : 0
-      : (calc?.applicable ? calc.savingManwon : 0);
+    /*
+     * ⚠️ 두 값의 의미가 다르다.
+     *     live.combined_contribution_manwon — 백엔드가 계산한 **납입액**
+     *     calc.savingManwon                 — 프론트가 계산한 **절감액**
+     * 그런데 같은 "+N만원" 절세액 슬롯에 들어간다. 백엔드가 붙으면 900만원 납입이
+     * "+900만원 절세"로 보인다. live 쪽 표기는 이 PR 이전부터의 동작이라 여기서
+     * 바꾸지 않지만, 백엔드를 연동할 때 반드시 손봐야 하는 자리다.
+     * (아래 총액도 같은 문제를 갖는다.)
+     */
+    const liveContributionManwon = live?.applicable
+      ? live.combined_contribution_manwon
+      : 0;
+    const calcSavingManwon = calc?.applicable ? calc.savingManwon : 0;
+    const shownManwon = live ? liveContributionManwon : calcSavingManwon;
 
     const saving =
       copy.savingRole === "included"
-        ? savingManwon > 0
+        ? shownManwon > 0
           ? copy.saving
           : ""
-        : savingManwon > 0
-          ? `+${fmtSaving(savingManwon)}만원`
+        : shownManwon > 0
+          ? `+${fmtSaving(shownManwon)}만원`
           : "";
 
     return { ...copy, body, saving, applicable };
@@ -442,7 +480,8 @@ function AdviceCards({ liveCards, plan }: AdviceCardsProps) {
 
   // 기존 6종 combined_total에는 화면에서 제외한 전략도 들어 있다. 표시 총액은
   // ISA와 pension_credit을 각각 한 번만 합산해 3개 카드와 계산 범위를 맞춘다.
-  const massTotalManwon = liveCards?.length
+  // ⚠️ 위와 같은 의미 불일치 — live 쪽은 납입액 합, 프론트 쪽은 절감액 합이다.
+  const massTotalManwon = useLive
     ? MASS_TAX_SOURCE_KEYS.reduce(
         (sum, key) =>
           sum + (liveByKey.get(key)?.combined_contribution_manwon ?? 0),
