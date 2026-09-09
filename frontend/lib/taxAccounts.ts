@@ -269,6 +269,8 @@ export interface AllocationPlan {
   pensionManwon: number;
   /** 그중 연금저축 몫(만원). 단독 한도 600만원에 걸린다. */
   pensionSavingsManwon: number;
+  /** 연금저축 단독 한도의 잔여분(만원). 합산 한도와 다르므로 카드가 따로 표기해야 한다. */
+  pensionSavingsRoomManwon: number;
   /** 그중 IRP 몫(만원). 연금저축 단독 한도를 넘는 금액이 여기로 간다. */
   irpManwon: number;
   /** ISA 납입액(만원) */
@@ -357,6 +359,7 @@ export function allocationPlan(
   return {
     pensionManwon: toPension,
     pensionSavingsManwon: toPensionSavings,
+    pensionSavingsRoomManwon: savingsRoom,
     irpManwon: toIrp,
     isaManwon: toIsa,
     generalManwon: toGeneral,
