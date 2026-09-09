@@ -9,7 +9,6 @@ import {
   type Customer,
   type MacroIndicator,
   type Portfolio,
-  CONSULT_LOG,
   CUSTOMERS,
   IPS_DEFAULT,
   MACRO_INDICATORS,
@@ -37,32 +36,24 @@ import {
 export type { CurrentWeightsInput };
 
 /**
- * 확정 스냅샷 — PB가 확정 승인한 시점에 화면이 보여 주던 안.
+ * 확정 스냅샷 — PB가 확정 승인한 시점에 화면이 보여 주던 안을 한 줄로 적은 것.
  *
  * 승인은 "그 안, 그 비중으로 계산한 리포트"에 대한 것이라, 확정 이후 보는 안이
  * 바뀌면 확정본과 다른 내용이 PDF로 나간다. 그래서 지금 보는 안을 이 스냅샷과
  * 대조해 다르면 추출을 잠근다(runStatus 는 locked 그대로 둔다 — 확정한 사실
  * 자체는 남아 있고, 확정한 안으로 돌아오면 재승인 없이 다시 열린다).
+ *
+ * 안의 키 · 그 안의 비중 · 확정 당시의 현재 보유 비중을 이어 붙인다. 세 조각을
+ * 따로 들고 필드마다 비교하는 대신 문자열 하나로 두면 대조가 === 하나로 끝난다.
  */
-export interface LockedSnapshot {
-  /** 확정 당시 보던 안의 키. "a" | "b" | "proposed". */
-  planKey: string;
-  /** 그 안의 비중(%). SNAPSHOT_KEYS 순서로 고정한 배열이라 그대로 비교할 수 있다. */
-  weights: number[];
-  /** 확정 당시의 현재 보유 비중(%). 분석 입력이 바뀌어도 확정본이 그대로 나가는 것을 막는다. */
-  currentWeights: number[];
-}
+type LockedSnapshot = string;
 
-/** 비중 비교의 축. 순서를 고정해야 배열 비교가 성립한다. */
+/** 비중 비교의 축. 순서를 고정해야 문자열 비교가 성립한다. */
 const SNAPSHOT_KEYS: string[] = [...CALC_UNITS.map((u) => u.id), "cash"];
 
-/** 미입력을 0으로 채워 고정 길이 배열로 만든다. 소수 2자리에서 끊어 부동소수 오차를 없앤다. */
-function normalizeWeights(w: Record<string, number | undefined>): number[] {
-  return SNAPSHOT_KEYS.map((k) => Math.round((w[k] ?? 0) * 100) / 100);
-}
-
-function sameWeights(a: number[], b: number[]): boolean {
-  return a.length === b.length && a.every((v, i) => v === b[i]);
+/** 미입력을 0으로 채워 고정 길이로 적는다. 소수 2자리에서 끊어 부동소수 오차를 없앤다. */
+function normalizeWeights(w: Record<string, number | undefined>): string {
+  return SNAPSHOT_KEYS.map((k) => Math.round((w[k] ?? 0) * 100) / 100).join(",");
 }
 
 export interface IpsState {
@@ -139,12 +130,11 @@ export interface DashboardState {
    * 제안 조정은 분석 결과가 나온 뒤에만 만질 수 있어(isTrusted 게이트) 다르다.
    */
   proposedWeightsDirty: boolean;
-  setProposedWeightsDirty: (v: boolean) => void;
 
   // ── STT/상담 연동 상태 ──
-  /** 화면에 표시하는 상담 전사. 초기값은 mock(CONSULT_LOG). */
+  /** 화면에 표시하는 상담 전사. 녹음·업로드 전에는 빈 배열이다. */
   transcript: ConsultMessage[];
-  /** 전사 데이터 출처(mock 초기 표시 = fallback). */
+  /** 전사 데이터 출처(상담 입력 전 = empty, 시연 전사 = fallback). */
   transcriptSource: DataSource;
   /** STT 로 확보한 실 consultation_id(RAG·tax 재사용). 없으면 빈 문자열. */
   consultationId: string;
@@ -271,11 +261,11 @@ function viewedPlan(s: DashboardState): LockedSnapshot {
     planKey === "proposed"
       ? s.proposedWeightsInput
       : (s.portfolios.find((pf) => pf.id === planKey)?.weights ?? {});
-  return {
+  return [
     planKey,
-    weights: normalizeWeights(weights),
-    currentWeights: normalizeWeights(s.currentWeightsInput),
-  };
+    normalizeWeights(weights),
+    normalizeWeights(s.currentWeightsInput),
+  ].join("|");
 }
 
 /**
@@ -346,7 +336,6 @@ export const useDashboardStore = create<DashboardState>((set) => ({
   analyzeRejected: false,
   setAnalyzeRejected: (v) => set({ analyzeRejected: v }),
   proposedWeightsDirty: false,
-  setProposedWeightsDirty: (v) => set({ proposedWeightsDirty: v }),
   weightsTab: "current",
   setWeightsTab: (tab) => set({ weightsTab: tab }),
   proposedWeightsInput: {},
@@ -462,9 +451,9 @@ export const useDashboardStore = create<DashboardState>((set) => ({
   insightResult: null,
   setInsightResult: (result) => set({ insightResult: result }),
 
-  // 초기 상담 전사는 mock(데모) — 출처를 fallback 으로 둬 배지로 명시한다.
-  transcript: CONSULT_LOG,
-  transcriptSource: "fallback",
+  // 상담 입력 전에는 내역을 비워 둔다. 고정 전사는 녹음 종료 또는 데모 업로드 후에만 반영한다.
+  transcript: [],
+  transcriptSource: "empty",
   consultationId: "",
   sttStatus: "idle",
   sttNote: undefined,
@@ -617,10 +606,6 @@ export const useDashboardStore = create<DashboardState>((set) => ({
 /** 현재 실행 상태. */
 export const selectRunStatus = (s: DashboardState): RunStatus => s.runStatus;
 
-/** blocked 사유. 차단 상태가 아니면 빈 문자열. */
-export const selectRunStatusReason = (s: DashboardState): string =>
-  s.runStatusReason;
-
 /**
  * 아직 분석 결과가 없는가 — 중앙 빈 화면·우측 인사이트·자세히 버튼이 함께 읽는다.
  *
@@ -649,12 +634,7 @@ export const selectExportAllowed = (s: DashboardState): boolean => {
   if (!RUN_STATUS_EXPORT_ALLOWED[s.runStatus]) return false;
   const snap = s.lockedSnapshot;
   if (!snap) return false;
-  const now = viewedPlan(s);
-  return (
-    now.planKey === snap.planKey &&
-    sameWeights(now.weights, snap.weights) &&
-    sameWeights(now.currentWeights, snap.currentWeights)
-  );
+  return viewedPlan(s) === snap;
 };
 
 /** 추출이 막힌 이유. 허용 상태면 빈 문자열. */

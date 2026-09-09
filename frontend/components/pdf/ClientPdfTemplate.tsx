@@ -1,16 +1,20 @@
 /**
  * 고객용 PDF 템플릿 — A4 세로(794×1123px) 고정, 5페이지.
- * 구조: 표지 → 시장&IPS → 포트폴리오 비교&지표 → 절세&계좌 → 분산투자&상관관계
+ * 구조: 표지 → 시장&IPS → 포트폴리오 비교&지표 → 절세&계좌 → 위험 점검
  */
 
+import {
+  STRESS_SCENARIOS,
+  formatKrwLoss,
+  runStress,
+} from "@/lib/stressScenarios";
+import { DISCLAIMERS, IPS_CONFLICTS } from "@/lib/mock/symphonyReport";
 import { useDashboardStore } from "@/lib/store";
+import { useViewedPortfolio } from "@/lib/viewedPortfolio";
 import { formatSharpe } from "@/lib/sharpe";
 import {
   buildPdfAllocation,
   buildPdfMacroCell,
-  buildPdfCorrHeatmap,
-  heatBg,
-  heatTextColor,
 } from "@/lib/pdfPortfolioData";
 import {
   buildPdfTaxEffect,
@@ -698,17 +702,16 @@ const METRIC_CARDS = [
 function PortfolioPage() {
   // 훅은 early return 앞에서 호출(react-hooks/rules-of-hooks).
   const storePortfolios = useDashboardStore((s) => s.portfolios);
-  const selectedPortfolioId = useDashboardStore((s) => s.selectedPortfolioId);
   const C = useSelectedCustomer();
   const portCurrent = storePortfolios.find((p) => p.id === "current");
-  // 대시보드에서 선택한 포트폴리오(A 또는 B). 선택 없으면 A 폴백.
-  const selectedPf =
-    storePortfolios.find((p) => p.id === selectedPortfolioId) ??
-    storePortfolios.find((p) => p.id === "a");
+  /*
+    고객 문서에는 확정 대상인 안 하나만 싣는다. 조정했으면 조정안이다 —
+    상담에서 함께 손본 비중과 다른 문서를 건네지 않기 위해서다.
+  */
+  const { viewed: selectedPf } = useViewedPortfolio();
   if (!portCurrent || !selectedPf) return null;
   const cur = portCurrent.metrics;
   const sel = selectedPf.metrics;
-  // 선택 포트폴리오의 자산 배분 칩 — pf.allocation(백엔드 실데이터) 우선, 폴백 포함.
   const assetLabelsSelected = buildPdfAllocation(selectedPf).map(
     (s) => `${s.label} ${Math.round(s.weight)}%`,
   );
@@ -1078,12 +1081,8 @@ function TaxPage() {
   const C = useSelectedCustomer();
   const taxOptimizerMap = useDashboardStore((s) => s.taxOptimizer);
   const selectedPortfolioId = useDashboardStore((s) => s.selectedPortfolioId);
-  const storePortfolios = useDashboardStore((s) => s.portfolios);
-  // 절세 계좌 배치 바는 절세 화면과 동일하게 '선택한 포트폴리오'의 자산배분을 따른다.
-  const selectedPf =
-    storePortfolios.find((p) => p.id === selectedPortfolioId) ??
-    storePortfolios.find((p) => p.id === "a") ??
-    storePortfolios[0];
+  // 절세 계좌 배치 바는 확정 대상인 안의 자산배분을 따른다(조정했으면 조정안).
+  const { viewed: selectedPf } = useViewedPortfolio();
   const selectedAllocSlices = selectedPf ? buildPdfAllocation(selectedPf) : [];
   const taxOptimizerEntry = extractTaxOptimizerEntry(
     taxOptimizerMap,
@@ -1712,62 +1711,30 @@ function TaxPage() {
   );
 }
 
-// ── Page 5: 분산투자 & 상관관계 ────────────────────────────────────
+// ── Page 5: 위험 점검 ────────────────────────────────────────────
+//
+// "자세히" 리포트에서 고객이 읽을 수 있는 것만 골라 싣는다.
+//   스트레스 시나리오 — 화면 카드와 같은 runStress 로 계산해 숫자가 어긋나지 않는다
+//   IPS 충돌 검사     — 무엇이 왜 걸리는지. 룰 ID·정책 파일명은 빼고 문장만 남긴다
+//   면책             — 고객에게 나가는 문서라 필수다
+//
+// VaR·CVaR·손실 기여도·검증 항목·재현성 해시는 싣지 않는다. 설명 없이는 읽히지
+// 않거나(VaR 99% 1일), 내부 품질 관리라 고객 문서에 들어갈 성격이 아니다.
+// PB 리포트에는 전부 들어간다.
 
-// 상관관계 히트맵은 이제 PDF 에만 남아 있다(대시보드 컴포넌트는 제거됨).
-// 색상 공식: rgba(0,100,255, 0.06 + v * 0.8) — 이 파일이 기준이다.
-const ASSET_CARDS = [
-  {
-    title: "저쿠폰 장기채",
-    corr: "주식과 상관계수: −0.3 ~ −0.5",
-    body: "금리가 내릴 때 가격이 크게 오르는 채권입니다. 주식 시장 하락 시 포트폴리오를 안정시키는 역할을 합니다.",
-  },
-  {
-    title: "해외 배당주",
-    corr: "국내주식과 상관계수: 0.4~0.6",
-    body: "미국 등 해외 고배당 주식은 국내 주식과 완전히 같이 움직이지 않아 분산 효과가 있습니다. 환율 상승 시 추가 이익도 기대할 수 있습니다.",
-  },
-  {
-    title: "분리과세 채권 ETF",
-    corr: "주식과 상관계수: 0.1~0.2",
-    body: "세금 면에서 유리하게 설계된 채권 ETF입니다. 주식과 거의 독립적으로 움직여 안정적인 수익을 제공하면서 세금도 줄여줍니다.",
-  },
-  {
-    title: "리츠 (부동산 ETF)",
-    corr: "주식과 상관계수: 0.5~0.7",
-    body: "부동산에 간접 투자하는 방법으로, 정기적인 배당 수익을 기대할 수 있습니다. 실물 부동산보다 유동성이 높아 필요 시 빠르게 현금화됩니다.",
-  },
-];
+function RiskCheckPage() {
+  const C = useSelectedCustomer();
+  // 스트레스는 비중만 있으면 계산되므로 조정안 비중을 그대로 쓴다.
+  const { viewed: selectedPf } = useViewedPortfolio();
+  if (!C || !selectedPf) return null;
 
-// 히트맵 레이아웃 — 자산 개수에 따라 셀 너비를 동적으로 계산(페이지 폭 안에 맞춤)
-const HEATMAP_AVAIL = 714; // 794 - 좌우 패딩 40*2
-const HEATMAP_LABEL_COL = 56;
-const HEATMAP_GAP = 2;
+  const totalKrw = (C.aumEokwon ?? 0) * 100_000_000;
+  const rows = STRESS_SCENARIOS.map((sc) => ({
+    label: sc.label,
+    shock: sc.shockSummary,
+    loss: runStress(selectedPf.weights, totalKrw, sc),
+  }));
 
-function DiversificationPage() {
-  const heatmap = useDashboardStore((s) => s.correlationHeatmap);
-  const selectedPortfolioId = useDashboardStore((s) => s.selectedPortfolioId);
-  const storePortfolios = useDashboardStore((s) => s.portfolios);
-  // 대시보드와 동일하게 '선택한 포트폴리오'의 비중>0 자산 기준으로 히트맵을 구성한다.
-  const selectedPf =
-    storePortfolios.find((p) => p.id === selectedPortfolioId) ??
-    storePortfolios.find((p) => p.id === "a") ??
-    storePortfolios[0];
-  const {
-    labels: corrLabels,
-    matrix: corrMatrix,
-    isFallback: corrIsFallback,
-  } = buildPdfCorrHeatmap(heatmap, selectedPf);
-  const heatCellW = Math.max(
-    40,
-    Math.min(
-      96,
-      Math.floor((HEATMAP_AVAIL - HEATMAP_LABEL_COL) / corrLabels.length) -
-        HEATMAP_GAP,
-    ),
-  );
-  const heatTableW =
-    HEATMAP_LABEL_COL + corrLabels.length * (heatCellW + HEATMAP_GAP);
   return (
     <div
       data-pdf-page=""
@@ -1780,7 +1747,6 @@ function DiversificationPage() {
         overflow: "hidden",
       }}
     >
-      {/* 페이지 헤더 바 */}
       <div
         style={{
           background: `linear-gradient(90deg, ${BRAND_DARK} 0%, ${BRAND} 100%)`,
@@ -1792,7 +1758,7 @@ function DiversificationPage() {
       >
         <div>
           <div style={{ fontSize: 18, fontWeight: 800, color: "white" }}>
-            분산투자 효과 — 상관관계가 낮은 대체자산이란?
+            ④ 위험 점검
           </div>
           <div
             style={{
@@ -1801,226 +1767,173 @@ function DiversificationPage() {
               marginTop: 2,
             }}
           >
-            왜 여러 자산을 함께 보유해야 하는지 이해하기
+            과거 충격 국면에서의 손실 추정 · 확인이 필요한 항목
           </div>
         </div>
       </div>
 
-      <div style={{ padding: "24px 40px 80px", wordBreak: "keep-all" }}>
-        {/* 상관관계 설명 박스 */}
+      <div style={{ padding: "22px 40px 80px", wordBreak: "keep-all" }}>
+        <div style={{ display: "flex", alignItems: "center", marginBottom: 10 }}>
+          <SectionBar />
+          <div style={{ fontSize: 15, fontWeight: 800, color: TEXT }}>
+            이런 일이 다시 오면
+          </div>
+        </div>
+        <p style={{ margin: "0 0 12px", fontSize: 11, color: MUTED, lineHeight: 1.7 }}>
+          과거에 있었던 시장 충격을 참조해, {selectedPf.name} 구성이 같은 상황을
+          만났을 때 줄어들 수 있는 금액입니다. 정밀한 재현이 아니라 방향과 크기를
+          맞춘 대표 시나리오입니다.
+        </p>
+
+        <table
+          style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}
+        >
+          <colgroup>
+            <col style={{ width: 120 }} />
+            <col />
+            <col style={{ width: 200 }} />
+          </colgroup>
+          <thead>
+            <tr>
+              <th
+                style={{
+                  padding: "8px 10px",
+                  textAlign: "left",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: MUTED,
+                  background: BG_ALT,
+                  borderBottom: `1px solid ${BORDER}`,
+                }}
+              >
+                시나리오
+              </th>
+              <th
+                style={{
+                  padding: "8px 10px",
+                  textAlign: "left",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: MUTED,
+                  background: BG_ALT,
+                  borderBottom: `1px solid ${BORDER}`,
+                }}
+              >
+                충격 가정
+              </th>
+              <th
+                style={{
+                  padding: "8px 10px",
+                  textAlign: "right",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: MUTED,
+                  background: BG_ALT,
+                  borderBottom: `1px solid ${BORDER}`,
+                }}
+              >
+                줄어들 수 있는 금액
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.label}>
+                <td
+                  style={{
+                    padding: "10px",
+                    fontSize: 12,
+                    fontWeight: 800,
+                    color: TEXT,
+                    borderBottom: `1px solid ${BORDER}`,
+                  }}
+                >
+                  {r.label}
+                </td>
+                <td
+                  style={{
+                    padding: "10px",
+                    fontSize: 10.5,
+                    color: MUTED,
+                    borderBottom: `1px solid ${BORDER}`,
+                  }}
+                >
+                  {r.shock}
+                </td>
+                <td
+                  style={{
+                    padding: "10px",
+                    textAlign: "right",
+                    borderBottom: `1px solid ${BORDER}`,
+                  }}
+                >
+                  <div style={{ fontSize: 13, fontWeight: 900, color: BRAND }}>
+                    &minus;{formatKrwLoss(r.loss.lossKrw)}
+                  </div>
+                  <div style={{ fontSize: 10, color: MUTED, marginTop: 2 }}>
+                    &minus;{formatKrwLoss(r.loss.lossKrwLow)} ~ &minus;
+                    {formatKrwLoss(r.loss.lossKrwHigh)}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
         <div
           style={{
-            background: BG_ALT,
-            border: `1px solid ${BORDER}`,
-            borderRadius: 10,
-            padding: "14px 18px",
-            marginBottom: 22,
+            display: "flex",
+            alignItems: "center",
+            margin: "26px 0 10px",
           }}
-        >
-          <div
-            style={{
-              fontSize: 13,
-              fontWeight: 800,
-              color: BRAND,
-              marginBottom: 6,
-            }}
-          >
-            상관관계(Correlation)란?
-          </div>
-          <p style={{ fontSize: 12, color: TEXT, lineHeight: 1.7, margin: 0 }}>
-            두 자산이 함께 움직이는 정도를 나타냅니다. −1에 가까울수록 반대로
-            움직이고, +1에 가까울수록 같이 움직입니다. 주식과{" "}
-            <strong>상관관계가 낮거나 음(−)인 자산을 함께 보유하면</strong>,
-            주식이 하락할 때 손실을 줄여주는 효과가 있습니다.
-          </p>
-        </div>
-
-        {/* 상관관계 매트릭스 — 백엔드 correlation_heatmap 응답 기준 */}
-        <div style={{ marginBottom: 40 }}>
-          <div
-            style={{
-              fontSize: 12,
-              fontWeight: 800,
-              color: TEXT,
-              marginBottom: 10,
-            }}
-          >
-            자산별 상관관계 히트맵
-          </div>
-
-          {/* 히트맵 테이블 — 선택 포트폴리오의 비중>0 자산 기준(대시보드 동일) */}
-          <table style={{ borderCollapse: "separate", borderSpacing: HEATMAP_GAP }}>
-            <thead>
-              <tr>
-                <th style={{ width: HEATMAP_LABEL_COL, padding: 0 }} />
-                {corrLabels.map((g, ci) => (
-                  <th
-                    key={`${g}-${ci}`}
-                    style={{
-                      width: heatCellW,
-                      paddingBottom: 4,
-                      fontSize: 10,
-                      fontWeight: 600,
-                      color: MUTED,
-                      textAlign: "center",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {g}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {corrMatrix.map((row, ri) => (
-                <tr key={ri}>
-                  <td
-                    style={{
-                      width: HEATMAP_LABEL_COL,
-                      fontSize: 10,
-                      fontWeight: 600,
-                      color: MUTED,
-                      paddingRight: 8,
-                      textAlign: "right",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {corrLabels[ri]}
-                  </td>
-                  {row.map((v, ci) => (
-                    <td
-                      key={ci}
-                      style={{
-                        width: heatCellW,
-                        height: 40,
-                        background: heatBg(v),
-                        textAlign: "center",
-                        fontSize: 11,
-                        fontWeight: 700,
-                        color: heatTextColor(v),
-                        borderRadius: 3,
-                      }}
-                    >
-                      {v.toFixed(2)}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          {corrIsFallback && (
-            <div
-              style={{
-                marginTop: 6,
-                fontSize: 9,
-                color: MUTED,
-                fontStyle: "italic",
-              }}
-            >
-              ※ 분석 전 대표 참고값(국내 금융시장 학술 추정치)입니다. 분석 후
-              실제 포트폴리오 기반 값으로 업데이트됩니다.
-            </div>
-          )}
-
-          {/* 범례 — 그라디언트 바 */}
-          <div
-            style={{
-              marginTop: 12,
-              width: heatTableW,
-              paddingLeft: HEATMAP_LABEL_COL + 8,
-            }}
-          >
-            <div
-              style={{
-                height: 12,
-                borderRadius: 6,
-                background:
-                  "linear-gradient(to right, rgba(0,100,255,0.06), rgba(0,100,255,0.26), rgba(0,100,255,0.46), rgba(0,100,255,0.66), rgba(0,100,255,0.86))",
-                marginBottom: 4,
-              }}
-            />
-            {/* 눈금 라벨 */}
-            <div style={{ display: "flex", justifyContent: "space-between" }}>
-              {[
-                { v: 0.0, label: "0.0\n매우 낮음" },
-                { v: 0.25, label: "0.25\n낮음" },
-                { v: 0.5, label: "0.50\n중간" },
-                { v: 0.75, label: "0.75\n높음" },
-                { v: 1.0, label: "1.0\n매우 높음" },
-              ].map(({ v, label }) => (
-                <div key={v} style={{ textAlign: "center" }}>
-                  {label.split("\n").map((line, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        fontSize: 9,
-                        color: i === 0 ? TEXT : MUTED,
-                        fontWeight: i === 0 ? 700 : 500,
-                        lineHeight: 1.4,
-                      }}
-                    >
-                      {line}
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* 대체자산 4종 카드 */}
-        <div
-          style={{ display: "flex", alignItems: "center", marginBottom: 28 }}
         >
           <SectionBar />
-          <div style={{ fontSize: 14, fontWeight: 800, color: TEXT }}>
-            분산 효과가 있는 대체자산 4종
+          <div style={{ fontSize: 15, fontWeight: 800, color: TEXT }}>
+            확인이 필요한 항목
           </div>
         </div>
 
+        {IPS_CONFLICTS.map((c) => (
+          <div
+            key={c.rule}
+            style={{
+              border: `1px solid ${BORDER}`,
+              borderRadius: 8,
+              padding: "11px 13px",
+              marginBottom: 8,
+              background: BG_ALT,
+            }}
+          >
+            <div style={{ fontSize: 12, fontWeight: 800, color: TEXT, marginBottom: 3 }}>
+              {c.message}
+            </div>
+            <div style={{ fontSize: 11, color: TEXT }}>
+              {c.observed} · 기준 {c.threshold}
+            </div>
+          </div>
+        ))}
+        <p style={{ margin: "6px 0 0", fontSize: 10.5, color: MUTED, lineHeight: 1.7 }}>
+          위 항목은 투자를 막는 사유가 아니라, 담당 PB 와 함께 확인하고 조정할 지점입니다.
+        </p>
+
         <div
           style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: 12,
-            marginBottom: 24,
+            display: "flex",
+            alignItems: "center",
+            margin: "26px 0 10px",
           }}
         >
-          {ASSET_CARDS.map((c) => (
-            <div
-              key={c.title}
-              style={{
-                border: `1px solid ${BORDER}`,
-                borderRadius: 10,
-                padding: "14px 16px",
-                background: "white",
-              }}
-            >
-              <div
-                style={{
-                  fontSize: 13,
-                  fontWeight: 800,
-                  color: TEXT,
-                  marginBottom: 4,
-                }}
-              >
-                {c.title}
-              </div>
-
-              <p
-                style={{
-                  fontSize: 11,
-                  color: TEXT,
-                  lineHeight: 1.6,
-                  margin: 0,
-                }}
-              >
-                {c.body}
-              </p>
-            </div>
-          ))}
+          <SectionBar />
+          <div style={{ fontSize: 15, fontWeight: 800, color: TEXT }}>유의사항</div>
         </div>
+        {DISCLAIMERS.map((d) => (
+          <p
+            key={d.code}
+            style={{ margin: "0 0 6px", fontSize: 10.5, color: MUTED, lineHeight: 1.7 }}
+          >
+            · {d.text}
+          </p>
+        ))}
       </div>
 
       <PageFooter page={5} total={5} />
@@ -2037,7 +1950,7 @@ export default function ClientPdfTemplate() {
       <MarketIpsPage />
       <PortfolioPage />
       <TaxPage />
-      <DiversificationPage />
+      <RiskCheckPage />
     </>
   );
 }

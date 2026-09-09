@@ -9,6 +9,7 @@ import TaxWaterfall from "@/components/tax/TaxWaterfall";
 import HelpTooltip from "@/components/common/HelpTooltip";
 // 계좌별 활용도 막대(AccountAllocation)와 이름이 헷갈리지 않도록 "납입 배분"으로 둔다.
 import ContributionSplit from "@/components/tax/ContributionSplit";
+import { fmtSaving } from "@/lib/formatKrw";
 import { TAX_ADVICE } from "@/lib/mockData";
 import { PRODUCT_LINKS } from "@/lib/productLinks";
 import { useDashboardStore } from "@/lib/store";
@@ -416,21 +417,6 @@ export default function TaxSection() {
  */
 type AdviceTab = "납입안" | "상품추천";
 
-/**
- * 절감액 표기(만원). 만원 단위로 반올림하고 "약"을 붙인다.
- *
- * 소수 첫째 자리까지 적으면(148.5만원) 900만 × 16.5% 라는 유도가 화면에 남지만,
- * PB 가 고객에게 그렇게 말하지 않고 ISA 절감액은 애초에 이자·배당 3% **가정** 위에
- * 얹힌 값이라 그 자리에 의미가 없다. 없는 정밀도를 주장하지 않는다.
- * 유도는 가이드 툴팁이 "배분액 × 공제율"로 들고 있다.
- *
- * "약"을 빼면 반올림한 값이 정확한 값처럼 읽히므로 접두는 호출부에서 반드시 붙인다.
- */
-const fmtSaving = (n: number) => {
-  const r = Math.round(n);
-  // 5천원짜리를 "약 0만원"으로 적을 수는 없다.
-  return r === 0 && n > 0 ? "1만원 미만" : r.toLocaleString("ko-KR");
-};
 
 interface AdviceCardsProps {
   liveCards: StressTaxStrategyCard[] | null;

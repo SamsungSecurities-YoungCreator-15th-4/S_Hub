@@ -38,3 +38,19 @@ export function pctOfAumLabel(
   const krw = (Math.abs(pct) / 100) * aumEokwon * 100_000_000;
   return `${prefix}${formatKrwCompact(krw)}`;
 }
+
+/**
+ * 절세 절감액 표기(만원). 만원 단위로 반올림한다.
+ *
+ * 소수 첫째 자리까지 적으면(148.5만원) 900만 × 16.5% 라는 유도가 화면에 남지만,
+ * PB 가 고객에게 그렇게 말하지 않고 ISA 절감액은 애초에 이자·배당 3% **가정** 위에
+ * 얹힌 값이라 그 자리에 의미가 없다. 없는 정밀도를 주장하지 않는다.
+ * 유도는 가이드 툴팁이 "배분액 × 공제율"로 들고 있다.
+ *
+ * "약"을 빼면 반올림한 값이 정확한 값처럼 읽히므로 접두는 호출부에서 반드시 붙인다.
+ */
+export function fmtSaving(n: number): string {
+  const r = Math.round(n);
+  // 5천원짜리를 "약 0만원"으로 적을 수는 없다.
+  return r === 0 && n > 0 ? "1만원 미만" : r.toLocaleString("ko-KR");
+}
