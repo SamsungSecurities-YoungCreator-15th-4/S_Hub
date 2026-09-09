@@ -195,9 +195,10 @@ function AssetBar({
 }) {
   return (
     <div
-      style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 5 }}
+      // 11종으로 늘면서 한 열이 11줄이 된다. 줄 간격을 좁혀 페이지를 넘기지 않게 한다.
+      style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}
     >
-      <span style={{ width: 48, fontSize: 11, color: MUTED, flexShrink: 0 }}>
+      <span style={{ width: 60, fontSize: 10, color: MUTED, flexShrink: 0 }}>
         {label}
       </span>
       <div
@@ -783,7 +784,7 @@ function PortfolioPage() {
 
       <div style={{ padding: "28px 40px 80px", wordBreak: "keep-all" }}>
         <div
-          style={{ display: "flex", alignItems: "center", marginBottom: 28 }}
+          style={{ display: "flex", alignItems: "center", marginBottom: 16 }}
         >
           <SectionBar />
           <div style={{ fontSize: 14, fontWeight: 800, color: TEXT }}>
@@ -791,7 +792,7 @@ function PortfolioPage() {
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 12, marginBottom: 40 }}>
+        <div style={{ display: "flex", gap: 12, marginBottom: 22 }}>
           {cols.map(({ p, alloc, label, badge, badgeColor, selected }) => (
             <div
               key={p.id}
@@ -842,7 +843,7 @@ function PortfolioPage() {
         </div>
 
         <div
-          style={{ display: "flex", alignItems: "center", marginBottom: 28 }}
+          style={{ display: "flex", alignItems: "center", marginBottom: 16 }}
         >
           <SectionBar />
           <div style={{ fontSize: 14, fontWeight: 800, color: TEXT }}>
@@ -855,7 +856,7 @@ function PortfolioPage() {
             width: "100%",
             borderCollapse: "collapse",
             tableLayout: "fixed",
-            marginBottom: 40,
+            marginBottom: 22,
           }}
         >
           <colgroup>
