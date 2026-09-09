@@ -131,6 +131,8 @@ export default function Sidebar() {
     setRunStatus,
     resetRunStatus,
     setAnalyzeRejected,
+    analyzeRejected,
+    runStatusReason,
   } = useDashboardStore();
   const customer =
     customers.find((c) => c.id === selectedCustomerId) ?? customers[0];
@@ -853,6 +855,36 @@ export default function Sidebar() {
         </Card>
 
         <CurrentPortfolioInput />
+
+        {/*
+          분석하기가 왜 막혔는지·왜 실행되지 않았는지를 버튼 바로 위에 모은다.
+          비중 합계·거절·확정 해제는 성격이 달라 보여도 전부 "이 입력으로는 아직
+          분석 결과가 없다" 는 한 이야기라, 화면 곳곳에 흩어놓지 않는다.
+
+          IPS 반영 거절은 여기 넣지 않는다 — 그건 분석을 막지 않는다.
+          우측 IPS 반영하기 버튼 아래에 둔다.
+        */}
+        {(!isCurrentWeightsInputValid(currentWeightsInput) ||
+          analyzeRejected ||
+          runStatusReason) && (
+          <div className="-mb-1 flex flex-col gap-0.5 px-0.5">
+            {!isCurrentWeightsInputValid(currentWeightsInput) && (
+              <p className="text-[11px] font-semibold text-destructive">
+                합계는 100%여야 합니다
+              </p>
+            )}
+            {analyzeRejected && (
+              <p className="text-[11px] font-semibold text-destructive">
+                PB가 분석 승인을 거절했습니다
+              </p>
+            )}
+            {runStatusReason && (
+              <p className="text-[11px] font-semibold text-destructive">
+                {runStatusReason}
+              </p>
+            )}
+          </div>
+        )}
 
         <Button
           size="lg"

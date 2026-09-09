@@ -95,7 +95,7 @@ export default function RightPanel() {
 
       {/* 좌측 분석 게이트 거절 표기와 같은 문형으로 적는다. */}
       {reflectRejected && (
-        <p className="-mt-1 text-[11px] font-semibold text-down">
+        <p className="-mt-1 text-[11px] font-semibold text-destructive">
           PB가 IPS 반영을 거절했습니다
         </p>
       )}

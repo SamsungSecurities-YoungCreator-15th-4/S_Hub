@@ -73,8 +73,6 @@ export default function CurrentPortfolioInput() {
     (s) => s.setProposedWeightsInput,
   );
   const portfolioSource = useDashboardStore((s) => s.portfolioSource);
-  const runStatusReason = useDashboardStore((s) => s.runStatusReason);
-  const analyzeRejected = useDashboardStore((s) => s.analyzeRejected);
 
   // 탭 상태는 스토어에 둔다 — 중앙 제안 카드의 세그먼트가 같은 값을 보고 함께 움직인다.
   const tab = useDashboardStore((s) => s.weightsTab);
@@ -203,22 +201,6 @@ export default function CurrentPortfolioInput() {
           {total.toLocaleString()}%
         </span>
       </div>
-      {!isValid && (
-        <p className="mt-1 text-[11px] font-semibold text-destructive">
-          합계는 100%여야 합니다.
-        </p>
-      )}
-      {/* 게이트 거절 — 합계 경고와 같은 자리에 모은다. 둘 다 "지금 이 입력이
-          분석에 들어가지 않았다" 는 같은 이야기라, 버튼 아래로 흩어놓지 않는다. */}
-      {analyzeRejected && (
-        <p className="mt-1 text-[11px] font-semibold text-down">
-          PB가 분석 승인을 거절했습니다
-        </p>
-      )}
-      {/* 확정이 풀린 이유 — 왜 PDF가 다시 잠겼는지 여기서만 보인다. */}
-      {runStatusReason && (
-        <p className="mt-1 text-[11px] font-semibold text-down">{runStatusReason}</p>
-      )}
     </div>
   );
 }
