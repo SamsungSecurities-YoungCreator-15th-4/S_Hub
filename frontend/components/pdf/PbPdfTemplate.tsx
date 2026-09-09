@@ -268,8 +268,15 @@ function CoverPage() {
   const selectedPortfolioId = useDashboardStore((s) => s.selectedPortfolioId);
   const storePortfolios = useDashboardStore((s) => s.portfolios);
   const taxEffect = buildPdfTaxEffect(extractTaxOptimizerEntry(useDashboardStore((s) => s.taxOptimizer), selectedPortfolioId));
-  const selectedPortfolioName =
-    storePortfolios.find((p) => p.id === selectedPortfolioId)?.name ?? "안정 추구";
+  /*
+    표지의 "선택 포트폴리오"도 확정 대상을 따른다 — 조정하고 확정했는데 표지만
+    조정 전 제안 이름이면 본문 4열과 표지가 서로 다른 안을 가리킨다.
+  */
+  const { base: viewedBase, isAdjusted } = useViewedPortfolio();
+  const selectedPortfolioName = isAdjusted
+    ? `${viewedBase?.name ?? "안정 추구"} (조정)`
+    : (storePortfolios.find((p) => p.id === selectedPortfolioId)?.name ??
+      "안정 추구");
   return (
     <div
       data-pdf-page=""
@@ -1092,12 +1099,8 @@ function TaxPage() {
   const customer = useSelectedCustomer();
   const taxOptimizerMap = useDashboardStore((s) => s.taxOptimizer);
   const selectedPortfolioId = useDashboardStore((s) => s.selectedPortfolioId);
-  const storePortfolios = useDashboardStore((s) => s.portfolios);
-  // 절세 계좌 배치 바는 절세 화면과 동일하게 '선택한 포트폴리오'의 자산배분을 따른다.
-  const selectedPf =
-    storePortfolios.find((p) => p.id === selectedPortfolioId) ??
-    storePortfolios.find((p) => p.id === "a") ??
-    storePortfolios[0];
+  // 절세 계좌 배치 바는 절세 화면(AccountAllocation)과 같이 확정 대상 안을 따른다.
+  const { viewed: selectedPf } = useViewedPortfolio();
   const selectedAllocSlices = selectedPf ? buildPdfAllocation(selectedPf) : [];
   const taxOptimizerEntry = extractTaxOptimizerEntry(taxOptimizerMap, selectedPortfolioId);
   const taxEffect = buildPdfTaxEffect(taxOptimizerEntry);
