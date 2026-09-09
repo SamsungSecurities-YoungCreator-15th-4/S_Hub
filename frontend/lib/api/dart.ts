@@ -131,7 +131,15 @@ function mapResponse(res: DartInsightResponse): InsightData {
 export async function fetchDartInsight(
   corpName: string,
 ): Promise<ApiResult<InsightData>> {
-  if (IS_DEMO) return demo({ ...demoInsight(), question: corpName });
+  // 회사명 조회다 — 개별 종목 응답으로 직접 보낸다. 백엔드 없이 재무 수치를
+  // 만들어 내지 않는 것이 이 함수의 규약이라(위 주석), 포트폴리오 분석 답을
+  // 회사 조회 결과인 것처럼 돌려주지 않는다.
+  if (IS_DEMO) {
+    return demo({
+      ...demoInsight(corpName, "individual_security"),
+      question: corpName,
+    });
+  }
 
   const name = corpName.trim();
   if (!name) {

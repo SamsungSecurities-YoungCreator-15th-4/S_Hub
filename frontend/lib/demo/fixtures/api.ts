@@ -55,11 +55,27 @@ export function demoConsultation(): SttConsultationData {
 }
 
 /** RAG·DART 인사이트. question 은 호출부가 채운다. */
-export function demoInsight(): InsightData {
+/**
+ * 질문 성격에 맞는 응답을 고른다. 맞는 것이 없으면 기본(현재 포트폴리오 분석).
+ * `key` 를 주면 그 응답을 직접 고른다 — 호출부가 질문의 성격을 이미 아는 경우다.
+ *
+ * 질문을 무시하고 늘 같은 답을 내면 화면에서 RAG 가 질문을 읽는지 확인할 수 없다.
+ * 응답·인용은 전부 `mockData.INSIGHT` 에 있다 — 여기서 만들지 않는다.
+ */
+export function demoInsight(query?: string, key?: string): InsightData {
+  const q = (query ?? "").toLowerCase();
+  const hit = key
+    ? INSIGHT.scenarios.find((sc) => sc.key === key)
+    : q
+      ? INSIGHT.scenarios.find((sc) => sc.keywords.some((k) => q.includes(k)))
+      : undefined;
+
+  const answer = hit?.answer ?? INSIGHT.defaultAnswer;
+  const sources = hit?.sources ?? INSIGHT.sources;
   return {
-    answer: INSIGHT.defaultAnswer,
-    summary: INSIGHT.defaultAnswer.split("\n\n")[0] ?? INSIGHT.defaultAnswer,
-    citations: INSIGHT.sources.map((s) => ({ title: s.title, date: s.date })),
+    answer,
+    summary: answer.split("\n\n")[0] ?? answer,
+    citations: sources.map((s) => ({ title: s.title, date: s.date })),
   };
 }
 
