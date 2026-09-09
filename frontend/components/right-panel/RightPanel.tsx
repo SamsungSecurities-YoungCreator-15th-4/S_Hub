@@ -13,7 +13,8 @@ import {
 import InsightSection from "@/components/right-panel/InsightSection";
 import HelpTooltip from "@/components/common/HelpTooltip";
 import { useAutoCollapse } from "@/lib/useAutoCollapse";
-import { useDashboardStore } from "@/lib/store";
+import { useDashboardStore, useRunStatus } from "@/lib/store";
+import { RUN_STATUS, canTransition } from "@/lib/runStatus";
 
 /** 우측 패널: 시나리오 Test + AI 인사이트 — 여닫기 토글 포함 */
 export default function RightPanel() {
@@ -29,7 +30,9 @@ export default function RightPanel() {
     setIsOpen(false);
   }, [collapsePanelsSignal, setIsOpen]);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const { insightResult, ips, setIps } = useDashboardStore();
+  const { insightResult, ips, setIps, setRunStatus, resetRunStatus } =
+    useDashboardStore();
+  const runStatus = useRunStatus();
 
   const summary =
     insightResult?.source !== "empty" ? insightResult?.data?.summary : null;
@@ -44,6 +47,12 @@ export default function RightPanel() {
     const prev = (ips.unique ?? "").trim();
     setIps({ unique: prev ? `${prev}\n${summary}` : summary });
     setConfirmOpen(false);
+    // PB가 IPS 변경을 승인했으므로 reviewed 로 올린다.
+    // locked·blocked 에서는 reviewed 로 가는 전이가 전이표에 없다(lib/runStatus.ts:48).
+    // IPS 가 바뀌면 확정본 내용도 함께 바뀌므로, 확정을 유지한 채 두지 않고
+    // 초기화(draft)한 뒤 다시 검토 상태로 올린다 — 확정은 상세 화면에서 다시 받는다.
+    if (!canTransition(runStatus, RUN_STATUS.REVIEWED)) resetRunStatus();
+    setRunStatus(RUN_STATUS.REVIEWED);
   };
 
   if (!isOpen) {
