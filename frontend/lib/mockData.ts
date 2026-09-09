@@ -6,7 +6,13 @@
  *    이 파일을 API 응답으로 대체한다. 임의 수치를 실데이터처럼 쓰지 말 것.
  */
 
-import type { CalcUnitWeights } from "./assetMapping";
+import {
+  CALC_UNITS,
+  isCurrentWeightsInputValid,
+  sumCurrentWeightsInput,
+  type CalcUnitWeights,
+  type CurrentWeightsInput,
+} from "./assetMapping";
 import { withSharpe } from "./sharpe";
 
 // ── 헤더: 거시지표 ──────────────────────────────────────────────
@@ -77,6 +83,19 @@ export interface Customer {
    * 개설 시점이 정한다. 미지정이면 미개설=3년, 개설=0년으로 본다.
    */
   isaYearsUntilLiquid?: number;
+  /**
+   * 마지막 상담일(YYYY-MM-DD). 없으면 상담 이력이 없는 고객이다.
+   * `isNew` 와 같은 사실의 두 표현이라 함께 움직인다 — isNew 는 분기용,
+   * 이쪽은 화면 표기용이다.
+   */
+  lastConsultedAt?: string;
+  /**
+   * 상담 이력이 있는 고객이 화면에 열릴 때 복원할 IPS. 없으면 IPS_DEFAULT 를 쓴다.
+   * 신규 고객은 이 값을 두지 않는다 — 상담 전에 IPS 가 있을 수 없다.
+   */
+  ips?: typeof IPS_DEFAULT;
+  /** 상담 이력이 있는 고객의 현재 보유 비중(%). 합계 100. */
+  currentWeights?: CurrentWeightsInput;
   /** DB(client 테이블) UUID. 초기 mock 3명·미저장(데모) 고객은 없음. */
   clientId?: string;
   /** DB 저장 성공 여부. false = 데모(로컬에만 추가). undefined = mock 초기 고객. */
@@ -91,13 +110,102 @@ export interface Customer {
 
 export const CUSTOMERS: Customer[] = [
   {
-    // 시연 기준 고객. 33세 직장인 6년차 — 은퇴자산을 쌓으면서 3년 뒤 전세
-    // 보증금 인상분도 마련해야 하는, 절세계좌 lock-up 과 정면으로 부딪히는 사례다.
+    // 상담 이력이 있는 고객. 화면을 열면 지난 회차의 IPS·비중·확정 상태가 복원된다.
+    // 목록 첫 번째라 초기 선택 고객이기도 하다 — 처음 열었을 때 채워진 화면을 본다.
+    id: "cust-002",
+    name: "이사조",
+    grade: "일반",
+    pbCode: "PB-100483",
+    aumLabel: "운용자산 3억원",
+    aumEokwon: 3,
+    salaryManwon: 8000,
+    isaUsedManwon: 2000,
+    pensionUsedManwon: 900,
+    realizedLossManwon: 0,
+    marginalRatePct: 26.4,
+    age: 47,
+    horizonYears: 13,
+    nearTermNeedManwon: 0,
+    nearTermNeedYears: 0,
+    isaOpened: true,
+    lastConsultedAt: "2026-08-21",
+    ips: {
+      goal: "은퇴 후 현금흐름 확보",
+      assetLabel: "3억원",
+      returnPct: 5,
+      // 브리프의 "중립형"은 IpsState.risk 유니온(안정형·균형형·공격형)에 없는 값이라
+      // 같은 자리의 균형형으로 적는다. 유니온은 팀 데이터 계약이라 넓히지 않는다.
+      risk: "균형형" as "안정형" | "균형형" | "공격형",
+      timeYears: 13,
+      tax: "배당소득 원천징수",
+      liquidity: "낮음" as "낮음" | "중간" | "높음",
+      legal: "특이사항 없음",
+      unique: "배당 중심 선호 · ISA 한도 소진",
+    },
+    currentWeights: {
+      domesticEquity: 18,
+      overseasGrowthEquity: 14,
+      overseasDividendEquity: 16,
+      domesticBond: 22,
+      overseasBond: 10,
+      reits: 8,
+      gold: 6,
+      cash: 6,
+    },
+  },
+  {
+    // 상담 이력이 있는 고객. 위와 같은 성격, 값만 다르다.
+    id: "cust-003",
+    name: "박기업",
+    grade: "일반",
+    pbCode: "PB-100484",
+    aumLabel: "운용자산 5억원",
+    aumEokwon: 5,
+    salaryManwon: 6000,
+    isaUsedManwon: 2000,
+    pensionUsedManwon: 1800,
+    realizedLossManwon: 0,
+    marginalRatePct: 26.4,
+    age: 58,
+    horizonYears: 7,
+    nearTermNeedManwon: 0,
+    nearTermNeedYears: 0,
+    isaOpened: true,
+    lastConsultedAt: "2026-07-30",
+    ips: {
+      goal: "원금 보전 우선 · 정기 인출",
+      assetLabel: "5억원",
+      returnPct: 4,
+      // 브리프의 "안정추구형" → 유니온의 안정형. 위와 같은 이유다.
+      risk: "안정형" as "안정형" | "균형형" | "공격형",
+      timeYears: 7,
+      tax: "금융소득 종합과세 대상",
+      liquidity: "높음" as "낮음" | "중간" | "높음",
+      legal: "특이사항 없음",
+      unique: "3년 내 인출 계획 · 채권 비중 선호",
+    },
+    currentWeights: {
+      domesticEquity: 8,
+      overseasGrowthEquity: 6,
+      overseasDividendEquity: 10,
+      domesticBond: 30,
+      separateTaxBond: 12,
+      overseasBond: 12,
+      gold: 4,
+      cash: 18,
+    },
+  },
+  {
+    // 상담 전 고객. 좌·중·우가 전부 비어 있고 확정도 없다 — IPS·비중·분석 결과는
+    // 상담을 거쳐 사람이 채운다. isNew 가 그 분기를 담당한다(store.selectCustomer).
+    // 33세 직장인 6년차 — 은퇴자산을 쌓으면서 3년 뒤 전세 보증금 인상분도
+    // 마련해야 하는, 절세계좌 lock-up 과 정면으로 부딪히는 사례다.
     id: "cust-001",
     name: "김성삼",
     grade: "일반",
     pbCode: "PB-100482",
-    aumLabel: "운용자산 1억원",
+    // 분석 전이라 운용자산을 단정하지 않는다. 목록에는 이 자리에 상담 이력을 적는다.
+    aumLabel: "상담 이력 없음",
     aumEokwon: 1,
     salaryManwon: 5200, // 총급여 5,500만원 이하 → 연금 세액공제율 16.5%
     annualContributionManwon: 1500, // 연 납입여력
@@ -112,42 +220,42 @@ export const CUSTOMERS: Customer[] = [
     nearTermNeedYears: 3,
     isaOpened: true,
     isaYearsUntilLiquid: 2, // 작년 개설 — 2년 뒤 해제, 전세 시점(3년)보다 이르다
-  },
-  {
-    id: "cust-002",
-    name: "이사조",
-    grade: "VVIP",
-    pbCode: "PB-100483",
-    aumLabel: "운용자산 52억원",
-    aumEokwon: 52,
-    isaUsedManwon: 800, // ISA 여유 있음
-    pensionUsedManwon: 600,
-    realizedLossManwon: 3200,
-    marginalRatePct: 49.5,
-    age: 33,
-    horizonYears: 3, // 변경: 1년 → 3년
-    nearTermNeedManwon: 0, // 창업 대금(금액 미상) — 추후 입력
-    nearTermNeedYears: null,
-    isaOpened: true,
-  },
-  {
-    id: "cust-003",
-    name: "박기업",
-    grade: "VVIP",
-    pbCode: "PB-100484",
-    aumLabel: "운용자산 31억원",
-    aumEokwon: 31,
-    isaUsedManwon: 0, // ISA 미납입
-    pensionUsedManwon: 300,
-    realizedLossManwon: 0,
-    marginalRatePct: 38.5,
-    age: 62,
-    horizonYears: 10, // 초장기(10년 이상)
-    nearTermNeedManwon: 0, // 법인 운전자금은 별도 관리
-    nearTermNeedYears: null,
-    isaOpened: true,
+    isNew: true,
   },
 ];
+
+/**
+ * PB가 입력한 현재 보유 비중을 "현재" 포트폴리오의 weights 에 얹는다.
+ *
+ * 도넛(PortfolioSection 의 toCalcUnitAllocation)과 스트레스 손실
+ * (StressTestSection → runStress)이 같은 weights 를 읽으므로, 입력이 화면까지
+ * 그대로 도달한다. 스트레스 손실은 엔진 상수·수식으로 실제 계산되는 값이다
+ * (`lib/stressScenarios.ts` — SSOT 는 engine/engine/stress.py).
+ *
+ * 지표(기대수익률·변동성·MDD·소르티노)는 바꾸지 않는다. 임의 비중으로 다시
+ * 계산하려면 자산별 수익률 시계열이 있어야 하는데 프론트 경로에는 없다
+ * (`lib/sharpe.ts` 가 같은 이유로 샤프 외의 지표 계산을 두지 않았다).
+ * 없는 값을 지어내지 않고 픽스처 값을 유지하며, 출처는 DataSourceBadge 가
+ * "시연 고정 데이터"로 표시한다.
+ *
+ * 입력이 없거나 합계가 100%가 아니면 손대지 않는다 — 라이브 경로도
+ * `isCurrentWeightsInputValid` 로 같은 입력을 막는다.
+ */
+export function withCurrentWeights(
+  portfolios: Portfolio[],
+  input?: CurrentWeightsInput,
+): Portfolio[] {
+  if (!input || sumCurrentWeightsInput(input) === 0) return portfolios;
+  if (!isCurrentWeightsInputValid(input)) return portfolios;
+
+  const weights = Object.fromEntries(
+    CALC_UNITS.map((u) => [u.id, input[u.id] ?? 0]),
+  ) as CalcUnitWeights;
+
+  return portfolios.map((pf) =>
+    pf.id === "current" ? { ...pf, weights, allocation: undefined } : pf,
+  );
+}
 
 // ── 지난 상담 기록 목록 (더미) ─────────────────────────────────
 export interface PastConsultation {
@@ -417,7 +525,7 @@ export const BACKTEST_SERIES = [
 
 // ── 절세 최적화 시뮬레이터 ─────────────────────────────────────
 export const TAX_EFFECT = {
-  baseLabel: "기준 : 포트폴리오 A · 18억",
+  baseLabel: "기준 : 포트폴리오 A",
   annualSavingManwon: 1080,
   subNote:
     "일반과세 대비 · 세후 수익률 +0.6%p · 해외주식 양도세 22%·공제 250만 반영",
