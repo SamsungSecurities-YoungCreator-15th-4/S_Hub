@@ -134,6 +134,7 @@ export default function PortfolioSection() {
             <PortfolioCard
               pf={(customPortfolio ?? selectedProposal)!}
               className="xl:col-span-2"
+              legendCols={3}
               metricsUnavailableNote={
                 isCustom
                   ? "직접 조정한 비중의 지표는 자산군별 수익률·변동성 데이터가 연결되면 계산됩니다."
@@ -189,6 +190,7 @@ function PortfolioCard({
   header,
   className,
   metricsUnavailableNote,
+  legendCols,
 }: {
   pf: CardPortfolio;
   /** 카드 상단 — 현재 카드는 이름, 제안 카드는 세그먼트 컨트롤이 온다. */
@@ -196,6 +198,7 @@ function PortfolioCard({
   className?: string;
   /** 지표를 계산할 근거가 없을 때의 안내. 있으면 지표 격자 대신 이 문장을 보여준다. */
   metricsUnavailableNote?: string;
+  legendCols?: 2 | 3;
 }) {
   // 지표의 원화 병기 기준. 고객 총자산이 없으면 pctOfAumLabel 이 병기를 생략한다.
   const aumEokwon = useDashboardStore(
@@ -227,7 +230,7 @@ function PortfolioCard({
 
       <div className="flex min-h-72 items-stretch gap-2.5">
         <div className="flex flex-1 flex-col items-center">
-          <AssetDonut allocation={allocation} />
+          <AssetDonut allocation={allocation} legendCols={legendCols} />
         </div>
       </div>
 
@@ -247,7 +250,15 @@ function PortfolioCard({
           </p>
         </div>
       ) : (
-        <div className="mt-2.5 grid grid-cols-3 gap-px overflow-hidden rounded-lg bg-muted">
+        <div className="mt-2.5 grid grid-cols-2 gap-px overflow-hidden rounded-lg bg-muted">
+        {/*
+          2열 3행이다. 3열로 두면 좁은 "현재" 카드에서 타일이 100px 남짓이라
+          "-2억 6,280만원" 같은 원화 병기가 줄바꿈으로 깨지고, 그 바람에 두 카드의
+          같은 지표가 서로 다른 높이에 놓여 비교가 되지 않았다.
+
+          행마다 성격을 맞춰 묶는다 — 얼마나 잃을 수 있나 / 위험 대비 수익 /
+          얼마나 벌 수 있나. 쓸 날이 정해진 자금을 다루는 상담이라 손실이 맨 위다.
+        */}
         <Metric
           k="MDD"
           v={`${m.mddPct.toFixed(1)}%`}
@@ -266,6 +277,7 @@ function PortfolioCard({
           k="소르티노"
           v={m.sortino != null ? m.sortino.toFixed(2) : "-"}
         />
+        <Metric k="샤프지수" v={formatSharpe(m.sharpe)} />
         <Metric k="기대수익률" v={`${m.expectedReturnPct.toFixed(2)}%`} />
         <Metric
           k="세후수익률"
@@ -288,7 +300,6 @@ function PortfolioCard({
           }
           value={m.afterTaxReturnPct}
         />
-        <Metric k="샤프지수" v={formatSharpe(m.sharpe)} />
         </div>
       )}
     </Card>
@@ -337,7 +348,7 @@ function Metric({
           원화 병기가 없는 지표(샤프·소르티노 등)는 비율·수치가 그대로 큰 값이 된다.
         */}
         <div
-          className={`mt-1 text-[14px] font-extrabold leading-none tabular-nums ${toneCls}`}
+          className={`mt-1 whitespace-nowrap text-[14px] font-extrabold leading-none tabular-nums ${toneCls}`}
         >
           {/* 금액은 부호(+ · - · ±)만 달고 삼각형은 아래 비율이 가져간다. */}
           {sub ? (
@@ -354,7 +365,7 @@ function Metric({
           )}
         </div>
         {sub && (
-          <div className={`mt-0.5 text-[12px] font-bold tabular-nums ${toneCls}`}>
+          <div className={`mt-0.5 whitespace-nowrap text-[12px] font-bold tabular-nums ${toneCls}`}>
             {arrow && <span className="mr-0.5">{arrow}</span>}
             {v}
           </div>

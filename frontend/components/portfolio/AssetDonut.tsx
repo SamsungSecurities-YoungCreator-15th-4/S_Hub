@@ -4,13 +4,15 @@ import { Pie, PieChart, ResponsiveContainer } from "recharts";
 
 interface Props {
   allocation: { label: string; weight: number; color: string }[];
+  /** 범례 열 수. 넓은 카드는 3열로 늘려 가로를 쓴다. */
+  legendCols?: 2 | 3;
 }
 
 /** 포트폴리오 카드 자산배분 도넛 차트 + 하단 2열 범례
  *  - 도넛은 항상 h-40 고정 → 아이템 수 무관하게 같은 크기
  *  - 범례는 justify-between으로 항상 하단 고정
  */
-export default function AssetDonut({ allocation }: Props) {
+export default function AssetDonut({ allocation, legendCols = 2 }: Props) {
   const data = allocation
     .filter((d) => d.weight > 0)
     .map((d) => ({ ...d, fill: d.color }));
@@ -38,7 +40,11 @@ export default function AssetDonut({ allocation }: Props) {
       </div>
 
       {/* 범례: 항상 하단 */}
-      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 px-2">
+      <div
+        className={`grid gap-x-4 gap-y-1.5 px-2 ${
+          legendCols === 3 ? "grid-cols-3" : "grid-cols-2"
+        }`}
+      >
         {data.map((d) => {
           const rounded = Math.round(d.weight * 10) / 10;
           const displayWeight = rounded % 1 === 0 ? rounded.toFixed(0) : rounded.toFixed(1);
