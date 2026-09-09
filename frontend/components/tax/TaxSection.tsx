@@ -288,7 +288,7 @@ export default function TaxSection() {
 
       <Card className="min-h-0 flex-1 gap-0 p-3">
         {/* 탭 1: 절세 효과 */}
-        <TabsContent value="effect" className="flex flex-col gap-2">
+        <TabsContent value="effect" className="flex min-h-0 flex-1 flex-col gap-2">
           {/*
             절세 효과 금액이 없는 상태에서는 왼쪽이 배지 한 줄뿐이라 박스가 비어
             보인다. 세로 여백과 지표 카드를 줄여 내용만큼만 차지하게 한다.
@@ -365,8 +365,8 @@ export default function TaxSection() {
             세로로 쌓으면 남는 높이가 두 그림의 폭으로 바뀐다.
             각각 테두리로 묶어 어디까지가 한 그림인지 경계를 준다.
           */}
-          <div className="flex flex-col gap-2.5">
-            <div className="rounded-xl border p-3">
+          <div className="flex min-h-0 flex-1 flex-col gap-2.5">
+            <div className="flex min-h-0 flex-1 flex-col rounded-xl border p-3">
               <TaxWaterfall
                 waterfallData={isStressMode ? null : waterfallData}
                 liveHeadline={isStressMode ? (taxSource?.headline ?? null) : null}
@@ -374,7 +374,7 @@ export default function TaxSection() {
                 flow={waterfallFlow}
               />
             </div>
-            <div className="rounded-xl border p-3">
+            <div className="flex min-h-0 flex-1 flex-col rounded-xl border p-3">
               <AccountAllocation
                 accounts={[
                   {

@@ -250,7 +250,7 @@ export default function TaxWaterfall({
   ];
 
   return (
-    <div className="flex flex-col">
+    <div className="flex min-h-0 flex-1 flex-col">
       {/*
         막대 길이를 손본 사실과 세목 구분을 가이드 툴팁에 둔다. 화면에 늘 띄우면
         차트보다 주석이 길어지는데, 근거 없이 지우면 2배로 늘려 그린 막대에 아무
@@ -277,8 +277,12 @@ export default function TaxWaterfall({
         </span>
       </div>
 
-      {/* 폭이 두 배가 되면서 막대가 얇아 보인다 — 두께와 높이를 함께 올린다. */}
-      <div className={flow ? "h-44" : "h-32"}>
+      {/*
+        고정 높이 대신 상한·하한 사이에서 남거나 모자란 높이를 흡수한다. 좌측
+        사이드바가 행 높이를 정하므로 이쪽이 따라 줄어야 카드가 그 아래로
+        비어져 나오지 않는다. 상한은 종전 높이라 더 커지지는 않는다.
+      */}
+      <div className={flow ? "min-h-24 max-h-40 flex-1" : "h-32"}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={data}
