@@ -105,7 +105,7 @@ export default function CurrentPortfolioInput() {
   return (
     <div className="rounded-xl border p-3">
       <div className="mb-2 flex items-center justify-between">
-        <div className="flex items-center gap-0.5 rounded-lg bg-muted p-0.5">
+        <div className="flex rounded-lg bg-muted p-0.5">
           <TabButton
             active={active === "current"}
             onClick={() => setTab("current")}
@@ -221,9 +221,11 @@ function TabButton({
       onClick={onClick}
       disabled={disabled}
       title={disabled ? reason : undefined}
-      className={`rounded-md px-2 py-1 text-[12px] font-bold transition-colors ${
+      // 중앙 제안 카드의 세그먼트와 같은 규격이다 — 좌·우가 같은 상태를 보므로
+      // 생김새도 같아야 두 곳이 한 컨트롤임이 드러난다.
+      className={`rounded-md px-3 py-1 text-[11px] font-bold transition-colors ${
         active
-          ? "bg-card text-foreground shadow-sm"
+          ? "bg-white text-brand-dark shadow-sm"
           : "text-muted-foreground hover:text-foreground"
       } disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-muted-foreground`}
     >
