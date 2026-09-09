@@ -428,10 +428,10 @@ function AdviceCards({ liveCards, plan }: AdviceCardsProps) {
       headroomManwon: account.headroomManwon,
       savingManwon: isIsa ? plan.isaSavingManwon : plan.pensionSavingManwon,
       note: isIsa
-        ? `${plan.isaType.type === "seogmin" ? "서민형" : "일반형"} · 비과세 ${plan.isaType.taxFreeManwon}만원 (${plan.isaType.reason})`
+        ? `이 고객은 ${plan.isaType.type === "seogmin" ? "서민형" : "일반형"} — 비과세 ${plan.isaType.taxFreeManwon}만원 (${plan.isaType.reason})`
         : card.key === "irp"
-          ? "연금저축 단독 한도 600만원을 넘는 금액이 여기로 갑니다."
-          : "연금저축 단독 한도는 600만원입니다.",
+          ? "연금저축 단독 한도 600만원 초과분이 여기로 배분"
+          : "연금저축 단독 한도는 600만원",
     };
   };
 
@@ -454,11 +454,11 @@ function AdviceCards({ liveCards, plan }: AdviceCardsProps) {
      *   explain — 제도 설명·판정 근거 (가이드 ON 일 때 hover 로 뜬다)
      */
     let summary: string;
-    let explain = copy.body;
+    let explain: string[] = copy.helpLines;
 
     if (!applicable && reason) {
       summary = "적용 불가";
-      explain = reason;
+      explain = [reason];
     } else if (calc) {
       summary =
         calc.allocatedManwon > 0
@@ -466,7 +466,7 @@ function AdviceCards({ liveCards, plan }: AdviceCardsProps) {
             `${calc.allocatedManwon.toLocaleString()}만원 배분`
           : `${calc.capLabel} ${calc.capManwon.toLocaleString()}만원`;
       // 판정 근거(일반형/서민형, 연금저축 단독 한도)도 설명 쪽이다.
-      explain = `${copy.body} ${calc.note}`;
+      explain = [...copy.helpLines, calc.note];
     } else if (transferManwon != null) {
       summary =
         copy.sourceKey === "isa"

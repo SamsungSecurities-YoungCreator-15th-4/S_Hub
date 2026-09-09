@@ -23,7 +23,11 @@ export default function HelpTooltip({
   wide = false,
 }: {
   children: React.ReactNode;
-  text: string;
+  /**
+   * 배열이면 개조식 목록으로 그린다. 툴팁은 마우스를 올린 잠깐 읽는 글이라
+   * 문장을 이어 붙이면 눈이 처음부터 다시 훑는다. 한 줄에 한 사실만 둔다.
+   */
+  text: string | string[];
   placement?: "top" | "bottom";
   className?: string;
   /** 문장이 긴 설명용. 폭을 320px 로 넓힌다. */
@@ -85,7 +89,18 @@ export default function HelpTooltip({
                 : "translateX(-50%) translateY(-100%)",
           }}
         >
-          {text}
+          {Array.isArray(text) ? (
+            <ul className="flex flex-col gap-1">
+              {text.map((line) => (
+                <li key={line} className="flex gap-1.5">
+                  <span className="mt-[7px] size-1 shrink-0 rounded-full bg-background/60" />
+                  <span>{line}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            text
+          )}
           <span
             className={`absolute left-1/2 -translate-x-1/2 border-4 border-transparent ${
               placement === "bottom"
