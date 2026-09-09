@@ -138,6 +138,8 @@ export default function Sidebar() {
     resetRunStatus,
     setAnalyzeRejected,
     analyzeRejected,
+    setProposedWeightsDirty,
+    proposedWeightsDirty,
     runStatusReason,
   } = useDashboardStore();
   const customer =
@@ -366,6 +368,7 @@ export default function Sidebar() {
   const handleGateApprove = () => {
     setGateOpen(false);
     setAnalyzeRejected(false);
+    setProposedWeightsDirty(false);
     resetRunStatus();
     setRunStatus(RUN_STATUS.REVIEWED);
     void handleAnalyze();
@@ -385,6 +388,28 @@ export default function Sidebar() {
   };
 
   if (!customer) return null;
+
+  /**
+   * 버튼 위 안내 한 줄. 위에 있는 것이 먼저 이긴다.
+   *
+   *   1) 합계 미달 — 분석하기 자체가 막혀 있다. 이것부터 고쳐야 나머지가 의미가 있다.
+   *   2) 분석 거절  — 방금 실행되지 않았다는 사실. 비중을 손대면 store 가 지운다.
+   *   3) 제안 조정 변경 — 화면의 제안과 조정값이 갈렸다.
+   *   4) 그 밖의 실행 상태 사유 — 위 셋으로 설명되지 않는 경우의 폴백.
+   *
+   * 2와 3이 동시에 참일 수 없는 이유는 store 에 있다 — 비중을 바꾸는 setter 가
+   * analyzeRejected 를 내린다. 그래도 순서를 정해 두는 것은, 한 줄만 나온다는
+   * 보장을 store 의 부수효과가 아니라 여기서 읽을 수 있게 하기 위함이다.
+   */
+  const gateNotice = !isCurrentWeightsInputValid(currentWeightsInput)
+    ? "합계는 100%여야 합니다"
+    : analyzeRejected
+      ? ANALYZE_REJECT_REASON
+      : proposedWeightsDirty
+        ? "비중 변경 · 재분석 필요"
+        : runStatusReason && runStatusReason !== ANALYZE_REJECT_REASON
+          ? runStatusReason
+          : "";
 
   const handleDropdownToggle = () => {
     if (!dropdownOpen && dropdownTriggerRef.current) {
@@ -863,38 +888,17 @@ export default function Sidebar() {
         <CurrentPortfolioInput />
 
         {/*
-          분석하기가 왜 막혔는지·왜 실행되지 않았는지를 버튼 바로 위에 모은다.
-          비중 합계·거절·확정 해제는 성격이 달라 보여도 전부 "이 입력으로는 아직
-          분석 결과가 없다" 는 한 이야기라, 화면 곳곳에 흩어놓지 않는다.
+          버튼 위 안내는 한 번에 한 줄만 띄운다. 여러 줄이 겹치면 지금 무엇을
+          해야 하는지가 흐려진다 — 세 줄이 동시에 떠도 PB 가 할 수 있는 일은
+          하나뿐이다.
 
           IPS 반영 거절은 여기 넣지 않는다 — 그건 분석을 막지 않는다.
-          우측 IPS 반영하기 버튼 아래에 둔다.
+          우측 IPS 반영하기 버튼 위에 둔다.
         */}
-        {(!isCurrentWeightsInputValid(currentWeightsInput) ||
-          analyzeRejected ||
-          runStatusReason) && (
-          <div className="-mb-1 flex flex-col gap-0.5 px-0.5">
-            {!isCurrentWeightsInputValid(currentWeightsInput) && (
-              <p className="text-[11px] font-semibold text-destructive">
-                합계는 100%여야 합니다
-              </p>
-            )}
-            {analyzeRejected && (
-              <p className="text-[11px] font-semibold text-destructive">
-                {ANALYZE_REJECT_REASON}
-              </p>
-            )}
-            {/*
-              거절이 reviewed·locked 에서 일어나면 전이가 성사돼 runStatusReason 에도
-              같은 문장이 들어간다. 그대로 두면 한 사건이 두 줄로 찍히므로 여기서 건너뛴다.
-              (draft 에서는 전이가 무시돼 reason 이 비거나 직전 사유가 남는다.)
-            */}
-            {runStatusReason && runStatusReason !== ANALYZE_REJECT_REASON && (
-              <p className="text-[11px] font-semibold text-destructive">
-                {runStatusReason}
-              </p>
-            )}
-          </div>
+        {gateNotice && (
+          <p className="-mb-1 px-0.5 text-[11px] font-semibold text-destructive">
+            {gateNotice}
+          </p>
         )}
 
         <Button

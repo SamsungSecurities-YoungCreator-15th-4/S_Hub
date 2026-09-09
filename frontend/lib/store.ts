@@ -131,6 +131,16 @@ export interface DashboardState {
    */
   analyzeRejected: boolean;
   setAnalyzeRejected: (v: boolean) => void;
+  /**
+   * 제안 조정 비중을 손댔는가 — 화면 안내 전용 플래그.
+   *
+   * 현재 보유 비중에는 두지 않는다. 그쪽은 분석 전에 처음 채워 넣는 입력이라
+   * 0에서 값이 들어가는 것이 정상 경로인데, 거기에 "재분석 필요"를 띄우면
+   * 아직 한 번도 분석하지 않은 화면에서 재분석을 요구하게 된다.
+   * 제안 조정은 분석 결과가 나온 뒤에만 만질 수 있어(isTrusted 게이트) 다르다.
+   */
+  proposedWeightsDirty: boolean;
+  setProposedWeightsDirty: (v: boolean) => void;
 
   // ── STT/상담 연동 상태 ──
   /** 화면에 표시하는 상담 전사. 초기값은 mock(CONSULT_LOG). */
@@ -296,13 +306,18 @@ export const useDashboardStore = create<DashboardState>((set) => ({
     })),
   analyzeRejected: false,
   setAnalyzeRejected: (v) => set({ analyzeRejected: v }),
+  proposedWeightsDirty: false,
+  setProposedWeightsDirty: (v) => set({ proposedWeightsDirty: v }),
   weightsTab: "current",
   setWeightsTab: (tab) => set({ weightsTab: tab }),
   proposedWeightsInput: {},
   setProposedWeightsInput: (patch) =>
     set((s) => ({
       proposedWeightsInput: { ...s.proposedWeightsInput, ...patch },
+      // 비중을 새로 손댔으면 직전 거절은 지나간 이야기다 — 안내를 한 줄만
+      // 띄우려면 지금 유효한 사실만 남아야 한다.
       analyzeRejected: false,
+      proposedWeightsDirty: true,
     })),
 
   // 초기 포트폴리오는 mock(데모) — 출처를 fallback 으로 둬 배지로 명시한다.
@@ -419,6 +434,7 @@ export const useDashboardStore = create<DashboardState>((set) => ({
         analyzeRejected: false,
         weightsTab: "current",
         proposedWeightsInput: {},
+        proposedWeightsDirty: false,
         isStressMode: false,
         stressPreset: "current",
         stressScenarioKey: null,
