@@ -21,6 +21,7 @@ import {
   formatWon,
 } from "@/lib/mock/symphonyReport";
 import { useDashboardStore } from "@/lib/store";
+import { useViewedPortfolio } from "@/lib/viewedPortfolio";
 import { buildPdfAllocation, buildPdfMacroCell, buildPdfPerfRows } from "@/lib/pdfPortfolioData";
 import {
   buildPdfTaxEffect,
@@ -204,17 +205,27 @@ function AssetBar({
   label,
   pct,
   color,
+  /** 제안 조정 열이 붙어 4열이 되면 한 열이 좁아진다. 라벨을 줄여 막대를 살린다. */
+  compact = false,
 }: {
   label: string;
   pct: number;
   color: string;
+  compact?: boolean;
 }) {
   return (
     <div
       // 11종으로 늘면서 한 열이 11줄이 된다. 줄 간격을 좁혀 페이지를 넘기지 않게 한다.
       style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}
     >
-      <span style={{ width: 60, fontSize: 10, color: MUTED, flexShrink: 0 }}>
+      <span
+        style={{
+          width: compact ? 48 : 60,
+          fontSize: compact ? 9 : 10,
+          color: MUTED,
+          flexShrink: 0,
+        }}
+      >
         {label}
       </span>
       <div
@@ -237,8 +248,8 @@ function AssetBar({
       </div>
       <span
         style={{
-          width: 26,
-          fontSize: 11,
+          width: compact ? 24 : 26,
+          fontSize: compact ? 10 : 11,
           fontWeight: 700,
           textAlign: "right" as const,
           color,
@@ -717,21 +728,40 @@ function PortfolioPage() {
   const aumEokwon =
     (customers.find((c) => c.id === selectedCustomerId) ?? customers[0])?.aumEokwon ?? 50;
 
+  // 훅은 early return 앞에서 호출(react-hooks/rules-of-hooks).
+  /*
+    강조·계산 대상은 지금 확정 대상인 안이다 — PB 가 제안 조정으로 손본 뒤 확정했는데
+    리포트가 조정 전 안을 보여주면 승인한 것과 다른 문서가 나간다.
+  */
+  const { viewed: adjustedPf, isAdjusted } = useViewedPortfolio();
+  const adjusted = isAdjusted ? adjustedPf : null;
+
   const current = storePortfolios.find((p) => p.id === "current");
   const portA = storePortfolios.find((p) => p.id === "a");
   const portB = storePortfolios.find((p) => p.id === "b");
   if (!current || !portA || !portB) return null;
 
-  // 대시보드에서 선택한 포트폴리오(a/b)에 따라 강조·예상손익 대상을 결정한다.
   const selId: "a" | "b" = selectedPortfolioId === "b" ? "b" : "a";
 
+  /*
+    조정하지 않았으면 "제안 조정" 열은 선택한 제안과 같은 값이라 같은 것을 두 번
+    보여주게 된다. 손댔을 때만 넷째 열을 세운다.
+  */
   const cols = [
     { p: current, alloc: buildPdfAllocation(current), label: "현재 포트폴리오", badge: "", badgeColor: "#6B7280", headerColor: "#6B7280", selected: false },
-    { p: portA, alloc: buildPdfAllocation(portA), label: "안정추구", badge: "", badgeColor: BRAND, headerColor: BRAND, selected: selId === "a" },
-    { p: portB, alloc: buildPdfAllocation(portB), label: "수익추구", badge: "", badgeColor: "#2C7BFF", headerColor: "#2C7BFF", selected: selId === "b" },
+    { p: portA, alloc: buildPdfAllocation(portA), label: "안정추구", badge: "", badgeColor: BRAND, headerColor: BRAND, selected: !isAdjusted && selId === "a" },
+    { p: portB, alloc: buildPdfAllocation(portB), label: "수익추구", badge: "", badgeColor: "#2C7BFF", headerColor: "#2C7BFF", selected: !isAdjusted && selId === "b" },
+    ...(adjusted
+      ? [{ p: adjusted, alloc: buildPdfAllocation(adjusted), label: "제안 조정", badge: "", badgeColor: BRAND_DARK, headerColor: BRAND_DARK, selected: true }]
+      : []),
   ];
 
   const perfRows = buildPdfPerfRows(storePortfolios, aumEokwon);
+  /*
+    지표는 자산군별 수익률·변동성 계열이 있어야 나오는데 조정안에는 그 계열이 없다.
+    없는 값을 채우느니 지표 표는 세 안만 두고 아래 한 줄로 이유를 밝힌다.
+  */
+  const perfCols = cols.slice(0, 3);
 
   // ── Stress Test ─────────────────────────────────────────────────
   // 화면 카드(StressTestSection)와 같은 runStress 를 쓴다 — 리포트 숫자가
@@ -740,7 +770,8 @@ function PortfolioPage() {
   // 이전에는 isStressMode(백엔드 stress 엔드포인트) 기준이었으나, 금리·환율
   // 슬라이더가 없어지면서 그 플래그를 켤 경로가 사라져 섹션 자체가 렌더되지
   // 않았다. 시나리오가 자산군 충격 기반이므로 금리·환율 열도 충격 가정으로 바꾼다.
-  const selectedPf = selId === "a" ? portA : portB;
+  // 스트레스는 비중만 있으면 계산되므로 조정안이 있으면 그 비중으로 낸다.
+  const selectedPf = adjusted ?? (selId === "a" ? portA : portB);
   const stressTotalKrw = aumEokwon * 100_000_000;
 
   const fmtLoss = (lossKrw: number): { text: string; color: string } => {
@@ -808,7 +839,7 @@ function PortfolioPage() {
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 12, marginBottom: 22 }}>
+        <div style={{ display: "flex", gap: isAdjusted ? 8 : 12, marginBottom: 22 }}>
           {cols.map(({ p, alloc, label, badge, badgeColor, selected }) => (
             <div
               key={p.id}
@@ -816,7 +847,7 @@ function PortfolioPage() {
                 flex: 1,
                 border: selected ? `2px solid ${BRAND}` : `1px solid ${BORDER}`,
                 borderRadius: 10,
-                padding: "13px 14px",
+                padding: isAdjusted ? "12px 10px" : "13px 14px",
                 background: "white",
               }}
             >
@@ -852,6 +883,7 @@ function PortfolioPage() {
                   label={slice.label}
                   pct={Math.round(slice.weight)}
                   color={slice.color}
+                  compact={isAdjusted}
                 />
               ))}
             </div>
@@ -895,7 +927,7 @@ function PortfolioPage() {
               >
                 지표
               </th>
-              {cols.map((c) => (
+              {perfCols.map((c) => (
                 <th
                   key={c.p.id}
                   style={{
@@ -932,10 +964,10 @@ function PortfolioPage() {
                       textAlign: "center",
                       fontSize: 11,
                       fontWeight: j === 0 ? 500 : 700,
-                      color: row.upColor ?? cols[j].headerColor,
+                      color: row.upColor ?? perfCols[j].headerColor,
                       whiteSpace: "pre-line" as const,
                       lineHeight: 1.4,
-                      background: cols[j].selected ? `${BRAND}0D` : "inherit",
+                      background: perfCols[j].selected ? `${BRAND}0D` : "inherit",
                     }}
                   >
                     {v}
@@ -945,6 +977,12 @@ function PortfolioPage() {
             ))}
           </tbody>
         </table>
+
+        {isAdjusted && (
+          <div style={{ fontSize: 10, color: MUTED, marginTop: -16, marginBottom: 22, lineHeight: 1.5 }}>
+            직접 조정한 비중의 지표는 자산군별 수익률·변동성 데이터가 연결되면 계산됩니다.
+          </div>
+        )}
 
         {stressRows.length > 0 && (
           <>

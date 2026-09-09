@@ -10,6 +10,7 @@ import {
 } from "@/lib/stressScenarios";
 import { DISCLAIMERS, IPS_CONFLICTS } from "@/lib/mock/symphonyReport";
 import { useDashboardStore } from "@/lib/store";
+import { useViewedPortfolio } from "@/lib/viewedPortfolio";
 import { formatSharpe } from "@/lib/sharpe";
 import {
   buildPdfAllocation,
@@ -701,17 +702,17 @@ const METRIC_CARDS = [
 function PortfolioPage() {
   // 훅은 early return 앞에서 호출(react-hooks/rules-of-hooks).
   const storePortfolios = useDashboardStore((s) => s.portfolios);
-  const selectedPortfolioId = useDashboardStore((s) => s.selectedPortfolioId);
   const C = useSelectedCustomer();
   const portCurrent = storePortfolios.find((p) => p.id === "current");
-  // 대시보드에서 선택한 포트폴리오(A 또는 B). 선택 없으면 A 폴백.
-  const selectedPf =
-    storePortfolios.find((p) => p.id === selectedPortfolioId) ??
-    storePortfolios.find((p) => p.id === "a");
-  if (!portCurrent || !selectedPf) return null;
+  /*
+    고객 문서에는 확정 대상인 안 하나만 싣는다. 조정했으면 조정안이다 —
+    상담에서 함께 손본 비중과 다른 문서를 건네지 않기 위해서다.
+  */
+  const { base, viewed: selectedPf, isAdjusted } = useViewedPortfolio();
+  if (!portCurrent || !selectedPf || !base) return null;
   const cur = portCurrent.metrics;
-  const sel = selectedPf.metrics;
-  // 선택 포트폴리오의 자산 배분 칩 — pf.allocation(백엔드 실데이터) 우선, 폴백 포함.
+  // 지표는 조정 전 제안의 값이다 — 조정 비중으로 다시 계산할 데이터가 아직 없다.
+  const sel = base.metrics;
   const assetLabelsSelected = buildPdfAllocation(selectedPf).map(
     (s) => `${s.label} ${Math.round(s.weight)}%`,
   );
@@ -889,6 +890,11 @@ function PortfolioPage() {
             <div style={{ fontSize: 13, fontWeight: 800, color: BRAND }}>
               {selectedPf.name}
             </div>
+            {isAdjusted && (
+              <div style={{ fontSize: 10, color: MUTED }}>
+                지표는 조정 전 {base.name} 기준입니다
+              </div>
+            )}
           </div>
           <div
             style={{
@@ -1081,12 +1087,8 @@ function TaxPage() {
   const C = useSelectedCustomer();
   const taxOptimizerMap = useDashboardStore((s) => s.taxOptimizer);
   const selectedPortfolioId = useDashboardStore((s) => s.selectedPortfolioId);
-  const storePortfolios = useDashboardStore((s) => s.portfolios);
-  // 절세 계좌 배치 바는 절세 화면과 동일하게 '선택한 포트폴리오'의 자산배분을 따른다.
-  const selectedPf =
-    storePortfolios.find((p) => p.id === selectedPortfolioId) ??
-    storePortfolios.find((p) => p.id === "a") ??
-    storePortfolios[0];
+  // 절세 계좌 배치 바는 확정 대상인 안의 자산배분을 따른다(조정했으면 조정안).
+  const { viewed: selectedPf } = useViewedPortfolio();
   const selectedAllocSlices = selectedPf ? buildPdfAllocation(selectedPf) : [];
   const taxOptimizerEntry = extractTaxOptimizerEntry(
     taxOptimizerMap,
@@ -1728,11 +1730,8 @@ function TaxPage() {
 
 function RiskCheckPage() {
   const C = useSelectedCustomer();
-  const storePortfolios = useDashboardStore((s) => s.portfolios);
-  const selectedPortfolioId = useDashboardStore((s) => s.selectedPortfolioId);
-  const selectedPf =
-    storePortfolios.find((p) => p.id === selectedPortfolioId) ??
-    storePortfolios.find((p) => p.id === "a");
+  // 스트레스는 비중만 있으면 계산되므로 조정안 비중을 그대로 쓴다.
+  const { viewed: selectedPf } = useViewedPortfolio();
   if (!C || !selectedPf) return null;
 
   const totalKrw = (C.aumEokwon ?? 0) * 100_000_000;
