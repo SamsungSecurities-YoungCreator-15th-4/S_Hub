@@ -321,11 +321,11 @@ export interface ConsultMessage {
   time: string;
 }
 
-export const CONSULT_DURATION = "02:14";
+export const CONSULT_DURATION = "02:39";
 
 export const CONSULT_LOG: ConsultMessage[] = [
   // 이 전사가 IPS 의 근거다. IPS Unique 를 바꾸면 여기도 같이 바꿔야 앞뒤가 맞는다.
-  // (store 의 transcript 초기값이라 사이드바 상담 내역에 그대로 찍힌다.)
+  // 실시간 녹음 시연이 종료되면 이 전체 배열이 상담 내역에 반영된다.
   {
     speaker: "PB",
     text: "은퇴자산을 길게 가져가고 싶다고 하셨는데, 중간에 목돈 나갈 일이 있으실까요?",
@@ -333,7 +333,7 @@ export const CONSULT_LOG: ConsultMessage[] = [
   },
   {
     speaker: "고객",
-    text: "3년 뒤에 전세 재계약이 있어요. 보증금 인상분이 2,000만원쯤 될 것 같습니다.",
+    text: "3년 뒤에 전세 계약이 끝나요. 보증금 인상분이 2,000만원쯤 될 것 같습니다.",
     time: "00:15",
   },
   {
@@ -348,28 +348,48 @@ export const CONSULT_LOG: ConsultMessage[] = [
   },
   {
     speaker: "PB",
-    text: "ISA 한도는 미사용분이 다음 해로 쌓입니다. 작년 미납분까지 하면 올해는 3,200만원까지 가능합니다.",
+    text: "지금 배분에서 걱정되시는 게 있으신가요?",
     time: "00:52",
   },
   {
     speaker: "고객",
+    text: "솔직히 이대로 괜찮은지 모르겠어요. 코스피 오르는 거 보고 계속 늘렸고, 금도 작년에 많이 올랐다길래 뒤늦게 넣었거든요.",
+    time: "00:58",
+  },
+  {
+    speaker: "PB",
+    text: "기간과 목표수익률은 어떻게 보고 계신가요?",
+    time: "01:14",
+  },
+  {
+    speaker: "고객",
+    text: "은퇴까지 20년 넘게 남았으니 길게 보려고요. 연 7% 정도면 좋겠고, 손실은 어느 정도 감수할 수 있습니다.",
+    time: "01:20",
+  },
+  {
+    speaker: "PB",
+    text: "ISA 한도는 미사용분이 다음 해로 쌓입니다. 작년 미납분까지 하면 올해는 3,200만원까지 가능합니다.",
+    time: "01:36",
+  },
+  {
+    speaker: "고객",
     text: "연금저축은 아직 안 만들었어요. 세액공제가 크다고는 들었는데 55세까지 못 뺀다고 해서요.",
-    time: "01:08",
+    time: "01:52",
   },
   {
     speaker: "PB",
     text: "연 900만원까지 세액공제 대상이고 총급여 5,500만원 이하면 공제율이 16.5%입니다. 다만 말씀대로 만 55세까지 묶입니다.",
-    time: "01:20",
+    time: "02:04",
   },
   {
     speaker: "고객",
     text: "매년 1,500만원 정도는 넣을 수 있는데, 3년 뒤 전세금까지 생각하면 얼마씩 나눠야 할지 모르겠네요.",
-    time: "01:42",
+    time: "02:26",
   },
   {
     speaker: "PB",
     text: "절세와 유동성이 반대로 움직이는 구간이라 배분을 같이 보면서 정하겠습니다.",
-    time: "01:55",
+    time: "02:39",
   },
 ];
 

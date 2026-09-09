@@ -9,7 +9,6 @@ import {
   type Customer,
   type MacroIndicator,
   type Portfolio,
-  CONSULT_LOG,
   CUSTOMERS,
   IPS_DEFAULT,
   MACRO_INDICATORS,
@@ -142,9 +141,9 @@ export interface DashboardState {
   setProposedWeightsDirty: (v: boolean) => void;
 
   // ── STT/상담 연동 상태 ──
-  /** 화면에 표시하는 상담 전사. 초기값은 mock(CONSULT_LOG). */
+  /** 화면에 표시하는 상담 전사. 녹음·업로드 전에는 빈 배열이다. */
   transcript: ConsultMessage[];
-  /** 전사 데이터 출처(mock 초기 표시 = fallback). */
+  /** 전사 데이터 출처(상담 입력 전 = empty, 시연 전사 = fallback). */
   transcriptSource: DataSource;
   /** STT 로 확보한 실 consultation_id(RAG·tax 재사용). 없으면 빈 문자열. */
   consultationId: string;
@@ -462,9 +461,9 @@ export const useDashboardStore = create<DashboardState>((set) => ({
   insightResult: null,
   setInsightResult: (result) => set({ insightResult: result }),
 
-  // 초기 상담 전사는 mock(데모) — 출처를 fallback 으로 둬 배지로 명시한다.
-  transcript: CONSULT_LOG,
-  transcriptSource: "fallback",
+  // 상담 입력 전에는 내역을 비워 둔다. 고정 전사는 녹음 종료 또는 데모 업로드 후에만 반영한다.
+  transcript: [],
+  transcriptSource: "empty",
   consultationId: "",
   sttStatus: "idle",
   sttNote: undefined,
