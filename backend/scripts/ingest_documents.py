@@ -115,7 +115,12 @@ def extract_text(pdf_path: Path) -> str:
 
 
 def chunk_text(text: str) -> list[tuple[str, int]]:
-    """tiktoken 토큰 기준 슬라이딩 윈도우 청킹. (청크 텍스트, 토큰수) 리스트 반환."""
+    """tiktoken 토큰 기준 슬라이딩 윈도우 청킹. (청크 텍스트, 토큰수) 리스트 반환.
+
+    이름이 같은 함수가 엔진 쪽(engine/rag/ingest.py)에도 있고 그쪽은 문자 기준이다.
+    단위 차이는 의도된 것이다(app/rag/config.py 의 CHUNK_SIZE 주석 참조). 일괄
+    치환·경로 리팩터링은 반드시 한쪽만 대상으로 한다(AGENTS.md).
+    """
     tokens = _TOKENIZER.encode(text)
     if not tokens:
         return []

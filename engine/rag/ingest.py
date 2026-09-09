@@ -26,6 +26,12 @@ from pathlib import Path
 log = logging.getLogger(__name__)
 
 # --- 청킹 파라미터 (상수로 분리, 값 명시) ---
+# 대시보드(backend/app/rag/config.py)에도 같은 이름의 상수가 있고 값은 512 **토큰** /
+# 50 토큰이다. 맞춰야 할 값이 아니다 — 단위가 다른 것이 의도된 선택이다.
+#   - 엔진(여기): 재현성이 우선이라 tiktoken 버전에 좌우되지 않는 문자 기준을 쓴다.
+#   - 대시보드: 임베딩 모델의 토큰 입력 한도가 기준이라 토큰으로 자른다.
+# 두 파이프라인은 런타임 의존이 없고 저장소도 다르다(여기 Chroma / 대시보드 pgvector).
+# 한쪽을 다른 쪽에 맞추려 하기 전에 이 차이가 의도된 것임을 먼저 확인한다.
 CHUNK_SIZE = 1000          # 청크 문자 수
 CHUNK_OVERLAP = 200        # 인접 청크 간 중첩 문자 수
 TBD_MARKER = "[TBD"        # 미완성 방법론 문서 마커
@@ -138,6 +144,10 @@ def chunk_text(
 
     각 청크 metadata: source(파일명), category(폴더명), chunk_id, published_at,
     char_start, char_end.
+
+    이름이 같은 함수가 대시보드 쪽(backend/scripts/ingest_documents.py)에도 있다.
+    단위가 다르므로(위 CHUNK_SIZE 주석 참조) 일괄 치환·경로 리팩터링은 반드시
+    한쪽만 대상으로 한다(AGENTS.md "통합 레포에서 특히 조심할 것").
     """
     step = CHUNK_SIZE - CHUNK_OVERLAP
     if step <= 0:
