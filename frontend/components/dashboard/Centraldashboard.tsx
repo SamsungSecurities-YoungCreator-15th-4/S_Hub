@@ -2,7 +2,6 @@
 
 import PortfolioSection from "@/components/portfolio/PortfolioSection";
 import BacktestChart from "@/components/portfolio/BacktestChart";
-import StressTestSection from "@/components/dashboard/StressTestSection";
 import TaxSection from "@/components/tax/TaxSection";
 import { useDashboardStore } from "@/lib/store";
 
@@ -33,13 +32,6 @@ export default function CentralDashboard() {
   return (
     <main className="flex min-w-0 flex-1 flex-col gap-3">
       <PortfolioSection />
-      {/*
-        스트레스 카드는 PB 의 입력 도구가 아니라 고객과 함께 보는 결과다.
-        사이드바는 PB 가 직접 접을 수 있어, 카드를 거기 두면 결과를 보여줘야 하는
-        순간에 함께 사라진다 — 그래서 중앙에 둔다.
-        선택한 포트폴리오 비중을 쓰므로 PortfolioSection 바로 아래가 맞는 자리다.
-      */}
-      <StressTestSection />
       <BacktestChart />
       <TaxSection />
     </main>
