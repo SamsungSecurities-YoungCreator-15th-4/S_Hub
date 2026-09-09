@@ -198,6 +198,33 @@ export default function TaxSection() {
         )
       : null;
 
+  /**
+   * 백엔드가 없을 때 세금 흐름을 프론트에서 잇는다. 위에서 고른 포트폴리오의
+   * 지표와 아래 절세 제안의 계산을 그대로 쓰므로 한 화면 안에서 숫자가 어긋나지
+   * 않는다. 예전에는 mock 이 자산 18억 기준(세전 2.59억)을 그려, 1억원 고객
+   * 화면에도 그대로 나왔다.
+   *
+   * 절감액을 두 갈래로 나눠 넘긴다. ISA 는 금융소득세를 직접 깎지만 연금
+   * 세액공제는 근로소득세에서 돌려받는 돈이라 같은 막대에 못 쌓는다.
+   */
+  const waterfallFlow =
+    customer && plan && selectedPortfolio && currentPortfolio
+      ? {
+          aumManwon: customer.aumEokwon * 10000,
+          current: {
+            expectedReturnPct: currentPortfolio.metrics.expectedReturnPct,
+            afterTaxReturnPct: currentPortfolio.metrics.afterTaxReturnPct,
+          },
+          selected: {
+            name: selectedPortfolio.name,
+            expectedReturnPct: selectedPortfolio.metrics.expectedReturnPct,
+            afterTaxReturnPct: selectedPortfolio.metrics.afterTaxReturnPct,
+          },
+          financialTaxSavingManwon: plan.isaSavingManwon,
+          creditRefundManwon: plan.pensionSavingManwon,
+        }
+      : null;
+
   const baseLabel = selectedPortfolio?.name ?? "포트폴리오";
 
   if (
@@ -322,6 +349,7 @@ export default function TaxSection() {
               waterfallData={isStressMode ? null : waterfallData}
               liveHeadline={isStressMode ? (taxSource?.headline ?? null) : null}
               liveAumEokwon={customer?.aumEokwon}
+              flow={waterfallFlow}
             />
             <AccountAllocation
               accounts={[

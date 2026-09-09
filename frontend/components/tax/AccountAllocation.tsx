@@ -60,9 +60,16 @@ export default function AccountAllocation({
 }: {
   accounts?: AccountSlot[];
 }) {
-  const { selectedPortfolioId } = useDashboardStore();
+  /*
+   * store 의 portfolios 를 읽는다. mockData 상수를 읽고 있어서, PB 가 현재 보유
+   * 비중을 입력해도(demoPortfolioCalc 의 withCurrentWeights) 이 막대만 따라오지
+   * 않았다. 같은 화면의 도넛·스트레스는 store 를 읽는데 여기만 상수였다.
+   */
+  const { selectedPortfolioId, portfolios } = useDashboardStore();
   const portfolio =
-    PORTFOLIOS.find((p) => p.id === selectedPortfolioId) ?? PORTFOLIOS[1];
+    portfolios.find((p) => p.id === selectedPortfolioId) ??
+    portfolios[1] ??
+    PORTFOLIOS[1];
   const allocation = toDisplayAllocation(portfolio.weights).filter(
     ({ weight }) => weight > 0,
   );
