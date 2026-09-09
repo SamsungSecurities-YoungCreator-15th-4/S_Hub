@@ -24,7 +24,7 @@ function equityShare(weights: Portfolio["weights"]): number {
  * 샤프만은 보간하지 않고 `withSharpe` 로 다시 유도한다 — 기대수익률·변동성과
  * 어긋난 샤프가 나오는 것을 막기 위해서다.
  */
-function deriveAdjustedMetrics(
+export function deriveAdjustedMetrics(
   current: Portfolio,
   base: Portfolio,
   adjustedWeights: Portfolio["weights"],

@@ -14,6 +14,7 @@ import {
 import { type Portfolio, type PortfolioMetrics } from "@/lib/mockData";
 import { pctOfAumLabel } from "@/lib/formatKrw";
 import { formatSharpe } from "@/lib/sharpe";
+import { deriveAdjustedMetrics } from "@/lib/viewedPortfolio";
 import { RUN_STATUS } from "@/lib/runStatus";
 import {
   selectAnalysisEmpty,
@@ -117,11 +118,14 @@ export default function PortfolioSection() {
 
   /**
    * 제안 조정 안. 비중은 PB 가 사이드바에서 손본 값(proposedWeightsInput)을 그대로 쓴다.
-   * 지표는 비워 둔다 — 임의 비중의 기대수익률·변동성·MDD 를 산출하려면 자산군별
-   * 수익률·공분산이 필요한데 프론트에 그 데이터가 없다. 근거 없는 숫자를 지어
-   * 넣지 않는다(lib/sharpe.ts 가 같은 이유로 샤프만 계산으로 승격했다).
+   * 지표는 `deriveAdjustedMetrics` 가 현재↔제안 사이 보간으로 유도한다 — PDF 와
+   * 같은 함수라 화면과 출력물의 숫자가 갈라지지 않는다.
    */
   const editBase = selectedProposal ?? proposals[0];
+  const adjustedWeights = CALC_UNITS.reduce(
+    (acc, unit) => ({ ...acc, [unit.id]: proposedWeightsInput[unit.id] ?? 0 }),
+    {} as Portfolio["weights"],
+  );
   const adjustedPortfolio: CardPortfolio | undefined = isProposedEdit && editBase
     ? {
         ...editBase,
@@ -129,10 +133,10 @@ export default function PortfolioSection() {
         allocation: undefined,
         id: ADJUSTED_KEY,
         name: ADJUSTED_LABEL,
-        weights: CALC_UNITS.reduce(
-          (acc, unit) => ({ ...acc, [unit.id]: proposedWeightsInput[unit.id] ?? 0 }),
-          {} as Portfolio["weights"],
-        ),
+        weights: adjustedWeights,
+        metrics: current
+          ? deriveAdjustedMetrics(current, editBase, adjustedWeights)
+          : editBase.metrics,
       }
     : undefined;
 
@@ -200,11 +204,6 @@ export default function PortfolioSection() {
           {(adjustedPortfolio ?? selectedProposal) && (
             <PortfolioCard
               pf={(adjustedPortfolio ?? selectedProposal)!}
-              metricsUnavailableNote={
-                isProposedEdit
-                  ? "직접 조정한 비중의 지표는 자산군별 수익률·변동성 데이터가 연결되면 계산됩니다."
-                  : undefined
-              }
               header={
                 <>
                 {/*
@@ -281,14 +280,11 @@ function PortfolioCard({
   pf,
   header,
   className,
-  metricsUnavailableNote,
 }: {
   pf: CardPortfolio;
   /** 카드 상단 — 현재 카드는 이름, 제안 카드는 세그먼트 컨트롤이 온다. */
   header: React.ReactNode;
   className?: string;
-  /** 지표를 계산할 근거가 없을 때의 안내. 있으면 지표 격자 대신 이 문장을 보여준다. */
-  metricsUnavailableNote?: string;
 }) {
   // 지표의 원화 병기 기준. 고객 총자산이 없으면 pctOfAumLabel 이 병기를 생략한다.
   const aumEokwon = useDashboardStore(
@@ -333,66 +329,58 @@ function PortfolioCard({
         pctOfAumLabel(비율 × 고객 총자산)로 만든다. 어느 경로든 값의 출처가
         코드에서 하나로 추적된다.
       */}
-      {metricsUnavailableNote ? (
-        <div className="mt-2.5 rounded-lg border border-dashed border-muted-foreground/25 bg-muted/30 px-3 py-5">
-          <p className="text-center text-[12px] font-semibold leading-relaxed text-muted-foreground">
-            {metricsUnavailableNote}
-          </p>
-        </div>
-      ) : (
-        <div className="mt-2.5 grid grid-cols-2 gap-px overflow-hidden rounded-lg bg-muted">
-        {/*
-          2열 3행. 왼쪽 열은 버는 쪽, 오른쪽 열은 잃는·흔들리는 쪽으로 세로를 맞춘다.
+      <div className="mt-2.5 grid grid-cols-2 gap-px overflow-hidden rounded-lg bg-muted">
+      {/*
+        2열 3행. 왼쪽 열은 버는 쪽, 오른쪽 열은 잃는·흔들리는 쪽으로 세로를 맞춘다.
 
-            세후수익률 · MDD      원화 금액이 붙는 두 지표 — 벌 돈과 잃을 수 있는 돈
-            기대수익률 · 변동성    같은 두 축의 세전·비율 버전
-            샤프지수  · 소르티노   위험 대비 수익 비율. 소르티노는 하방만 보므로 오른쪽
+          세후수익률 · MDD      원화 금액이 붙는 두 지표 — 벌 돈과 잃을 수 있는 돈
+          기대수익률 · 변동성    같은 두 축의 세전·비율 버전
+          샤프지수  · 소르티노   위험 대비 수익 비율. 소르티노는 하방만 보므로 오른쪽
 
-          금액이 붙는 두 지표를 같은 행에 둬야 행 높이도 어긋나지 않는다.
-        */}
-        <Metric
-          k="세후수익률"
-          v={`${Math.abs(m.afterTaxReturnPct).toFixed(1)}%`}
-          rangeSub={m.afterTaxReturnRangeLabel}
-          sub={
-            m.afterTaxAmountLabel ??
-            pctOfAumLabel(
-              m.afterTaxReturnPct,
-              aumEokwon,
-              m.afterTaxReturnPct < 0 ? "-" : "+",
-            )
-          }
-          tone={
-            m.afterTaxReturnPct > 0
-              ? "up"
-              : m.afterTaxReturnPct < 0
-                ? "down"
-                : undefined
-          }
-          value={m.afterTaxReturnPct}
-        />
-        <Metric
-          k="MDD"
-          v={`${m.mddPct.toFixed(1)}%`}
-          rangeSub={m.mddRangeLabel}
-          sub={m.mddAmountLabel ?? pctOfAumLabel(m.mddPct, aumEokwon, "-")}
-          tone={m.mddPct > 0 ? "down" : undefined}
-          value={m.mddPct}
-        />
-        <Metric k="기대수익률" v={`${m.expectedReturnPct.toFixed(2)}%`} />
-        <Metric
-          k="변동성"
-          v={`${m.volatilityPct.toFixed(2)}%`}
-          sub={m.volatilityAmountLabel ?? pctOfAumLabel(m.volatilityPct, aumEokwon, "±")}
-          value={m.volatilityPct}
-        />
-        <Metric k="샤프지수" v={formatSharpe(m.sharpe)} />
-        <Metric
-          k="소르티노"
-          v={m.sortino != null ? m.sortino.toFixed(2) : "-"}
-        />
-        </div>
-      )}
+        금액이 붙는 두 지표를 같은 행에 둬야 행 높이도 어긋나지 않는다.
+      */}
+      <Metric
+        k="세후수익률"
+        v={`${Math.abs(m.afterTaxReturnPct).toFixed(1)}%`}
+        rangeSub={m.afterTaxReturnRangeLabel}
+        sub={
+          m.afterTaxAmountLabel ??
+          pctOfAumLabel(
+            m.afterTaxReturnPct,
+            aumEokwon,
+            m.afterTaxReturnPct < 0 ? "-" : "+",
+          )
+        }
+        tone={
+          m.afterTaxReturnPct > 0
+            ? "up"
+            : m.afterTaxReturnPct < 0
+              ? "down"
+              : undefined
+        }
+        value={m.afterTaxReturnPct}
+      />
+      <Metric
+        k="MDD"
+        v={`${m.mddPct.toFixed(1)}%`}
+        rangeSub={m.mddRangeLabel}
+        sub={m.mddAmountLabel ?? pctOfAumLabel(m.mddPct, aumEokwon, "-")}
+        tone={m.mddPct > 0 ? "down" : undefined}
+        value={m.mddPct}
+      />
+      <Metric k="기대수익률" v={`${m.expectedReturnPct.toFixed(2)}%`} />
+      <Metric
+        k="변동성"
+        v={`${m.volatilityPct.toFixed(2)}%`}
+        sub={m.volatilityAmountLabel ?? pctOfAumLabel(m.volatilityPct, aumEokwon, "±")}
+        value={m.volatilityPct}
+      />
+      <Metric k="샤프지수" v={formatSharpe(m.sharpe)} />
+      <Metric
+        k="소르티노"
+        v={m.sortino != null ? m.sortino.toFixed(2) : "-"}
+      />
+      </div>
     </Card>
   );
 }
