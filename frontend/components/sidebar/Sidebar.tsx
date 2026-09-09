@@ -876,7 +876,7 @@ export default function Sidebar() {
             "검토 대기" 라는 말은 쓰지 않는다 — runStatus 의 blocked 라벨이
             "확정 차단 · 수동검토 대기" 이고 그쪽은 Judge 미통과라 다른 상태다. */}
         {analyzeRejected && (
-          <p className="rounded-xl border border-destructive/40 bg-destructive/5 px-3 py-2 text-[12px] font-semibold leading-snug text-destructive">
+          <p className="-mt-1 text-center text-[11px] font-semibold text-destructive">
             분석 취소됨
           </p>
         )}
