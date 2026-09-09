@@ -112,6 +112,8 @@ export interface DashboardState {
    *  현재 보유 비중과 달리 계산 요청에 실리지 않는다(표시·검토용). */
   proposedWeightsInput: CurrentWeightsInput;
   setProposedWeightsInput: (patch: CurrentWeightsInput) => void;
+  /** 제안 조정 입력을 지금 선택된 제안의 비중으로 되돌린다. */
+  resetProposedToSelected: () => void;
   /**
    * 비중 입력 폼이 지금 어느 쪽을 편집하는가.
    * 중앙 제안 카드의 세그먼트가 같은 값을 보므로 좌·우가 함께 움직인다 —
@@ -257,23 +259,48 @@ export interface DashboardState {
 }
 
 /**
- * 지금 화면이 보여 주는 안 — 확정 스냅샷과 같은 형태로 뽑는다.
+ * 중앙 카드가 지금 보여 주는 안의 키.
  *
- * 안의 키는 두 상태에 나뉘어 있다. 제안 조정 탭이면 weightsTab 이, 그렇지 않으면
- * selectedPortfolioId("a"|"b")가 정한다(components/portfolio/PortfolioSection.tsx
- * 의 세그먼트와 같은 규칙이다).
+ * 사이드바의 입력 탭(weightsTab)이 아니라 "손을 댔는가"로 정한다. 분석 직후
+ * 제안 조정 탭에는 선택한 제안의 값이 그대로 들어가 있어서, 그 시점의 조정안은
+ * 안정추구·수익추구와 같은 안이다. 실제로 값을 고쳐야 비로소 별개의 안이 된다.
+ *
+ * `components/portfolio/PortfolioSection.tsx` 의 세그먼트가 같은 식을 읽는다 —
+ * 화면에서 활성인 칸과 확정 대조의 기준이 갈라지면 안 된다.
  */
+export function selectViewedPlanKey(s: DashboardState): string {
+  return s.proposedWeightsDirty ? "proposed" : s.selectedPortfolioId;
+}
+
+/** 지금 보여 주는 안 — 확정 스냅샷과 같은 형태로 뽑는다. */
 function viewedPlan(s: DashboardState): LockedSnapshot {
-  const isProposedEdit = s.weightsTab === "proposed";
-  const planKey = isProposedEdit ? "proposed" : s.selectedPortfolioId;
-  const weights = isProposedEdit
-    ? s.proposedWeightsInput
-    : (s.portfolios.find((pf) => pf.id === planKey)?.weights ?? {});
+  const planKey = selectViewedPlanKey(s);
+  const weights =
+    planKey === "proposed"
+      ? s.proposedWeightsInput
+      : (s.portfolios.find((pf) => pf.id === planKey)?.weights ?? {});
   return {
     planKey,
     weights: normalizeWeights(weights),
     currentWeights: normalizeWeights(s.currentWeightsInput),
   };
+}
+
+/**
+ * 제안 안의 비중을 입력 폼 형태로 옮긴다. 없는 안이면 빈 값.
+ *
+ * 제안 조정은 "빈 칸에서 새로 짜는 것"이 아니라 "이 제안에서 출발해 손보는 것"이다.
+ * 그래서 제안을 고르는 순간 그 값이 입력 폼에 들어가 있어야 한다.
+ */
+function seedFromProposal(
+  portfolios: Portfolio[],
+  id: string,
+): CurrentWeightsInput {
+  const weights = portfolios.find((pf) => pf.id === id)?.weights;
+  if (!weights) return {};
+  return Object.fromEntries(
+    CALC_UNITS.map((u) => [u.id, weights[u.id] ?? 0]),
+  ) as CurrentWeightsInput;
 }
 
 export const useDashboardStore = create<DashboardState>((set) => ({
@@ -320,14 +347,25 @@ export const useDashboardStore = create<DashboardState>((set) => ({
   basePortfolios: PORTFOLIOS,
   portfolioSource: "fallback" as DataSource,
   portfolioNote: "포트폴리오를 계산 중입니다.",
+  /**
+   * 분석 결과 반영.
+   *
+   * 결과가 나오면 사이드바 입력을 제안 조정 탭으로 넘기고 선택된 제안의 비중을
+   * 심는다 — 이 시점부터 PB 가 만지는 것은 "고객이 지금 들고 있는 비중"이 아니라
+   * "고객에게 내놓을 안"이기 때문이다. 현재 보유 탭은 그대로 남아 있어 언제든
+   * 돌아갈 수 있다.
+   */
   setPortfolios: (portfolios, source, note) =>
-    set({
+    set((s) => ({
       portfolios,
       basePortfolios: portfolios,
       portfolioSource: source,
       portfolioNote: note,
       isStressMode: false,
-    }),
+      weightsTab: "proposed",
+      proposedWeightsInput: seedFromProposal(portfolios, s.selectedPortfolioId),
+      proposedWeightsDirty: false,
+    })),
   setStressPortfolios: (portfolios) => set({ portfolios, isStressMode: true }),
 
   isStressMode: false,
@@ -460,7 +498,28 @@ export const useDashboardStore = create<DashboardState>((set) => ({
         c.id === id ? { ...c, isNew: false } : c,
       ),
     })),
-  selectPortfolio: (id) => set({ selectedPortfolioId: id }),
+  /**
+   * 제안 선택 — 고른 안의 비중을 제안 조정 입력에 그대로 심는다.
+   *
+   * 심을 때 dirty 를 내린다. 방금 심은 값은 아직 조정이 아니라 그 제안 자체이고,
+   * 그 상태에서 중앙 세그먼트가 "제안 조정"으로 넘어가면 같은 안이 두 이름으로
+   * 보인다. 손대지 않은 제안은 제 이름으로 남는다.
+   *
+   * 조정 중에 다른 제안을 고르면 조정값은 덮인다 — 기준선을 갈아 끼우는 동작이라
+   * 그 위에 남은 조정을 얹을 자리가 없다.
+   */
+  selectPortfolio: (id) =>
+    set((s) => ({
+      selectedPortfolioId: id,
+      proposedWeightsInput: seedFromProposal(s.portfolios, id),
+      proposedWeightsDirty: false,
+    })),
+  /** 제안 조정을 고른 제안의 값으로 되돌린다(제안 조정 탭의 초기화). */
+  resetProposedToSelected: () =>
+    set((s) => ({
+      proposedWeightsInput: seedFromProposal(s.portfolios, s.selectedPortfolioId),
+      proposedWeightsDirty: false,
+    })),
   setIps: (patch) => set((s) => ({ ips: { ...s.ips, ...patch } })),
   setScenario: (patch) =>
     set((s) => ({ scenario: { ...s.scenario, ...patch } })),

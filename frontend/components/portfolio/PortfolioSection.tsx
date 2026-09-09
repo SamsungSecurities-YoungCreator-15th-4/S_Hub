@@ -15,7 +15,11 @@ import { type Portfolio, type PortfolioMetrics } from "@/lib/mockData";
 import { pctOfAumLabel } from "@/lib/formatKrw";
 import { formatSharpe } from "@/lib/sharpe";
 import { RUN_STATUS } from "@/lib/runStatus";
-import { useDashboardStore, useRunStatus } from "@/lib/store";
+import {
+  selectViewedPlanKey,
+  useDashboardStore,
+  useRunStatus,
+} from "@/lib/store";
 import HelpTooltip from "@/components/common/HelpTooltip";
 import AsOfNote from "@/components/common/AsOfNote";
 
@@ -53,11 +57,18 @@ const METRIC_HELP: Record<string, string> = {
  */
 type CardPortfolio = Omit<Portfolio, "id"> & { id: string };
 
-/** 제안 카드 세그먼트 라벨. 두 안은 같은 축의 양끝이라 성향 이름으로 부른다. */
+/**
+ * 제안 카드 세그먼트 라벨. 두 안은 같은 축의 양끝이라 성향 이름으로 부른다.
+ * 세 칸이 나란히 서므로 띄어쓰기를 "제안 조정" 과 같은 형태로 맞춘다.
+ */
 const PROPOSAL_LABEL: Record<string, string> = {
-  a: "안정추구",
-  b: "수익추구",
+  a: "안정 추구",
+  b: "수익 추구",
 };
+
+/** 조정안 칸의 키·라벨. 손댄 뒤에만 열린다. */
+const ADJUSTED_KEY = "proposed";
+const ADJUSTED_LABEL = "제안 조정";
 
 /** 중앙 상단: 현재(1/3) + 제안(2/3, 세그먼트 전환) */
 export default function PortfolioSection() {
@@ -65,7 +76,6 @@ export default function PortfolioSection() {
     selectedPortfolioId,
     selectPortfolio,
     proposedWeightsInput,
-    weightsTab,
     setWeightsTab,
     portfolios,
     portfolioSource,
@@ -87,7 +97,15 @@ export default function PortfolioSection() {
   const proposals = portfolios.filter((pf) => pf.id !== "current");
   const selectedProposal =
     proposals.find((pf) => pf.id === selectedPortfolioId) ?? proposals[0];
-  const isProposedEdit = weightsTab === "proposed";
+  /*
+    중앙 카드가 조정안을 보여주는 조건은 "제안 조정 탭에 있는가" 가 아니라
+    "그 값을 손댔는가" 다. 분석 직후 제안 조정 탭에는 선택한 제안의 값이 그대로
+    들어가 있어서, 그때의 조정안은 안정 추구·수익 추구와 같은 안이다.
+    판정 식은 store 의 selectViewedPlanKey 하나뿐이다 — 화면에서 활성인 칸과
+    PDF 확정 대조의 기준이 갈라지면 안 된다.
+  */
+  const viewedPlanKey = useDashboardStore(selectViewedPlanKey);
+  const isProposedEdit = viewedPlanKey === ADJUSTED_KEY;
 
   /**
    * 제안 조정 안. 비중은 PB 가 사이드바에서 손본 값(proposedWeightsInput)을 그대로 쓴다.
@@ -101,8 +119,8 @@ export default function PortfolioSection() {
         ...editBase,
         // 백엔드 원본 allocation 을 지운다 — 도넛이 사람이 조정한 weights 를 쓰게 한다.
         allocation: undefined,
-        id: "proposed",
-        name: "제안 조정",
+        id: ADJUSTED_KEY,
+        name: ADJUSTED_LABEL,
         weights: CALC_UNITS.reduce(
           (acc, unit) => ({ ...acc, [unit.id]: proposedWeightsInput[unit.id] ?? 0 }),
           {} as Portfolio["weights"],
@@ -190,14 +208,16 @@ export default function PortfolioSection() {
                 <span className="text-[13px] font-extrabold">제안</span>
                 <div className="flex rounded-lg bg-muted p-0.5">
                   {proposals.map((pf) => {
-                    const active = !isProposedEdit && selectedProposal?.id === pf.id;
+                    const active = viewedPlanKey === pf.id;
                     return (
                       <button
                         key={pf.id}
                         type="button"
+                        // 제안을 고르면 store 가 그 안의 비중을 제안 조정 입력에
+                        // 심는다 — PB 는 빈 칸이 아니라 이 안에서 출발해 손본다.
                         onClick={() => {
-                          setWeightsTab("current");
                           selectPortfolio(pf.id);
+                          setWeightsTab("proposed");
                         }}
                         aria-pressed={active}
                         className={`rounded-md px-3 py-1 text-[11px] font-bold transition-colors ${
@@ -210,18 +230,32 @@ export default function PortfolioSection() {
                       </button>
                     );
                   })}
-                  <button
-                    type="button"
-                    onClick={() => setWeightsTab("proposed")}
-                    aria-pressed={isProposedEdit}
-                    className={`rounded-md px-3 py-1 text-[11px] font-bold transition-colors ${
+                  {/*
+                    조정안 칸은 손댄 뒤에만 열린다. 손대기 전에는 선택한 제안과
+                    같은 값이라, 열어두면 같은 안이 두 이름으로 보인다.
+                    비활성일 때도 왜 못 누르는지 이유를 띄운다(무반응 금지).
+                  */}
+                  <span
+                    title={
                       isProposedEdit
-                        ? "bg-white text-brand-dark shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
+                        ? "직접 조정한 안입니다."
+                        : "좌측 자산 비중 조절기의 제안 조정 탭에서 비중을 수정하면 열립니다."
+                    }
                   >
-                    제안 조정
-                  </button>
+                    <button
+                      type="button"
+                      disabled={!isProposedEdit}
+                      onClick={() => setWeightsTab("proposed")}
+                      aria-pressed={isProposedEdit}
+                      className={`rounded-md px-3 py-1 text-[11px] font-bold transition-colors ${
+                        isProposedEdit
+                          ? "bg-white text-brand-dark shadow-sm"
+                          : "text-muted-foreground/40"
+                      }`}
+                    >
+                      {ADJUSTED_LABEL}
+                    </button>
+                  </span>
                 </div>
                 </>
               }
