@@ -241,7 +241,7 @@ function CoverPage() {
   const storePortfolios = useDashboardStore((s) => s.portfolios);
   const taxEffect = buildPdfTaxEffect(extractTaxOptimizerEntry(useDashboardStore((s) => s.taxOptimizer), selectedPortfolioId));
   const selectedPortfolioName =
-    storePortfolios.find((p) => p.id === selectedPortfolioId)?.name ?? "포트폴리오 A";
+    storePortfolios.find((p) => p.id === selectedPortfolioId)?.name ?? "안정추구";
   return (
     <div
       data-pdf-page=""
@@ -711,8 +711,8 @@ function PortfolioPage() {
 
   const cols = [
     { p: current, alloc: buildPdfAllocation(current), label: "현재 포트폴리오", badge: "", badgeColor: "#6B7280", headerColor: "#6B7280", selected: false },
-    { p: portA, alloc: buildPdfAllocation(portA), label: "포트폴리오 A", badge: "안정추구형", badgeColor: BRAND, headerColor: BRAND, selected: selId === "a" },
-    { p: portB, alloc: buildPdfAllocation(portB), label: "포트폴리오 B", badge: "수익추구형", badgeColor: "#2C7BFF", headerColor: "#2C7BFF", selected: selId === "b" },
+    { p: portA, alloc: buildPdfAllocation(portA), label: "안정추구", badge: "", badgeColor: BRAND, headerColor: BRAND, selected: selId === "a" },
+    { p: portB, alloc: buildPdfAllocation(portB), label: "수익추구", badge: "", badgeColor: "#2C7BFF", headerColor: "#2C7BFF", selected: selId === "b" },
   ];
 
   const perfRows = buildPdfPerfRows(storePortfolios);
@@ -1078,7 +1078,7 @@ function TaxPage() {
                 marginBottom: 4,
               }}
             >
-              연간 절세 효과 ({selectedPf?.name ?? "포트폴리오 A"} 기준 ·{" "}
+              연간 절세 효과 ({selectedPf?.name ?? "안정추구"} 기준 ·{" "}
               {customer.aumLabel})
             </div>
             <div

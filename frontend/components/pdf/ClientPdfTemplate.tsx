@@ -51,10 +51,6 @@ const ACCOUNT_PDF = [
   },
 ];
 
-const PORT_TYPE_LABEL: Record<string, string> = {
-  a: "안정추구형",
-  b: "수익추구형",
-};
 
 const BRAND = "#0050D6";
 const BRAND_DARK = "#1A4BAF";
@@ -151,7 +147,7 @@ function CoverPage() {
   );
   const selectedPortfolioName =
     storePortfolios.find((p) => p.id === selectedPortfolioId)?.name ??
-    "포트폴리오 A";
+    "안정추구";
   return (
     <div
       data-pdf-page=""
@@ -869,7 +865,7 @@ function PortfolioPage() {
           </div>
         </div>
 
-        {/* 포트폴리오 A */}
+        {/* 제안 포트폴리오 */}
         <div
           style={{
             border: `1.5px solid ${BRAND}`,
@@ -889,19 +885,6 @@ function PortfolioPage() {
           >
             <div style={{ fontSize: 13, fontWeight: 800, color: BRAND }}>
               {selectedPf.name}
-            </div>
-            <div
-              style={{
-                background: "#F3F4F6",
-                color: MUTED,
-                fontSize: 10,
-                fontWeight: 700,
-                borderRadius: 6,
-                padding: "3px 8px",
-                border: `1px solid ${BORDER}`,
-              }}
-            >
-              {PORT_TYPE_LABEL[selectedPf.id] ?? "수익추구형"}
             </div>
           </div>
           <div
@@ -1189,7 +1172,7 @@ function TaxPage() {
                 marginBottom: 4,
               }}
             >
-              연간 절세 효과 ({selectedPf?.name ?? "포트폴리오 A"} 기준 ·{" "}
+              연간 절세 효과 ({selectedPf?.name ?? "안정추구"} 기준 ·{" "}
               {C.aumLabel})
             </div>
             <div
