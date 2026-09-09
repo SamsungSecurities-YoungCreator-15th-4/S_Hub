@@ -291,8 +291,6 @@ function PortfolioCard({
         <Metric k="샤프지수" v={formatSharpe(m.sharpe)} />
         </div>
       )}
-      {/* 지표 타일의 기준일·통화. 백엔드 계산값이라 인용할 외부 출처가 없어 기준일만 적는다. */}
-      <AsOfNote source="KRW" className="mt-1.5 text-[10px]" />
     </Card>
   );
 }
