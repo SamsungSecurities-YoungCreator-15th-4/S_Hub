@@ -248,7 +248,13 @@ export default function TaxSection() {
   }
 
   return (
-    <Tabs defaultValue="effect">
+    /*
+      제목 줄과 카드 위치는 그대로 두고 카드 상자만 아래로 늘려 중앙 열 바닥을
+      메운다. 안쪽 내용은 자연 높이 그대로라 남는 높이는 카드 안쪽 여백이 된다 —
+      차트에 flex-1 을 흘려보내면 막대 세 개가 흩어져 오히려 성겨 보였다.
+      min-h-0 이 없으면 flex 자식이 내용 높이 아래로 줄지 않아 세로 스크롤이 생긴다.
+    */
+    <Tabs defaultValue="effect" className="flex min-h-0 flex-1 flex-col">
       <div className="mb-2 flex items-center justify-between px-0.5">
         <div className="flex items-center gap-2.5">
           <h2 className="text-lg font-extrabold">절세 최적화 시뮬레이터</h2>
@@ -280,7 +286,7 @@ export default function TaxSection() {
         </TabsList>
       </div>
 
-      <Card className="gap-0 p-3">
+      <Card className="min-h-0 flex-1 gap-0 p-3">
         {/* 탭 1: 절세 효과 */}
         <TabsContent value="effect" className="flex flex-col gap-2">
           {/*
