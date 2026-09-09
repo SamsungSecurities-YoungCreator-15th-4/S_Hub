@@ -10,11 +10,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { RUN_STATUS, canTransition } from "@/lib/runStatus";
-import { useDashboardStore, useRunStatus } from "@/lib/store";
+import { CALC_UNITS } from "@/lib/assetMapping";
 import {
-  ALLOCATION_SUMMARY,
+  selectViewedPlanKey,
+  useDashboardStore,
+  useRunStatus,
+} from "@/lib/store";
+import {
   CITATIONS,
-  CURRENT_ALLOCATION,
   CVAR_CONTRIBUTIONS,
   CVAR_CONTRIBUTION_NOTE,
   DISCLAIMERS,
@@ -197,11 +200,48 @@ function Block({
 const TH = "px-2 py-1.5 text-left text-[11px] font-bold text-muted-foreground";
 const TD = "px-2 py-1.5 text-[12px] font-semibold";
 
+/**
+ * 배분만 실제 값에서 읽는다.
+ *
+ * 확정 대상은 지금 보고 있는 제안이다. 상수로 적어 두면 대시보드에서 안을 바꿔도
+ * 리포트는 그대로라, 두 화면이 다른 포트폴리오를 말하게 된다. 배분은 비중을
+ * 옮겨 적는 일이라 계산이 필요 없어 화면에서 바로 읽을 수 있다.
+ *
+ * VaR·스트레스 등 나머지 수치는 상수로 둔다 — 수익률 시계열이 있어야 나오는
+ * 값이라 화면에서 다시 만들 수 없다.
+ */
 function AllocationBlock() {
+  const planKey = useDashboardStore(selectViewedPlanKey);
+  const proposedWeightsInput = useDashboardStore((s) => s.proposedWeightsInput);
+  const portfolios = useDashboardStore((s) => s.portfolios);
+
+  const weights: Record<string, number | undefined> =
+    planKey === "proposed"
+      ? proposedWeightsInput
+      : (portfolios.find((pf) => pf.id === planKey)?.weights ?? {});
+
+  const rows = CALC_UNITS.map((unit) => ({
+    label: unit.label,
+    weightPct: weights[unit.id] ?? 0,
+  }));
+
+  // 대분류 집계 — 현금은 계산단위가 아니라 별도 항목이라 따로 더한다.
+  const groupSum = (group: string) =>
+    CALC_UNITS.filter((u) => u.group === group).reduce(
+      (acc, u) => acc + (weights[u.id] ?? 0),
+      0,
+    );
+  const summary = [
+    { label: "주식", weightPct: groupSum("주식") },
+    { label: "채권", weightPct: groupSum("채권") },
+    { label: "대체", weightPct: groupSum("대체") },
+    { label: "현금", weightPct: weights.cash ?? 0 },
+  ];
+
   return (
-    <Block title="현재 자산 배분">
+    <Block title="자산 배분">
       <div className="mb-2.5 flex flex-wrap gap-x-4 gap-y-1">
-        {ALLOCATION_SUMMARY.map((row) => (
+        {summary.map((row) => (
           <span key={row.label} className="text-[12px] font-bold tabular-nums">
             {row.label}{" "}
             <span className="text-brand-dark">{row.weightPct.toFixed(0)}%</span>
@@ -209,7 +249,7 @@ function AllocationBlock() {
         ))}
       </div>
       <div className="grid grid-cols-2 gap-x-6 gap-y-1 sm:grid-cols-3">
-        {CURRENT_ALLOCATION.map((row) => (
+        {rows.map((row) => (
           <div
             key={row.label}
             className={`flex justify-between border-b border-dashed py-1 text-[12px] tabular-nums ${
