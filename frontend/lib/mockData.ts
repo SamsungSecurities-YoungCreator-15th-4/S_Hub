@@ -591,7 +591,16 @@ export interface TaxAdviceDisplayCard {
   savingRole: "primary" | "included";
   icon: string;
   title: string;
+  /**
+   * 고객용 PDF 가 쓰는 산문. 문단으로 읽히는 매체라 문장 형태를 유지한다.
+   * 화면 카드는 아래 helpLines 를 쓴다 — 같은 내용이므로 한쪽만 고치지 말 것.
+   */
   body: string;
+  /**
+   * 화면 가이드 툴팁용 개조식 목록. 마우스를 올린 잠깐 읽는 글이라 한 줄에
+   * 한 사실만 둔다.
+   */
+  helpLines: string[];
   tag: string;
   saving: string;
   products: TaxAdviceProduct[];
@@ -612,6 +621,11 @@ export const TAX_ADVICE: {
       // 출처: 삼성증권 ISA 안내
       // https://www.samsungpop.com/ux/kor/finance/isa/isainfo/intro.do
       body: "계좌 안의 손익을 통산한 순소득 중 일반형 200만원·서민형 400만원까지 비과세되고, 초과분은 9.9%로 분리과세됩니다.",
+      helpLines: [
+        "계좌 내 손익을 통산한 순소득에 과세",
+        "비과세 한도 일반형 200만원 · 서민형 400만원",
+        "초과분은 9.9% 분리과세",
+      ],
       tag: "연 2,000만원 · 의무보유 3년",
       saving: "",
       products: [
@@ -631,6 +645,10 @@ export const TAX_ADVICE: {
       // https://www.nts.go.kr/nts/cm/cntnts/cntntsView.do?cntntsId=7875&mi=6449
       // https://www.samsungpop.com/ux/kor/customer/guide/workproductguide/personalAnnuity.do
       body: "연금저축 납입액은 연 600만원까지 세액공제 대상이며, IRP·DC를 더하면 연금계좌 합산 연 900만원까지 적용됩니다.",
+      helpLines: [
+        "연 600만원까지 세액공제 대상",
+        "IRP·DC 합산 시 연 900만원까지 적용",
+      ],
       tag: "연금계좌 합산 절감액",
       saving: "",
       products: [
@@ -649,6 +667,14 @@ export const TAX_ADVICE: {
       // 출처: 삼성증권 연금가이드(가입대상·세액공제 한도)
       // https://www.samsungpop.com/mbw/finance/pensionAccount.do?cmd=guide&tab=DIRP
       body: "소득이 있는 취업자가 가입할 수 있으며, 연금저축·DC와 합산해 연 900만원까지 세액공제 대상이 됩니다.",
+      helpLines: [
+        "소득이 있는 취업자가 가입 가능",
+        "연금저축·DC와 합산해 연 900만원까지 세액공제",
+        // 연금저축을 먼저 채우는 배분 순서의 근거. 디폴트옵션이면 100% 투자가
+        // 가능하므로 "IRP 가 불리하다"고 단정하지 않고 한도가 있다는 사실만 적는다.
+        "위험자산 투자한도 70% (디폴트옵션 운용 시 예외)",
+        "중도인출은 무주택 주택구입·요양 등 법정 사유만 가능",
+      ],
       tag: "연금저축과 900만원 한도 공유",
       saving: "합산 절감액에 포함",
       products: [
