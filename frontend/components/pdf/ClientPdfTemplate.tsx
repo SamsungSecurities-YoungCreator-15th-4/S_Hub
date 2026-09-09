@@ -1,8 +1,14 @@
 /**
  * 고객용 PDF 템플릿 — A4 세로(794×1123px) 고정, 5페이지.
- * 구조: 표지 → 시장&IPS → 포트폴리오 비교&지표 → 절세&계좌
+ * 구조: 표지 → 시장&IPS → 포트폴리오 비교&지표 → 절세&계좌 → 위험 점검
  */
 
+import {
+  STRESS_SCENARIOS,
+  formatKrwLoss,
+  runStress,
+} from "@/lib/stressScenarios";
+import { DISCLAIMERS, IPS_CONFLICTS } from "@/lib/mock/symphonyReport";
 import { useDashboardStore } from "@/lib/store";
 import { formatSharpe } from "@/lib/sharpe";
 import {
@@ -640,7 +646,7 @@ function MarketIpsPage() {
         </div>
       </div>
 
-      <PageFooter page={2} total={4} />
+      <PageFooter page={2} total={5} />
     </div>
   );
 }
@@ -1064,7 +1070,7 @@ function PortfolioPage() {
         </div>
       </div>
 
-      <PageFooter page={3} total={4} />
+      <PageFooter page={3} total={5} />
     </div>
   );
 }
@@ -1704,7 +1710,240 @@ function TaxPage() {
         </div>
       </div>
 
-      <PageFooter page={4} total={4} />
+      <PageFooter page={4} total={5} />
+    </div>
+  );
+}
+
+// ── Page 5: 위험 점검 ────────────────────────────────────────────
+//
+// "자세히" 리포트에서 고객이 읽을 수 있는 것만 골라 싣는다.
+//   스트레스 시나리오 — 화면 카드와 같은 runStress 로 계산해 숫자가 어긋나지 않는다
+//   IPS 충돌 검사     — 무엇이 왜 걸리는지. 룰 ID·정책 파일명은 빼고 문장만 남긴다
+//   면책             — 고객에게 나가는 문서라 필수다
+//
+// VaR·CVaR·손실 기여도·검증 항목·재현성 해시는 싣지 않는다. 설명 없이는 읽히지
+// 않거나(VaR 99% 1일), 내부 품질 관리라 고객 문서에 들어갈 성격이 아니다.
+// PB 리포트에는 전부 들어간다.
+
+function RiskCheckPage() {
+  const C = useSelectedCustomer();
+  const storePortfolios = useDashboardStore((s) => s.portfolios);
+  const selectedPortfolioId = useDashboardStore((s) => s.selectedPortfolioId);
+  const selectedPf =
+    storePortfolios.find((p) => p.id === selectedPortfolioId) ??
+    storePortfolios.find((p) => p.id === "a");
+  if (!C || !selectedPf) return null;
+
+  const totalKrw = (C.aumEokwon ?? 0) * 100_000_000;
+  const rows = STRESS_SCENARIOS.map((sc) => ({
+    label: sc.label,
+    shock: sc.shockSummary,
+    loss: runStress(selectedPf.weights, totalKrw, sc),
+  }));
+
+  return (
+    <div
+      data-pdf-page=""
+      style={{
+        width: 794,
+        height: 1123,
+        fontFamily: "Pretendard, Apple SD Gothic Neo, sans-serif",
+        background: "white",
+        position: "relative",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        style={{
+          background: `linear-gradient(90deg, ${BRAND_DARK} 0%, ${BRAND} 100%)`,
+          padding: "19px 40px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <div>
+          <div style={{ fontSize: 18, fontWeight: 800, color: "white" }}>
+            ④ 위험 점검
+          </div>
+          <div
+            style={{
+              fontSize: 13,
+              color: "rgba(255,255,255,0.75)",
+              marginTop: 2,
+            }}
+          >
+            과거 충격 국면에서의 손실 추정 · 확인이 필요한 항목
+          </div>
+        </div>
+      </div>
+
+      <div style={{ padding: "22px 40px 80px", wordBreak: "keep-all" }}>
+        <div style={{ display: "flex", alignItems: "center", marginBottom: 10 }}>
+          <SectionBar />
+          <div style={{ fontSize: 15, fontWeight: 800, color: TEXT }}>
+            이런 일이 다시 오면
+          </div>
+        </div>
+        <p style={{ margin: "0 0 12px", fontSize: 11, color: MUTED, lineHeight: 1.7 }}>
+          과거에 있었던 시장 충격을 참조해, {selectedPf.name} 구성이 같은 상황을
+          만났을 때 줄어들 수 있는 금액입니다. 정밀한 재현이 아니라 방향과 크기를
+          맞춘 대표 시나리오입니다.
+        </p>
+
+        <table
+          style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}
+        >
+          <colgroup>
+            <col style={{ width: 120 }} />
+            <col />
+            <col style={{ width: 200 }} />
+          </colgroup>
+          <thead>
+            <tr>
+              <th
+                style={{
+                  padding: "8px 10px",
+                  textAlign: "left",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: MUTED,
+                  background: BG_ALT,
+                  borderBottom: `1px solid ${BORDER}`,
+                }}
+              >
+                시나리오
+              </th>
+              <th
+                style={{
+                  padding: "8px 10px",
+                  textAlign: "left",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: MUTED,
+                  background: BG_ALT,
+                  borderBottom: `1px solid ${BORDER}`,
+                }}
+              >
+                충격 가정
+              </th>
+              <th
+                style={{
+                  padding: "8px 10px",
+                  textAlign: "right",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: MUTED,
+                  background: BG_ALT,
+                  borderBottom: `1px solid ${BORDER}`,
+                }}
+              >
+                줄어들 수 있는 금액
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.label}>
+                <td
+                  style={{
+                    padding: "10px",
+                    fontSize: 12,
+                    fontWeight: 800,
+                    color: TEXT,
+                    borderBottom: `1px solid ${BORDER}`,
+                  }}
+                >
+                  {r.label}
+                </td>
+                <td
+                  style={{
+                    padding: "10px",
+                    fontSize: 10.5,
+                    color: MUTED,
+                    borderBottom: `1px solid ${BORDER}`,
+                  }}
+                >
+                  {r.shock}
+                </td>
+                <td
+                  style={{
+                    padding: "10px",
+                    textAlign: "right",
+                    borderBottom: `1px solid ${BORDER}`,
+                  }}
+                >
+                  <div style={{ fontSize: 13, fontWeight: 900, color: BRAND }}>
+                    &minus;{formatKrwLoss(r.loss.lossKrw)}
+                  </div>
+                  <div style={{ fontSize: 10, color: MUTED, marginTop: 2 }}>
+                    &minus;{formatKrwLoss(r.loss.lossKrwLow)} ~ &minus;
+                    {formatKrwLoss(r.loss.lossKrwHigh)}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            margin: "26px 0 10px",
+          }}
+        >
+          <SectionBar />
+          <div style={{ fontSize: 15, fontWeight: 800, color: TEXT }}>
+            확인이 필요한 항목
+          </div>
+        </div>
+
+        {IPS_CONFLICTS.map((c) => (
+          <div
+            key={c.rule}
+            style={{
+              border: `1px solid ${BORDER}`,
+              borderRadius: 8,
+              padding: "11px 13px",
+              marginBottom: 8,
+              background: BG_ALT,
+            }}
+          >
+            <div style={{ fontSize: 12, fontWeight: 800, color: TEXT, marginBottom: 3 }}>
+              {c.message}
+            </div>
+            <div style={{ fontSize: 11, color: TEXT }}>
+              {c.observed} · 기준 {c.threshold}
+            </div>
+          </div>
+        ))}
+        <p style={{ margin: "6px 0 0", fontSize: 10.5, color: MUTED, lineHeight: 1.7 }}>
+          위 항목은 투자를 막는 사유가 아니라, 담당 PB 와 함께 확인하고 조정할 지점입니다.
+        </p>
+
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            margin: "26px 0 10px",
+          }}
+        >
+          <SectionBar />
+          <div style={{ fontSize: 15, fontWeight: 800, color: TEXT }}>유의사항</div>
+        </div>
+        {DISCLAIMERS.map((d) => (
+          <p
+            key={d.code}
+            style={{ margin: "0 0 6px", fontSize: 10.5, color: MUTED, lineHeight: 1.7 }}
+          >
+            · {d.text}
+          </p>
+        ))}
+      </div>
+
+      <PageFooter page={5} total={5} />
     </div>
   );
 }
@@ -1718,6 +1957,7 @@ export default function ClientPdfTemplate() {
       <MarketIpsPage />
       <PortfolioPage />
       <TaxPage />
+      <RiskCheckPage />
     </>
   );
 }

@@ -4,6 +4,22 @@
  */
 
 import { STRESS_SCENARIOS, runStress } from "@/lib/stressScenarios";
+import {
+  CITATIONS,
+  CVAR_CONTRIBUTIONS,
+  CVAR_CONTRIBUTION_NOTE,
+  DISCLAIMERS,
+  IPS_CONFLICTS,
+  IPS_CONFLICT_NOTE,
+  REPORT_AS_OF,
+  REPORT_META,
+  REPRODUCIBILITY_HASHES,
+  REPRODUCIBILITY_NOTE,
+  RISK_METRICS,
+  VERIFICATIONS,
+  VERIFICATION_NOTE,
+  formatWon,
+} from "@/lib/mock/symphonyReport";
 import { useDashboardStore } from "@/lib/store";
 import { buildPdfAllocation, buildPdfMacroCell, buildPdfPerfRows } from "@/lib/pdfPortfolioData";
 import {
@@ -687,7 +703,7 @@ function MarketIpsPage() {
         </table>
       </div>
 
-      <PageFooter page={2} total={5} />
+      <PageFooter page={2} total={7} />
     </div>
   );
 }
@@ -1017,7 +1033,7 @@ function PortfolioPage() {
         )}
       </div>
 
-      <PageFooter page={3} total={5} />
+      <PageFooter page={3} total={7} />
     </div>
   );
 }
@@ -1639,7 +1655,7 @@ function TaxPage() {
         </div>
       </div>
 
-      <PageFooter page={4} total={5} />
+      <PageFooter page={4} total={7} />
     </div>
   );
 }
@@ -1678,7 +1694,7 @@ function AiPage() {
       }}
     >
       <PageHeader
-        pageNum="④"
+        pageNum="⑦"
         title="AI 인사이트"
         subtitle="RAG 기반 포트폴리오 분석 · 시장 환경 대응 제안"
       />
@@ -1843,7 +1859,317 @@ function AiPage() {
         )}
       </div>
 
-      <PageFooter page={5} total={5} />
+      <PageFooter page={7} total={7} />
+    </div>
+  );
+}
+
+// ── 페이지 5·6: S.ymphony 리스크 리포트 ─────────────────────────
+//
+// "자세히" 화면(components/dashboard/ReportDetailModal)이 보여 주는 내용을
+// 그대로 싣는다. PB 리포트는 근거·검증·재현성까지 남기는 문서라 전부 넣는다.
+// 값의 출처는 lib/mock/symphonyReport.ts 하나이며 여기서 계산하지 않는다.
+
+const RTH: React.CSSProperties = {
+  padding: "7px 10px",
+  textAlign: "left",
+  fontSize: 10.5,
+  fontWeight: 700,
+  color: MUTED,
+  background: BG_ALT,
+  borderBottom: `1px solid ${BORDER}`,
+};
+const RTD: React.CSSProperties = {
+  padding: "7px 10px",
+  fontSize: 10.5,
+  fontWeight: 600,
+  color: TEXT,
+  borderBottom: `1px solid ${BORDER}`,
+};
+
+function ReportSection({
+  title,
+  note,
+  children,
+}: {
+  title: string;
+  note?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div style={{ marginBottom: 18 }}>
+      <div style={{ display: "flex", alignItems: "center", marginBottom: 9 }}>
+        <SectionBar />
+        <div style={{ fontSize: 14, fontWeight: 800, color: TEXT }}>{title}</div>
+      </div>
+      {children}
+      {note && (
+        <p style={{ margin: "7px 0 0", fontSize: 10, color: MUTED, lineHeight: 1.6 }}>
+          {note}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function RiskReportPage() {
+  const contributionTotal = CVAR_CONTRIBUTIONS.reduce(
+    (acc, r) => acc + r.weightPct,
+    0,
+  );
+  return (
+    <div
+      data-pdf-page=""
+      style={{
+        width: W,
+        height: H,
+        fontFamily: "Pretendard, Apple SD Gothic Neo, sans-serif",
+        background: "white",
+        position: "relative",
+        overflow: "hidden",
+      }}
+    >
+      <PageHeader
+        pageNum="⑤"
+        title="S.ymphony 리스크 리포트"
+        subtitle={`IPS 충돌 검사 · VaR/CVaR · 손실 기여도 · 기준일 ${REPORT_AS_OF}`}
+      />
+
+      <div style={{ padding: "22px 40px 80px", wordBreak: "keep-all" }}>
+        <ReportSection
+          title={`IPS 충돌 검사 ${IPS_CONFLICTS.length}건`}
+          note={IPS_CONFLICT_NOTE}
+        >
+          {IPS_CONFLICTS.map((c) => (
+            <div
+              key={c.rule}
+              style={{
+                border: `1px solid ${BORDER}`,
+                borderRadius: 8,
+                padding: "9px 11px",
+                marginBottom: 7,
+                background: BG_ALT,
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 7,
+                  marginBottom: 3,
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 9,
+                    fontWeight: 800,
+                    color: "#92400E",
+                    background: "#FEF3C7",
+                    padding: "2px 6px",
+                    borderRadius: 4,
+                  }}
+                >
+                  {c.severity.toUpperCase()}
+                </span>
+                <span style={{ fontSize: 11.5, fontWeight: 800, color: TEXT }}>
+                  {c.message}
+                </span>
+                <span style={{ fontSize: 9, color: MUTED }}>{c.rule}</span>
+              </div>
+              <div style={{ fontSize: 10.5, color: TEXT, marginBottom: 2 }}>
+                관측값 {c.observed} · 기준값 {c.threshold}
+              </div>
+              <div style={{ fontSize: 10, color: MUTED }}>{c.basis}</div>
+            </div>
+          ))}
+        </ReportSection>
+
+        <ReportSection
+          title={`VaR / CVaR 신뢰수준 ${REPORT_META.confidenceLevelPct}% · ${formatWon(REPORT_META.totalValuationKrw)} 기준`}
+        >
+          <table
+            style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}
+          >
+            <colgroup>
+              <col style={{ width: 130 }} />
+              <col />
+              <col />
+              <col style={{ width: 165 }} />
+            </colgroup>
+            <thead>
+              <tr>
+                <th style={RTH}>지표</th>
+                <th style={{ ...RTH, textAlign: "right" }}>비율</th>
+                <th style={{ ...RTH, textAlign: "right" }}>금액</th>
+                <th style={{ ...RTH, textAlign: "right" }}>90% 신뢰구간</th>
+              </tr>
+            </thead>
+            <tbody>
+              {RISK_METRICS.map((m) => (
+                <tr key={m.label}>
+                  <td style={{ ...RTD, fontWeight: 800 }}>{m.label}</td>
+                  <td style={{ ...RTD, textAlign: "right" }}>
+                    {m.ratioPct.toFixed(2)}%
+                  </td>
+                  <td style={{ ...RTD, textAlign: "right", color: BRAND }}>
+                    -{formatWon(m.amountKrw)}
+                  </td>
+                  <td style={{ ...RTD, textAlign: "right", color: MUTED }}>
+                    {m.ciPct[0].toFixed(2)}% ~ {m.ciPct[1].toFixed(2)}%
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </ReportSection>
+
+        <ReportSection
+          title={`CVaR 자산군 기여도 합계 ${contributionTotal.toFixed(1)}%`}
+          note={CVAR_CONTRIBUTION_NOTE}
+        >
+          <table
+            style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}
+          >
+            <tbody>
+              {CVAR_CONTRIBUTIONS.map((r) => (
+                <tr key={r.label}>
+                  <td style={{ ...RTD, fontWeight: 700 }}>{r.label}</td>
+                  <td style={{ ...RTD, textAlign: "right" }}>
+                    {r.weightPct.toFixed(1)}%
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </ReportSection>
+      </div>
+
+      <PageFooter page={5} total={7} />
+    </div>
+  );
+}
+
+function EvidencePage() {
+  const passed = VERIFICATIONS.filter((v) => v.passed).length;
+  return (
+    <div
+      data-pdf-page=""
+      style={{
+        width: W,
+        height: H,
+        fontFamily: "Pretendard, Apple SD Gothic Neo, sans-serif",
+        background: "white",
+        position: "relative",
+        overflow: "hidden",
+      }}
+    >
+      <PageHeader
+        pageNum="⑥"
+        title="근거 · 검증 · 재현성"
+        subtitle={`인용 ${CITATIONS.length}건 · 검증 ${passed}/${VERIFICATIONS.length} 통과 · 엔진 ${REPORT_META.engineVersion}`}
+      />
+
+      <div style={{ padding: "22px 40px 80px", wordBreak: "keep-all" }}>
+        <ReportSection title={`인용·출처 ${CITATIONS.length}건`}>
+          <table
+            style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}
+          >
+            <colgroup>
+              <col style={{ width: 26 }} />
+              <col />
+              <col style={{ width: 175 }} />
+            </colgroup>
+            <thead>
+              <tr>
+                <th style={RTH}>#</th>
+                <th style={RTH}>출처</th>
+                <th style={RTH}>인용 위치</th>
+              </tr>
+            </thead>
+            <tbody>
+              {CITATIONS.map((c) => (
+                <tr key={c.no}>
+                  <td style={{ ...RTD, color: MUTED }}>{c.no}</td>
+                  <td style={RTD}>{c.source}</td>
+                  <td style={{ ...RTD, color: MUTED }}>{c.locator}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </ReportSection>
+
+        <ReportSection
+          title={`검증 항목 ${passed}/${VERIFICATIONS.length} 통과`}
+          note={VERIFICATION_NOTE}
+        >
+          <table
+            style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}
+          >
+            <colgroup>
+              <col style={{ width: 62 }} />
+              <col />
+            </colgroup>
+            <tbody>
+              {VERIFICATIONS.map((v) => (
+                <tr key={v.label}>
+                  <td
+                    style={{
+                      ...RTD,
+                      fontWeight: 800,
+                      color: v.passed ? BRAND : UP,
+                    }}
+                  >
+                    {v.passed ? "통과" : "미통과"}
+                  </td>
+                  <td style={RTD}>{v.label}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </ReportSection>
+
+        <ReportSection title="재현성 해시" note={REPRODUCIBILITY_NOTE}>
+          <table
+            style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}
+          >
+            <colgroup>
+              <col style={{ width: 140 }} />
+              <col />
+            </colgroup>
+            <tbody>
+              {REPRODUCIBILITY_HASHES.map((h) => (
+                <tr key={h.label}>
+                  <td style={{ ...RTD, fontWeight: 700 }}>{h.label}</td>
+                  <td
+                    style={{
+                      ...RTD,
+                      fontFamily: "monospace",
+                      fontSize: 9,
+                      color: MUTED,
+                      wordBreak: "break-all",
+                    }}
+                  >
+                    {h.value}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </ReportSection>
+
+        <ReportSection title="면책">
+          {DISCLAIMERS.map((d) => (
+            <p
+              key={d.code}
+              style={{ margin: "0 0 5px", fontSize: 10, color: MUTED, lineHeight: 1.7 }}
+            >
+              · {d.text}
+            </p>
+          ))}
+        </ReportSection>
+      </div>
+
+      <PageFooter page={6} total={7} />
     </div>
   );
 }
@@ -1856,6 +2182,8 @@ export default function PbPdfTemplate() {
       <MarketIpsPage />
       <PortfolioPage />
       <TaxPage />
+      <RiskReportPage />
+      <EvidencePage />
       <AiPage />
     </div>
   );
