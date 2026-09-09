@@ -384,7 +384,7 @@ export default function TaxSection() {
         </TabsContent>
 
         {/* 탭 2: 절세 제안 */}
-        <TabsContent value="advice" className="flex flex-col gap-2.5">
+        <TabsContent value="advice" className="flex min-h-0 flex-1 flex-col gap-2.5">
           {plan &&
             customer &&
             (customer.annualContributionManwon ?? 0) > 0 &&
@@ -583,8 +583,13 @@ function AdviceCards({ liveCards, plan }: AdviceCardsProps) {
       : TAX_ADVICE.totalSaving;
 
   return (
-    <>
-      <div className="max-h-[520px] overflow-y-auto">
+    /*
+      총합 바만 카드 바닥에 붙인다. 납입안 카드는 내용만큼만 차지한다 — 함께
+      늘리면 본문이 h-[104px] 로 고정이라 절감액 줄 아래가 하얗게 빈다.
+      남는 높이는 카드 목록과 총합 바 사이의 여백이 된다.
+    */
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="mb-2 max-h-[520px] overflow-y-auto">
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
           {cards.map((card) => {
             // 연계 상품 목록이 비면 "상품추천" 탭 자체를 감춘다 — 빈 탭·빈 박스를 남기지 않는다.
@@ -689,7 +694,7 @@ function AdviceCards({ liveCards, plan }: AdviceCardsProps) {
           })}
         </div>
       </div>
-      <div className="mt-2 flex items-center justify-between rounded-xl bg-brand/10 px-3 py-2">
+      <div className="mt-auto flex shrink-0 items-center justify-between rounded-xl bg-brand/10 px-3 py-2">
         <span className="text-[13px] font-bold text-brand-dark">
           {TAX_ADVICE.totalLabel}
         </span>
@@ -697,7 +702,7 @@ function AdviceCards({ liveCards, plan }: AdviceCardsProps) {
           {totalSaving}
         </span>
       </div>
-    </>
+    </div>
   );
 }
 
