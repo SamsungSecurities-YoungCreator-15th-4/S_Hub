@@ -21,6 +21,14 @@ const FLOW_TAX_COLORS = ["#F04452", "#F04452", "#F4A8AE"];
 /** 연금 세액공제. 근로소득세에서 돌려받는 돈이라 금융소득세(빨강)와 세목이 달라 색을 나눈다. */
 const CREDIT_COLOR = "#16B47A";
 
+/*
+  머리말 분해 줄에 쓰는 부호 표기. 세 항이 그대로 더해져 금융소득이 되므로
+  각 항의 부호는 "금융소득에 얼마를 더하고 빼는가"를 뜻한다 — 전환 세금은
+  나가는 돈이라 음수로 적힌다.
+*/
+const signed = (v: number) =>
+  `${v >= 0 ? "+" : "−"}${Math.abs(v).toLocaleString()}`;
+
 /** 만원 값 표기. 1억 미만을 "0.04억"으로 적으면 읽히지 않는다. */
 const money = (manwon: number) =>
   manwon >= 10000 ? `${(manwon / 10000).toFixed(2)}억` : `${Math.round(manwon).toLocaleString()}만`;
@@ -105,7 +113,10 @@ export default function TaxWaterfall({
   let breakdown: {
     financialManwon: number;
     pretaxGainManwon: number;
-    taxDeltaManwon: number;
+    /** 전환으로 늘어난 금융소득세 — 금융소득에서 빠지는 몫이라 부호가 뒤집힌다. */
+    switchTaxManwon: number;
+    /** ISA 가 도로 깎은 금융소득세. switchTax − isaCut 이 실제 세금 증가분이다. */
+    isaCutManwon: number;
     refundManwon: number;
   } | null = null;
 
@@ -186,10 +197,13 @@ export default function TaxWaterfall({
      */
     const financialManwon = rows[2].afterTax - rows[0].afterTax;
     const taxDeltaManwon = rows[2].tax - rows[0].tax;
+    const switchTaxManwon = rows[1].tax - rows[0].tax;
     breakdown = {
       financialManwon,
       pretaxGainManwon: financialManwon + taxDeltaManwon,
-      taxDeltaManwon,
+      switchTaxManwon,
+      // 차액으로 구한다. 이렇게 두면 세전 − 전환세금 + ISA 가 늘 금융소득과 맞는다.
+      isaCutManwon: switchTaxManwon - taxDeltaManwon,
       refundManwon: refund,
     };
     domainMax =
@@ -259,7 +273,7 @@ export default function TaxWaterfall({
     "세액공제는 근로소득세 환급이라 세목이 달라 막대 밖에 붙인다",
     ...(breakdown
       ? [
-          `세금 ${breakdown.taxDeltaManwon >= 0 ? "+" : "−"}${Math.abs(breakdown.taxDeltaManwon).toLocaleString()}만원 = 전환으로 늘어난 몫 − ISA 로 깎은 몫`,
+          `전환으로 금융소득세가 ${breakdown.switchTaxManwon.toLocaleString()}만원 늘고 ISA 가 ${breakdown.isaCutManwon.toLocaleString()}만원을 도로 깎는다`,
         ]
       : []),
     ...(taxScale > 1.05
@@ -301,9 +315,15 @@ export default function TaxWaterfall({
                 금융소득 +{breakdown.financialManwon.toLocaleString()}만
               </span>
               <span className="text-muted-foreground">
-                (세전 +{breakdown.pretaxGainManwon.toLocaleString()}
-                {breakdown.taxDeltaManwon >= 0 ? " − 세금 " : " + 세금 절감 "}
-                {Math.abs(breakdown.taxDeltaManwon).toLocaleString()})
+                {/*
+                  전환이 세금을 줄이는 안도 있다(채권 비중이 늘면 그렇다).
+                  그때 "전환 세금 +20" 은 세금이 20 늘었다는 말로 읽히므로
+                  말 자체를 바꾼다. 부호는 금융소득에 더하고 빼는 몫이다.
+                */}
+                (세전 {signed(breakdown.pretaxGainManwon)} ·{" "}
+                {breakdown.switchTaxManwon >= 0 ? "전환 세금 " : "전환 세금 절감 "}
+                {signed(-breakdown.switchTaxManwon)} · ISA 절감{" "}
+                {signed(breakdown.isaCutManwon)})
               </span>
               <span className="text-muted-foreground/60">·</span>
               <span style={{ color: CREDIT_COLOR }}>
