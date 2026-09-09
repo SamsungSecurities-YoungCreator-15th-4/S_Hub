@@ -156,7 +156,8 @@ export interface DashboardState {
 
   // ── 실행 상태(확정 수명주기) ──
   // 값·전이 규칙의 출처는 lib/runStatus.ts 하나뿐이다(엔진 계약을 그대로 옮긴 것).
-  // 아직 어느 화면에도 연결하지 않았다 — PDF 확정 게이트가 이 필드를 읽을 예정이다.
+  // 읽는 곳: 헤더 상태 칩·PDF 추출 잠금. 쓰는 곳: 분석 승인 게이트(Sidebar)·
+  // IPS 반영 승인(RightPanel)·확정 승인(ReportDetailModal)뿐이다.
   /** 현재 상담의 실행 상태. 초기값 draft. */
   runStatus: RunStatus;
   /** blocked 사유(엔진 governance.confirmation_blocked_reason에 대응). 없으면 빈 문자열. */
@@ -325,6 +326,12 @@ export const useDashboardStore = create<DashboardState>((set) => ({
         consultationId: "",
         sttStatus: "idle" as SttStatus,
         sttNote: undefined,
+        // 승인은 "이 고객의 이 리포트"에 대한 것이라 고객과 함께 폐기한다.
+        // 위에서 분석 결과·IPS·비중을 전부 초기화하는데 확정만 남으면, 아무도
+        // 승인하지 않은 새 고객의 리포트가 곧바로 추출 가능해진다.
+        // 전이가 아니라 초기화이므로 전이표를 거치지 않는다(resetRunStatus 와 동일).
+        runStatus: INITIAL_RUN_STATUS,
+        runStatusReason: "",
         // 신규 고객(상담 전)은 IPS도 빈 상태로 시작 — 더미 데이터 노출 금지.
         // 기존 고객의 IPS는 직후 자동 복원(getPreviousDashboard→loadConsultationDetail)이 채운다.
         ...(target?.isNew ? { ips: EMPTY_IPS } : {}),
