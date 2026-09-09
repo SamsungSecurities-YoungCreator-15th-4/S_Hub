@@ -92,7 +92,7 @@ export default function ReportDetailModal({ onClose }: { onClose: () => void }) 
       <DialogContent
         className="flex h-[92vh] w-full max-w-[980px] flex-col gap-0 overflow-hidden p-0 sm:max-w-[980px]"
       >
-        {/* ① 상태 헤더 — 스크롤과 무관하게 상단 고정 */}
+        {/* 상태 헤더 — 스크롤과 무관하게 상단 고정 */}
         <div className="shrink-0 border-b px-5 py-3.5">
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 pr-9">
             <DialogTitle className="text-[16px] font-extrabold">
@@ -136,7 +136,7 @@ export default function ReportDetailModal({ onClose }: { onClose: () => void }) 
           <DisclaimerBlock />
         </div>
 
-        {/* ⑩ 하단 고정 액션 바 — 승인 주체는 PB다 */}
+        {/* 하단 고정 액션 바 — 승인 주체는 PB다 */}
         <div className="flex shrink-0 items-center justify-between gap-3 border-t px-5 py-3">
           {isLocked ? (
             <p className="flex items-center gap-1.5 text-[12px] font-bold text-positive">
@@ -171,12 +171,10 @@ export default function ReportDetailModal({ onClose }: { onClose: () => void }) 
 // ── 블록 ────────────────────────────────────────────────────────
 
 function Block({
-  no,
   title,
   children,
   note,
 }: {
-  no?: string;
   title: string;
   children: React.ReactNode;
   /** 블록 하단 한 줄. 이 블록을 어떻게 읽어야 하는지의 안내다. */
@@ -184,10 +182,7 @@ function Block({
 }) {
   return (
     <section className="rounded-xl border bg-card p-4">
-      <h3 className="mb-2.5 flex items-center gap-1.5 text-[13px] font-extrabold">
-        {no && <span className="text-muted-foreground">{no}</span>}
-        {title}
-      </h3>
+      <h3 className="mb-2.5 text-[13px] font-extrabold">{title}</h3>
       {children}
       {note && (
         <p className="mt-2.5 text-[11px] font-semibold leading-relaxed text-muted-foreground">
@@ -233,7 +228,6 @@ function AllocationBlock() {
 function ConflictBlock() {
   return (
     <Block
-      no="②"
       title={`IPS 충돌 검사 — ${IPS_CONFLICTS.length}건`}
       note={IPS_CONFLICT_NOTE}
     >
@@ -272,7 +266,6 @@ function ConflictBlock() {
 function RiskMetricBlock() {
   return (
     <Block
-      no="③"
       title={`VaR / CVaR — 신뢰수준 ${REPORT_META.confidenceLevelPct}% · ${formatWon(REPORT_META.totalValuationKrw)} 기준`}
     >
       <div className="overflow-x-auto">
@@ -314,7 +307,6 @@ function ContributionBlock() {
   const max = Math.max(...CVAR_CONTRIBUTIONS.map((r) => r.weightPct), 1);
   return (
     <Block
-      no="④"
       title={`CVaR 자산군 기여도 — 6자산군 · 합계 ${total.toFixed(1)}%`}
       note={CVAR_CONTRIBUTION_NOTE}
     >
@@ -346,7 +338,6 @@ function StressBlock() {
     STRESS_SCENARIOS[0];
   return (
     <Block
-      no="⑤"
       title={`스트레스 시나리오 — ${STRESS_SCENARIOS.length}종`}
       note={STRESS_NOTE}
     >
@@ -396,7 +387,7 @@ function StressBlock() {
 
 function CitationBlock() {
   return (
-    <Block no="⑥" title={`인용·출처 — ${CITATIONS.length}건`}>
+    <Block title={`인용·출처 — ${CITATIONS.length}건`}>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[520px] border-collapse">
           <thead>
@@ -429,7 +420,6 @@ function VerificationBlock() {
   const passed = VERIFICATIONS.filter((v) => v.passed).length;
   return (
     <Block
-      no="⑦"
       title={`검증 항목 — ${passed}/${VERIFICATIONS.length} 통과`}
       note={VERIFICATION_NOTE}
     >
@@ -458,7 +448,6 @@ function VerificationBlock() {
 function HashBlock() {
   return (
     <Block
-      no="⑧"
       title={`재현성 해시 — 엔진 ${REPORT_META.engineVersion}`}
       note={REPRODUCIBILITY_NOTE}
     >
@@ -481,7 +470,7 @@ function HashBlock() {
 
 function DisclaimerBlock() {
   return (
-    <Block no="⑨" title="면책">
+    <Block title="면책">
       <ul className="space-y-1">
         {DISCLAIMERS.map((d) => (
           <li
