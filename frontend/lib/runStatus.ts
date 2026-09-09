@@ -53,7 +53,7 @@ export const RUN_STATUS_TRANSITIONS: Readonly<
 /** 화면 표기. 문구가 필요한 곳은 문자열을 다시 적지 말고 이 표를 읽는다. */
 export const RUN_STATUS_LABEL: Readonly<Record<RunStatus, string>> = {
   [RUN_STATUS.DRAFT]: "작성 중",
-  [RUN_STATUS.REVIEWED]: "PB 검토 완료",
+  [RUN_STATUS.REVIEWED]: "PB 검토됨",
   [RUN_STATUS.LOCKED]: "확정",
   [RUN_STATUS.BLOCKED]: "확정 차단 · 수동검토 대기",
 } as const;

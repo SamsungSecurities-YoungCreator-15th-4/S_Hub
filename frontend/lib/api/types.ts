@@ -551,7 +551,8 @@ export interface StressTaxStrategyCard {
   combined_contribution_manwon: number;    // 만원
   transferableManwon?: number | null;      // 이전/납입 가능 금액(만원)
   rule_keys?: string[] | null;
-  reason?: Record<string, unknown> | null;
+  reason?: string | null;
+  ineligibleReason?: string | null;
 }
 
 export interface StressTaxStrategyCards {
@@ -642,4 +643,3 @@ export interface MarketDataPoint {
   annualReturn: number;
   annualVolatility: number;
 }
-

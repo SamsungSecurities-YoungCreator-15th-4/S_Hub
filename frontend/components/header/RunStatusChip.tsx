@@ -1,32 +1,31 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
 import { RUN_STATUS, RUN_STATUS_LABEL } from "@/lib/runStatus";
-import { useDashboardStore, useRunStatus } from "@/lib/store";
+import { useRunStatus } from "@/lib/store";
 
 /**
- * 현재 실행 상태 칩 — 읽기 전용. 상태를 바꾸는 조작은 여기 붙이지 않는다
- * (분석 승인은 좌측 게이트, 확정은 리포트 상세 화면에서만 일어난다).
- * 표기는 lib/runStatus.ts 의 RUN_STATUS_LABEL 하나만 쓴다.
+ * 실행 상태 칩 (읽기 전용).
+ *
+ * "분석이 끝났다"를 완료 문구가 아니라 확정 수명주기의 한 단계로 보여 준다.
+ * 값·문구의 출처는 lib/runStatus.ts 하나뿐이라 여기서 문자열을 다시 적지 않는다.
+ * 클릭·전이 조작은 없다 — 상태는 화면 조작이 아니라 실행 결과로만 움직인다.
  */
+const TONE: Record<string, string> = {
+  [RUN_STATUS.DRAFT]: "border-muted-foreground/20 bg-muted text-muted-foreground",
+  [RUN_STATUS.REVIEWED]: "border-brand/25 bg-brand/5 text-brand-dark",
+  [RUN_STATUS.LOCKED]: "border-positive/30 bg-positive/10 text-positive",
+  [RUN_STATUS.BLOCKED]: "border-destructive/30 bg-destructive/10 text-destructive",
+};
+
 export default function RunStatusChip() {
   const status = useRunStatus();
-  const reason = useDashboardStore((s) => s.runStatusReason);
-
-  const variant =
-    status === RUN_STATUS.LOCKED
-      ? "default"
-      : status === RUN_STATUS.BLOCKED
-        ? "destructive"
-        : "secondary";
 
   return (
-    <Badge
-      variant={variant}
-      title={reason || undefined}
-      className="hidden shrink-0 font-bold sm:inline-flex"
+    <span
+      title="상담 실행 상태 — 표시 전용"
+      className={`shrink-0 rounded-lg border px-2 py-0.5 text-[10px] font-bold ${TONE[status]}`}
     >
       {RUN_STATUS_LABEL[status]}
-    </Badge>
+    </span>
   );
 }

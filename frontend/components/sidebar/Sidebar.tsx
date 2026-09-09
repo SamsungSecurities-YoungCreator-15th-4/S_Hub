@@ -28,7 +28,6 @@ import { isTrusted } from "@/lib/api/result";
 import CurrentPortfolioInput from "@/components/sidebar/CurrentPortfolioInput";
 import SttRecordingModal from "@/components/sidebar/SttRecordingModal";
 import AnalyzeGateDialog from "@/components/sidebar/AnalyzeGateDialog";
-import { RUN_STATUS } from "@/lib/runStatus";
 import { isCurrentWeightsInputValid } from "@/lib/assetMapping";
 import { type Customer, CUSTOMERS } from "@/lib/mockData";
 import {
@@ -45,6 +44,7 @@ import {
   saveDashboardSnapshot,
   uploadSttConsultation,
 } from "@/lib/api";
+import { RUN_STATUS } from "@/lib/runStatus";
 import { useDashboardStore } from "@/lib/store";
 import { useAutoCollapse } from "@/lib/useAutoCollapse";
 import { useConsultPlayback } from "@/lib/useConsultPlayback";
@@ -128,7 +128,6 @@ export default function Sidebar() {
     consultationId,
     portfolioSource,
     currentWeightsInput,
-    signalCollapsePanels,
     setRunStatus,
     resetRunStatus,
   } = useDashboardStore();
@@ -164,33 +163,6 @@ export default function Sidebar() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-
-  /**
-   * 분석하기를 "직접 눌러" 끝낸 뒤에는 사이드바를 접는다.
-   *
-   * 사이드바는 PB 의 입력 도구(상담 녹음·IPS 조율·비중 입력)라, 결과를 고객과
-   * 함께 보는 단계에서는 자리를 비켜 주는 것이 맞다. 아래 자동 분석(첫 로드·
-   * 고객 전환)에서는 접지 않는다 — PB 가 아직 아무것도 하지 않은 시점이라
-   * 화면이 저절로 바뀌면 오히려 혼란스럽다.
-   */
-  const collapseAfterAnalyzeRef = useRef(false);
-  const prevAnalyzingRef = useRef(false);
-  useEffect(() => {
-    const finished = prevAnalyzingRef.current && !analyzing;
-    prevAnalyzingRef.current = analyzing;
-    if (!finished || !collapseAfterAnalyzeRef.current) return;
-    collapseAfterAnalyzeRef.current = false;
-    signalCollapsePanels();
-  }, [analyzing, signalCollapsePanels]);
-
-  // 신호를 받으면 접는다. 우측 패널도 같은 신호를 본다.
-  const collapsePanelsSignal = useDashboardStore((s) => s.collapsePanelsSignal);
-  const seenCollapseSignalRef = useRef(collapsePanelsSignal);
-  useEffect(() => {
-    if (seenCollapseSignalRef.current === collapsePanelsSignal) return;
-    seenCollapseSignalRef.current = collapsePanelsSignal;
-    setIsOpen(false);
-  }, [collapsePanelsSignal, setIsOpen]);
 
   // 자동 분석하기: 페이지 첫 로드 또는 고객 전환 시 handleAnalyze 자동 실행
   const handleAnalyzeRef = useRef<(() => Promise<void>) | null>(null);
@@ -375,6 +347,10 @@ export default function Sidebar() {
   /**
    * 게이트 승인 — 계산은 여기서만 시작된다.
    *
+   * 전이 규칙은 store 의 setRunStatus 가 canTransition 으로 검증한다. 자동 분석
+   * (첫 로드·고객 전환)은 PB 가 아직 검토하지 않은 시점이라 상태를 올리지 않는다 —
+   * 여기(승인)에서만 올린다.
+   *
    * 재분석은 직전 확정(locked)을 먼저 푼다. 좌측 입력이 바뀐 채로 확정이 남아 있으면
    * 승인받지 않은 내용이 확정본으로 나간다. reviewed·locked → draft 는 전이표
    * (lib/runStatus.ts:47)에 없는 전이라, 전이가 아니라 초기화(resetRunStatus)로 되돌린다.
@@ -384,7 +360,6 @@ export default function Sidebar() {
     setAnalyzeRejected(false);
     resetRunStatus();
     setRunStatus(RUN_STATUS.REVIEWED);
-    collapseAfterAnalyzeRef.current = true;
     void handleAnalyze();
   };
 

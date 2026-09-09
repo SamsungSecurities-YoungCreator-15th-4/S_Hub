@@ -17,18 +17,25 @@ export interface MacroIndicator {
   direction: "up" | "down" | "neutral";
 }
 
+/**
+ * 헤더 거시지표 폴백 — `/api/macro` 조회가 **최초 마운트에서** 실패했을 때만 보인다.
+ * (한 번이라도 성공한 뒤의 실패는 MacroTicker 가 직전 실데이터를 그대로 유지한다.)
+ *
+ * ⚠️ 실제 시세와 너무 벌어지면 폴백이 떴을 때 화면이 티가 난다. 실제로 한 번
+ *    KOSPI 2,790 / S&P 5,640 짜리 낡은 값이 남아 있어 실데이터(6,954 / 7,686)와
+ *    두 배 이상 벌어졌었다. 가끔 아래 스냅샷을 갱신할 것.
+ *
+ * 스냅샷 기준: 2026-09-08 종가 (`/api/macro` 실측)
+ * 표기 형식은 MacroTicker 의 실시간 경로와 같게 맞춘다 — 지수는 소수점 없이,
+ * 등락은 지수 소수 2자리 · 금리 %p · 환율 원.
+ */
 export const MACRO_INDICATORS: MacroIndicator[] = [
-  {
-    label: "미국 기준금리",
-    value: "3.50%",
-    change: "0.25%p",
-    direction: "down",
-  },
-  { label: "미 10Y", value: "4.38%", change: "0.05%p", direction: "down" },
-  { label: "미국 CPI", value: "3.2%", change: "0.25%p", direction: "down" },
-  { label: "원/달러", value: "1,220", change: "20원", direction: "down" },
-  { label: "KOSPI", value: "2,790", change: "31", direction: "up" },
-  { label: "S&P500", value: "5,640", change: "18", direction: "up" },
+  { label: "미국 기준금리", value: "3.75%", change: "0.25%p", direction: "down" },
+  { label: "미 10Y", value: "4.80%", change: "0.01%p", direction: "up" },
+  { label: "미국 CPI", value: "3.4%", change: "0.10%p", direction: "down" },
+  { label: "원/달러", value: "1,341", change: "4원", direction: "down" },
+  { label: "KOSPI", value: "6,955", change: "40.87", direction: "down" },
+  { label: "S&P 500", value: "7,686", change: "32.28", direction: "down" },
 ];
 
 export const BASE_TIME = "17:20";
@@ -446,59 +453,89 @@ export interface TaxAdviceProduct {
   desc: string;
 }
 
-export const TAX_ADVICE = {
+/**
+ * Mass 고객용 절세 제안 카드가 참조하는 기존 계산 전략.
+ * 연금저축과 IRP는 백엔드의 연금계좌 합산 계산(pension_credit)을 공유한다.
+ */
+export type TaxAdviceSourceKey = "isa" | "pension_credit";
+
+export interface TaxAdviceDisplayCard {
+  key: "brokerage_isa" | "pension_savings" | "irp";
+  sourceKey: TaxAdviceSourceKey;
+  /** 같은 연금계좌 계산값을 두 번 합산하지 않기 위한 표시 역할. */
+  savingRole: "primary" | "included";
+  icon: string;
+  title: string;
+  body: string;
+  tag: string;
+  saving: string;
+  products: TaxAdviceProduct[];
+}
+
+export const TAX_ADVICE: {
+  cards: TaxAdviceDisplayCard[];
+  totalLabel: string;
+  totalSaving: string;
+} = {
   cards: [
     {
-      icon: "I",
-      title: "ISA 계좌 활용",
-      body: "이자·배당 자산 1,200만원을 ISA 잔여 한도로 이전 — 비과세 200만 + 초과분 9.9% 분리과세, 종합과세 합산 제외.",
-      tag: "비과세 자산 이전",
-      saving: "+21만원",
-      products: [] as TaxAdviceProduct[],
-    },
-    {
-      icon: "연",
-      title: "연금계좌 세액공제",
-      body: "연금저축+IRP 잔여 한도 0만원 납입 시 13.2% 세액공제 — 만 55세 이후 연금 수령.",
-      tag: "부적합·투자기간 3년 < 연금 수령까지 22년",
+      key: "brokerage_isa",
+      sourceKey: "isa",
+      savingRole: "primary",
+      icon: "ISA",
+      title: "중개형 ISA",
+      // 출처: 삼성증권 ISA 안내
+      // https://www.samsungpop.com/ux/kor/finance/isa/isainfo/intro.do
+      body: "계좌 안의 손익을 통산한 순소득 중 일반형 200만원·서민형 400만원까지 비과세되고, 초과분은 9.9%로 분리과세됩니다.",
+      tag: "연 2,000만원 · 의무보유 3년",
       saving: "",
-      products: [] as TaxAdviceProduct[],
+      products: [
+        {
+          name: "삼성증권 중개형 ISA",
+          desc: "중개형 ISA 제도와 가입 조건 확인",
+        },
+      ],
     },
     {
-      icon: "채",
-      title: "분리과세 채권",
-      body: "일반채·저쿠폰채 이자 중 종합과세 구간분을 장기채권 분리과세(33%)로 종결해 한계세율 과세를 회피.",
-      tag: "분리과세 전환",
-      saving: "+142만원",
-      products: [] as TaxAdviceProduct[],
+      key: "pension_savings",
+      sourceKey: "pension_credit",
+      savingRole: "primary",
+      icon: "연",
+      title: "개인연금 (연금저축)",
+      // 출처: 국세청 연금계좌 세액공제·삼성증권 개인연금 거래안내
+      // https://www.nts.go.kr/nts/cm/cntnts/cntntsView.do?cntntsId=7875&mi=6449
+      // https://www.samsungpop.com/ux/kor/customer/guide/workproductguide/personalAnnuity.do
+      body: "연금저축 납입액은 연 600만원까지 세액공제 대상이며, IRP·DC를 더하면 연금계좌 합산 연 900만원까지 적용됩니다.",
+      tag: "연금계좌 합산 절감액",
+      saving: "",
+      products: [
+        {
+          name: "삼성증권 연금저축계좌",
+          desc: "연금저축 세액공제와 거래 조건 확인",
+        },
+      ],
     },
     {
-      icon: "배",
-      title: "저율과세 배당주",
-      body: "고배당(해외배당·리츠) 중 종합과세 구간 배당을 저배당·자본이득형으로 조정해 추가과세 회피.",
-      tag: "저율과세 편입",
-      saving: "+1,419만원",
-      products: [] as TaxAdviceProduct[],
-    },
-    {
-      icon: "공",
-      title: "해외주식 양도 250만 공제",
-      body: "해외주식 양도차익을 연 250만원 기본공제 한도까지 실현해 비과세로 차익 확정.",
-      tag: "기본공제 활용",
-      saving: "+55만원",
-      products: [] as TaxAdviceProduct[],
-    },
-    {
-      icon: "L",
-      title: "Tax-loss Harvesting",
-      body: "평가손실을 확정해 해외주식 양도차익과 통산 → 통산액의 양도세(22%)만큼 절감.",
-      tag: "평가손실 확정",
-      saving: "+704만원",
-      products: [] as TaxAdviceProduct[],
+      key: "irp",
+      sourceKey: "pension_credit",
+      savingRole: "included",
+      icon: "IRP",
+      title: "개인형 IRP",
+      // 출처: 삼성증권 연금가이드(가입대상·세액공제 한도)
+      // https://www.samsungpop.com/mbw/finance/pensionAccount.do?cmd=guide&tab=DIRP
+      body: "소득이 있는 취업자가 가입할 수 있으며, 연금저축·DC와 합산해 연 900만원까지 세액공제 대상이 됩니다.",
+      tag: "연금저축과 900만원 한도 공유",
+      saving: "합산 절감액에 포함",
+      products: [
+        {
+          name: "삼성증권 개인형 IRP",
+          desc: "개인형 IRP 가입 조건과 세제 혜택 확인",
+        },
+      ],
     },
   ],
-  totalLabel: "절세 제안 적용 시 예상 추가 절감",
-  totalSaving: "+2,341만원",
+  totalLabel: "3대 절세계좌 활용 시 예상 추가 절감",
+  totalSaving: "분석 후 계산",
 };
 
 // ── 시나리오 Test (스트레스 테스트) ─────────────────────────────

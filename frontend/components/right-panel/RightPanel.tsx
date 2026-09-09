@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { PanelRightClose, PanelRightOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,15 +20,6 @@ import { RUN_STATUS, canTransition } from "@/lib/runStatus";
 export default function RightPanel() {
   const [isOpen, setIsOpen] = useAutoCollapse(1280);
 
-  // 분석하기를 직접 눌러 끝나면 좌측 사이드바와 함께 접힌다 — 결과를 볼 때는
-  // 질의·IPS 반영 같은 PB 도구가 자리를 비켜 주는 편이 낫다.
-  const collapsePanelsSignal = useDashboardStore((s) => s.collapsePanelsSignal);
-  const seenCollapseSignalRef = useRef(collapsePanelsSignal);
-  useEffect(() => {
-    if (seenCollapseSignalRef.current === collapsePanelsSignal) return;
-    seenCollapseSignalRef.current = collapsePanelsSignal;
-    setIsOpen(false);
-  }, [collapsePanelsSignal, setIsOpen]);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const { insightResult, ips, setIps, setRunStatus, resetRunStatus } =
     useDashboardStore();

@@ -9,7 +9,8 @@
  *
  * 주의(추적성): live로 연결되는 값은 모두 calculate 응답(tax_optimizer)의 실제 수치다.
  *   - headline → 연간 절세액·세후수익률·실효세
- *   - strategy_cards → 절세 제안 6카드(제목·절감액·적용여부). 카피(body/tag/products)는 mock 출처 유지.
+ *   - strategy_cards → Mass 고객용 절세계좌 3카드(중개형 ISA·연금저축·IRP).
+ *     연금저축과 IRP는 pension_credit 합산 계산값을 공유하므로 중복 합산하지 않는다.
  *   - account_cards → 계좌 활용도(used/limit). 캡션 문구는 mock 유지.
  *   - flow(세금 흐름 3행 표)는 calculate에 3분할 소스가 없어 mock 유지 — 백엔드 분할 노출 후 연결 예정(TODO).
  */
@@ -32,16 +33,6 @@ export function extractTaxOptimizerEntry(
   const key = PDF_TAX_OPT_KEY[selectedPortfolioId] ?? "portfolio_a";
   return taxOptimizer[key] ?? taxOptimizer["portfolio_a"] ?? taxOptimizer["current"] ?? null;
 }
-
-// strategy_cards.key → mock TAX_ADVICE.cards 인덱스(카피·상품 출처).
-const ADVICE_KEY_ORDER = [
-  "isa",
-  "pension_credit",
-  "separate_bond",
-  "low_tax_dividend",
-  "overseas_exemption",
-  "tax_loss",
-] as const;
 
 const wonToManwon = (won: number | null | undefined): number | null =>
   won == null ? null : Math.round(won / 10000);
@@ -194,32 +185,39 @@ export function buildPdfTaxFlow(
   return null;
 }
 
-/** TAX_ADVICE(절세 제안) shape으로 변환. live 카드 제목·절감액·적용여부 override, 카피·상품은 mock 유지. */
+/** TAX_ADVICE(절세 제안) shape으로 변환. 카드별 계산값은 기존 ISA·연금 전략에서 가져온다. */
 export function buildPdfTaxAdvice(
   taxOptimizer: StressTaxData | null,
 ): typeof TAX_ADVICE {
   const live = taxOptimizer?.strategy_cards;
   if (!live?.cards?.length) return TAX_ADVICE;
 
-  const cards = [...live.cards]
-    .sort((a, b) => a.priority_rank - b.priority_rank)
-    .map((lc) => {
-      const idx = ADVICE_KEY_ORDER.indexOf(lc.key as (typeof ADVICE_KEY_ORDER)[number]);
-      const base = TAX_ADVICE.cards[idx] ?? TAX_ADVICE.cards[0]!;
+  const liveByKey = new Map(live.cards.map((card) => [card.key, card]));
+  const cards = TAX_ADVICE.cards.map((base) => {
+      const lc = liveByKey.get(base.sourceKey);
       const saving =
-        lc.applicable && lc.combined_contribution_manwon > 0
+        base.savingRole === "included"
+          ? lc?.applicable && lc.combined_contribution_manwon > 0
+            ? base.saving
+            : ""
+          : lc?.applicable && lc.combined_contribution_manwon > 0
           ? `+${lc.combined_contribution_manwon.toLocaleString()}만원`
           : "";
       return {
-        ...base, // icon·body·tag·products(카피·상품 출처)는 mock 유지
-        title: lc.title || base.title,
+        ...base,
         saving,
       };
     });
 
+  const combinedTotalManwon = ["isa", "pension_credit"].reduce(
+    (sum, key) =>
+      sum + (liveByKey.get(key)?.combined_contribution_manwon ?? 0),
+    0,
+  );
+
   return {
     ...TAX_ADVICE,
     cards,
-    totalSaving: `+${(live.combined_total_manwon ?? 0).toLocaleString()}만원`,
+    totalSaving: `+${combinedTotalManwon.toLocaleString()}만원`,
   };
 }
