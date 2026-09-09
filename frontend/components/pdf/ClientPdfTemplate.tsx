@@ -151,7 +151,7 @@ function CoverPage() {
   );
   const selectedPortfolioName =
     storePortfolios.find((p) => p.id === selectedPortfolioId)?.name ??
-    "안정추구";
+    "안정 추구";
   return (
     <div
       data-pdf-page=""
@@ -1171,7 +1171,7 @@ function TaxPage() {
                 marginBottom: 4,
               }}
             >
-              연간 절세 효과 ({selectedPf?.name ?? "안정추구"} 기준 ·{" "}
+              연간 절세 효과 ({selectedPf?.name ?? "안정 추구"} 기준 ·{" "}
               {C.aumLabel})
             </div>
             <div

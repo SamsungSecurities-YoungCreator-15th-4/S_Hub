@@ -201,6 +201,42 @@ export default function TaxWaterfall({
       ? { after: ["#AEB5BD", "#0064FF"], tax: ["#F04452", "#F4A8AE"] }
       : { after: AFTER_TAX_COLORS, tax: TAX_COLORS };
 
+  /**
+   * 막대 오른쪽에 세금·세액공제를 적는다.
+   *
+   * 두 조각 모두 폭이 좁아 안에 넣으면 글자가 잘린다(세금은 세후 수익의 1/5,
+   * 세액공제는 확대도 안 한 원래 크기). 조각을 더 키우면 비율 왜곡만 커지므로
+   * 숫자를 밖으로 뺀다. 스택 마지막 Bar 에 붙여 값이 0 인 행에서도 스택 끝
+   * 좌표를 받는다.
+   */
+  // recharts 의 LabelList content 는 x·y·width 를 string | number 로 넘긴다.
+  const num = (v: unknown) => (typeof v === "number" ? v : Number(v) || 0);
+  const RowSummary = (props: {
+    x?: string | number;
+    y?: string | number;
+    width?: string | number;
+    height?: string | number;
+    index?: number;
+  }) => {
+    const row = data[props.index ?? -1];
+    if (!row) return null;
+    const tx = num(props.x) + num(props.width) + 8;
+    const cy = num(props.y) + num(props.height) / 2;
+    const hasRefund = (row.refund ?? 0) > 0;
+    return (
+      <text x={tx} y={cy} dominantBaseline="middle" fontSize={11} fontWeight={800}>
+        <tspan x={tx} dy={hasRefund ? -6 : 0} fill="#F04452">
+          세금 {row.tax.toLocaleString()}만
+        </tspan>
+        {hasRefund && (
+          <tspan x={tx} dy={13} fill={CREDIT_COLOR}>
+            세액공제 +{row.refund!.toLocaleString()}만
+          </tspan>
+        )}
+      </text>
+    );
+  };
+
   const chartHelp = [
     "막대 전체 길이 = 세전 수익 (세후 수익 + 금융소득세)",
     "전환은 절세가 아니라 수익 증가 — 수익이 커지면 세금도 는다",
@@ -228,12 +264,12 @@ export default function TaxWaterfall({
           </span>
         </p>
       </HelpTooltip>
-      <div className="mb-2 flex items-center justify-between rounded-lg bg-muted/60 px-2.5 py-1.5">
+      <div className="mb-2 flex items-center justify-between gap-2 rounded-lg bg-muted/60 px-2.5 py-1.5">
         <span className="text-[12px] font-semibold text-muted-foreground">
           {totalLabel}
         </span>
         <span
-          className={`text-[13px] font-extrabold tabular-nums ${
+          className={`shrink-0 whitespace-nowrap text-[13px] font-extrabold tabular-nums ${
             flow ? "text-brand-dark" : "text-up"
           }`}
         >
@@ -246,7 +282,7 @@ export default function TaxWaterfall({
           <BarChart
             data={data}
             layout="vertical"
-            margin={{ top: 0, right: flow ? 92 : 52, bottom: 0, left: 0 }}
+            margin={{ top: 0, right: flow ? 108 : 52, bottom: 0, left: 0 }}
             barSize={flow ? 34 : 28}
           >
             <XAxis type="number" hide domain={[0, domainMax]} />
@@ -270,9 +306,25 @@ export default function TaxWaterfall({
               />
             </Bar>
             {/*
-              세금 막대. flow 에서는 taxPlot(확대한 길이)으로 그리고 라벨만 실제
-              값을 쓴다. 실제 비율로는 세후 수익의 1/5 라 80만과 150만의 차이가
-              몇 px 로 뭉개진다. 확대했다는 사실은 차트 아래에 적는다.
+              환급을 세금보다 앞에 쌓는다. 세금 막대는 세 행 모두 값이 있어 스택의
+              마지막에 두면 오른쪽 라벨이 항상 스택 끝 좌표를 받는다. 환급을 마지막에
+              두면 값이 0 인 행에서 라벨 자체가 렌더되지 않고, 남은 하나가 다른 행의
+              값을 엉뚱한 자리에 찍는다.
+
+              읽기에도 이 순서가 낫다 — 손에 남는 돈(세후·환급)이 붙어 있고 나가는
+              돈(세금)이 끝에 온다.
+            */}
+            {flow && (
+              <Bar dataKey="refund" stackId="flow" isAnimationActive={false}>
+                {data.map((_, i) => (
+                  <Cell key={i} fill={CREDIT_COLOR} radius={10} />
+                ))}
+              </Bar>
+            )}
+            {/*
+              세금 막대. flow 에서는 taxPlot(확대한 길이)으로 그리고 숫자는 막대 밖
+              RowSummary 가 적는다. 실제 비율로는 세후 수익의 1/5 이라 80만과 150만의
+              차이가 몇 px 로 뭉개지고, 조각 안에 글자를 넣으면 잘린다.
             */}
             <Bar
               dataKey={flow ? "taxPlot" : "tax"}
@@ -282,42 +334,19 @@ export default function TaxWaterfall({
               {data.map((_, i) => (
                 <Cell key={i} fill={colors.tax[i] ?? "transparent"} radius={10} />
               ))}
-              <LabelList
-                dataKey="tax"
-                // 환급 조각이 오른쪽에 붙는 행이 있어 바깥에 두면 겹친다.
-                position={flow ? "center" : "right"}
-                formatter={(v: unknown) =>
-                  Number(v) > 0 ? `${Number(v).toLocaleString()}만` : ""
-                }
-                style={{
-                  fontSize: 11,
-                  fontWeight: 800,
-                  fill: flow ? "#fff" : "#F04452",
-                }}
-              />
-            </Bar>
-            {/*
-              연금 세액공제. 절세 제안 탭이 쓰는 말을 그대로 쓴다 — "연말정산 환급"
-              이라고 부르면 같은 돈에 이름이 둘이 된다. 금융소득세 막대에서 빼지
-              않는 이유는 세목이 달라서다(150만 세금에서 155만을 빼면 음수가 난다).
-            */}
-            {flow && (
-              <Bar dataKey="refund" stackId="flow" isAnimationActive={false}>
-                {data.map((_, i) => (
-                  <Cell key={i} fill={CREDIT_COLOR} radius={10} />
-                ))}
+              {flow ? (
+                <LabelList dataKey="tax" content={RowSummary} />
+              ) : (
                 <LabelList
-                  dataKey="refund"
+                  dataKey="tax"
                   position="right"
                   formatter={(v: unknown) =>
-                    Number(v) > 0
-                      ? `세액공제 +${Number(v).toLocaleString()}만`
-                      : ""
+                    Number(v) > 0 ? `${Number(v).toLocaleString()}만` : ""
                   }
-                  style={{ fontSize: 11, fontWeight: 800, fill: CREDIT_COLOR }}
+                  style={{ fontSize: 12, fontWeight: 800, fill: "#F04452" }}
                 />
-              </Bar>
-            )}
+              )}
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       </div>
