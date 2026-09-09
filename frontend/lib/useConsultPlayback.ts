@@ -29,9 +29,6 @@ const TICK_MS = 100;
 /** 버튼을 누르고 첫 발화가 뜨기까지의 준비 구간(ms). */
 const CONNECTING_MS = 700;
 
-/** 마지막 발화 후 종료까지 두는 여유(ms) — 마지막 줄을 읽을 시간. */
-const TRAILING_MS = 1200;
-
 /** "00:07" → 7. 형식이 어긋나면 null 이라 해당 항목을 건너뛴다. */
 function parseTimeToSeconds(time: string): number | null {
   const m = /^(\d{1,2}):(\d{2})$/.exec(time.trim());
@@ -122,12 +119,10 @@ export function useConsultPlayback() {
 
     if (nextIndexRef.current >= cues.length) {
       clearTimers();
-      timeoutRef.current = setTimeout(() => {
-        timeoutRef.current = null;
-        finish();
-      }, TRAILING_MS);
+      // 마지막 전사가 나와도 recording 상태와 팝업은 그대로 유지한다.
+      // 사용자가 종료 버튼을 눌렀을 때만 finish가 실행되어 팝업이 닫힌다.
     }
-  }, [clearTimers, finish, setTranscript]);
+  }, [clearTimers, setTranscript]);
 
   const runInterval = useCallback(() => {
     if (intervalRef.current !== null) return;
