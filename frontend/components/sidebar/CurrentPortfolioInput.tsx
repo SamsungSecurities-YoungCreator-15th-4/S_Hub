@@ -185,15 +185,19 @@ export default function CurrentPortfolioInput() {
         <span className="text-[11px] font-semibold text-muted-foreground">합계</span>
         <span
           className={`text-[13px] font-extrabold tabular-nums ${
-            !hasAnyInput ? "text-muted-foreground" : isValid ? "text-brand-dark" : "text-down"
+            !hasAnyInput
+              ? "text-muted-foreground"
+              : isValid
+                ? "text-brand-dark"
+                : "text-destructive"
           }`}
         >
           {total.toLocaleString()}%
         </span>
       </div>
       {!isValid && (
-        <p className="mt-1 text-[11px] font-semibold text-down">
-          합계가 100%가 아닙니다. 맞춰야 분석하기를 실행할 수 있습니다.
+        <p className="mt-1 text-[11px] font-semibold text-destructive">
+          합계는 100%여야 합니다.
         </p>
       )}
       {/* 확정이 풀린 이유 — 왜 PDF가 다시 잠겼는지 여기서만 보인다. */}
