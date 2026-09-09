@@ -8,6 +8,7 @@ import {
   sumCurrentWeightsInput,
 } from "@/lib/assetMapping";
 import { isTrusted } from "@/lib/api/result";
+import HelpTooltip from "@/components/common/HelpTooltip";
 import { useDashboardStore } from "@/lib/store";
 
 type FieldId = CalcUnitId | "cash";
@@ -40,6 +41,12 @@ const PROXY_NOTE: Partial<Record<FieldId, string>> = {
 };
 
 type WeightTab = "current" | "proposed";
+
+/** 별표(*)가 붙은 자산의 계산 근거. 화면 글자를 줄이려고 하단 주석 대신 여기 둔다. */
+const PROXY_HELP =
+  "고객이 지금 들고 있는 비중과, 제안을 직접 손본 비중을 각각 입력합니다. " +
+  "별표(*)가 붙은 신흥국주식·해외채권·인프라펀드는 자산 매핑이 확정되기 전이라 " +
+  "각각 나스닥·달러인덱스·원자재로 계산됩니다.";
 
 /**
  * 자산 비중 입력 — 탭 2개.
@@ -110,7 +117,9 @@ export default function CurrentPortfolioInput() {
         제목은 사이드바의 다른 카드(고객 선택·상담 입력·IPS 조율기)와 같은 규격이다.
       */}
       <div className="mb-2 flex items-center justify-between">
-        <p className="text-[14px] font-bold">자산 비중 조절기</p>
+        <HelpTooltip text={PROXY_HELP} placement="bottom">
+          <p className="cursor-default text-[14px] font-bold">자산 비중 조절기</p>
+        </HelpTooltip>
         {hasAnyInput && (
           <button
             type="button"
@@ -139,12 +148,6 @@ export default function CurrentPortfolioInput() {
         </TabButton>
       </div>
 
-      {!proposedEnabled && (
-        <p className="mb-2 text-[10px] font-semibold text-muted-foreground">
-          제안 조정은 분석 후 열립니다
-        </p>
-      )}
-
       <div className="grid grid-cols-2 gap-x-3 gap-y-2">
         {GROUPS.map(({ group, ids }) => (
           <div key={group} className="col-span-2">
@@ -155,10 +158,11 @@ export default function CurrentPortfolioInput() {
                 return (
                   <label
                     key={id}
-                    className="flex items-center justify-between gap-1"
+                    className="flex items-center justify-between gap-0.5"
                     title={proxyNote ? `계산상 ${proxyNote} 자산으로 반영됨 (자산 매핑 확정 전)` : undefined}
                   >
-                    <span className="text-[12px] font-semibold text-foreground/80">
+                    {/* whitespace-nowrap: "국내일반채권" 처럼 긴 이름이 두 줄로 깨지지 않게. */}
+                    <span className="whitespace-nowrap text-[11px] font-semibold text-foreground/80">
                       {LABELS[id]}
                       {proxyNote && <span className="text-up">*</span>}
                     </span>
@@ -169,7 +173,7 @@ export default function CurrentPortfolioInput() {
                         value={value[id] ?? ""}
                         onChange={(e) => handleChange(id, e.target.value)}
                         placeholder="0"
-                        className="h-6 w-12 rounded-md border border-input bg-card px-1.5 text-right text-[12px] font-bold tabular-nums outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                        className="h-6 w-11 shrink-0 rounded-md border border-input bg-card px-1 text-right text-[12px] font-bold tabular-nums outline-none focus-visible:ring-1 focus-visible:ring-ring"
                       />
                       <span className="text-[11px] text-muted-foreground">%</span>
                     </span>
@@ -204,10 +208,6 @@ export default function CurrentPortfolioInput() {
       {runStatusReason && (
         <p className="mt-1 text-[11px] font-semibold text-down">{runStatusReason}</p>
       )}
-      <p className="mt-1 text-[10px] leading-snug text-muted-foreground">
-        * 자산 매핑 확정 전이라 신흥국주식·해외채권·인프라펀드는 각각 나스닥·달러인덱스·원자재로
-        계산됩니다.
-      </p>
     </div>
   );
 }
