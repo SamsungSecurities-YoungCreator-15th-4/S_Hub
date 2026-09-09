@@ -59,7 +59,10 @@ export interface Customer {
   annualContributionManwon?: number;
   // 절세계좌 기납입액·세부담 입력값(만원/%) — 절세 제안 실계산용 고객 데이터.
   // 실서비스에서는 PB가 입력/연동(준호님 DB 반영 예정). 여기선 현실적 자리표시자.
-  isaUsedManwon: number; // ISA 당해 기납입액 (법정 연 한도 2,000만)
+  // ISA **누적** 납입금액(만원). 조특법 산식이 누적 기준이라 당해 납입액이 아니다.
+  isaUsedManwon: number;
+  /** ISA 가입 후 경과연수 — 한도는 1월 1일에 새로 쌓인다. 미지정이면 가입 첫해로 본다. */
+  isaYearsSinceOpen?: number;
   pensionUsedManwon: number; // 연금저축+IRP 당해 납입액 (세액공제 한도 900만)
   realizedLossManwon: number; // 확정 가능 평가손실 (Tax-loss harvesting용)
   marginalRatePct: number; // 한계세율(지방세 포함, %) — 종합과세 추가과세 비교용
@@ -69,6 +72,11 @@ export interface Customer {
   nearTermNeedManwon: number; // 단기 필요자금(만원) — 묶이는 금액에서 제외 (IPS Unique)
   nearTermNeedYears: number | null; // 단기 필요자금 필요 시점(년)
   isaOpened: boolean; // ISA 기존 개설 여부(시나리오: 다들 옛날 개설=true)
+  /**
+   * ISA 의무보유 3년 중 남은 기간(년). 의무보유는 납입분별이 아니라 계좌 단위라
+   * 개설 시점이 정한다. 미지정이면 미개설=3년, 개설=0년으로 본다.
+   */
+  isaYearsUntilLiquid?: number;
   /** DB(client 테이블) UUID. 초기 mock 3명·미저장(데모) 고객은 없음. */
   clientId?: string;
   /** DB 저장 성공 여부. false = 데모(로컬에만 추가). undefined = mock 초기 고객. */
@@ -93,7 +101,8 @@ export const CUSTOMERS: Customer[] = [
     aumEokwon: 1,
     salaryManwon: 5200, // 총급여 5,500만원 이하 → 연금 세액공제율 16.5%
     annualContributionManwon: 1500, // 연 납입여력
-    isaUsedManwon: 800, // 작년 개설, 연 2,000만 한도 미소진
+    isaUsedManwon: 800, // 작년 개설 후 누적 납입액
+    isaYearsSinceOpen: 1, // 올해 한도 = 2,000×2 − 800 = 3,200만원 (미납분이 쌓인다)
     pensionUsedManwon: 0, // 연금계좌 미개설 — 900만 한도가 통째로 남아 있다
     realizedLossManwon: 0,
     marginalRatePct: 16.5, // 과세표준 1,400~5,000만 구간(15%) + 지방소득세
@@ -102,6 +111,7 @@ export const CUSTOMERS: Customer[] = [
     nearTermNeedManwon: 2000, // 3년 내 전세 보증금 인상분
     nearTermNeedYears: 3,
     isaOpened: true,
+    isaYearsUntilLiquid: 2, // 작년 개설 — 2년 뒤 해제, 전세 시점(3년)보다 이르다
   },
   {
     id: "cust-002",
