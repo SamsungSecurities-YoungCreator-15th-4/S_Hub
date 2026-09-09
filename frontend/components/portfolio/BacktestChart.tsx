@@ -17,7 +17,7 @@ import HelpTooltip from "@/components/common/HelpTooltip";
 import { useDashboardStore } from "@/lib/store";
 
 const BACKTEST_HELP =
-  "지금 이 포트폴리오를 과거 5년 전에 투자했다면 어떻게 됐을지 보여줍니다.\n" +
+  "지금 이 포트폴리오를 과거 5년 전에 투자했다면 어떻게 됐을지 보여줍니다. " +
   "실제 투자 결과가 아니라 과거 시장 데이터를 이용해 계산한 결과입니다.";
 
 const BENCHMARKS = ["KOSPI", "S&P500", "MSCI ACWI"] as const;

@@ -60,8 +60,7 @@ export default function HelpTooltip({
 
       {helpMode && pos && (
         <div
-          // whitespace-pre-line: 문구의 줄바꿈(\n)을 그대로 살린다 — 설명과 예시를 두 줄로 나눠 읽힌다.
-          className="pointer-events-none fixed z-[9999] w-64 whitespace-pre-line rounded-xl bg-foreground px-3 py-2.5 text-[13px] font-semibold leading-relaxed text-background shadow-xl"
+          className="pointer-events-none fixed z-[9999] w-64 rounded-xl bg-foreground px-3 py-2.5 text-[13px] font-semibold leading-relaxed text-background shadow-xl"
           style={{
             left: pos.x,
             top: placement === "bottom" ? pos.y + 8 : pos.y - 8,
