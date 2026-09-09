@@ -412,7 +412,7 @@ function MarketIpsPage() {
       tag: "Asset",
       label: "운용 자산",
       value: customer.aumLabel,
-      sub: "전체 운용 가능 자산 기준. 비상자금 3억원은 별도",
+      sub: "전체 운용 가능 자산 기준",
       show: true,
     },
     {
@@ -447,14 +447,14 @@ function MarketIpsPage() {
       tag: "Liquidity",
       label: "유동성 필요",
       value: ips.liquidity,
-      sub: "비상자금 3억원 외 3년 내 자금 활용 가능성 고려",
+      sub: "단기 필요자금은 IPS Unique 에 기재된 금액·시점 기준",
       show: true,
     },
     {
       tag: "Legal",
       label: "법적 제약",
       value: ips.legal,
-      sub: "사전 증여 전략 수립을 권장합니다",
+      sub: "IPS Legal 에 기재된 제약 기준",
       show: !!ips.legal?.trim(),
     },
     {
@@ -688,7 +688,7 @@ const METRIC_CARDS = [
     title: "최대낙폭 (MDD)",
     en: "Maximum Drawdown",
     body: "투자 기간 중 고점 대비 가장 많이 떨어진 최대 손실 폭입니다. 낮을수록 안전합니다.",
-    example: "-11.2%라면 18억원 중 최대 약 2,000만원 손실 가능성",
+    example: "-11.2%라면 보유 자산의 11.2%까지 평가손실이 났던 구간이 있었다는 뜻",
   },
   {
     num: "⑥",
