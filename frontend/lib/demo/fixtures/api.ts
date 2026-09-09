@@ -18,6 +18,7 @@ import {
   PAST_CONSULTATIONS,
   PORTFOLIOS,
   TAX_EFFECT,
+  withCurrentWeights,
 } from "../../mockData";
 import type { CreatedClient, CreateClientResult, ListedClient } from "../../api/clients";
 import type { ConsultationSummaryItem } from "../../api/consultations";
@@ -26,13 +27,7 @@ import type { PortfolioCalcData, StressMetricsResult } from "../../api/portfolio
 import type { SttConsultationData } from "../../api/stt";
 import type { TaxInsightData } from "../../api/tax";
 import type { Portfolio } from "../../mockData";
-import {
-  CALC_UNITS,
-  type CalcUnitWeights,
-  type CurrentWeightsInput,
-  isCurrentWeightsInputValid,
-  sumCurrentWeightsInput,
-} from "../../assetMapping";
+import type { CurrentWeightsInput } from "../../assetMapping";
 
 /** 상담 1건(전사 + IPS). stt.ts 의 업로드·상세조회 양쪽이 쓴다. */
 export function demoConsultation(): SttConsultationData {
@@ -55,11 +50,27 @@ export function demoConsultation(): SttConsultationData {
 }
 
 /** RAG·DART 인사이트. question 은 호출부가 채운다. */
-export function demoInsight(): InsightData {
+/**
+ * 질문 성격에 맞는 응답을 고른다. 맞는 것이 없으면 기본(현재 포트폴리오 분석).
+ * `key` 를 주면 그 응답을 직접 고른다 — 호출부가 질문의 성격을 이미 아는 경우다.
+ *
+ * 질문을 무시하고 늘 같은 답을 내면 화면에서 RAG 가 질문을 읽는지 확인할 수 없다.
+ * 응답·인용은 전부 `mockData.INSIGHT` 에 있다 — 여기서 만들지 않는다.
+ */
+export function demoInsight(query?: string, key?: string): InsightData {
+  const q = (query ?? "").toLowerCase();
+  const hit = key
+    ? INSIGHT.scenarios.find((sc) => sc.key === key)
+    : q
+      ? INSIGHT.scenarios.find((sc) => sc.keywords.some((k) => q.includes(k)))
+      : undefined;
+
+  const answer = hit?.answer ?? INSIGHT.defaultAnswer;
+  const sources = hit?.sources ?? INSIGHT.sources;
   return {
-    answer: INSIGHT.defaultAnswer,
-    summary: INSIGHT.defaultAnswer.split("\n\n")[0] ?? INSIGHT.defaultAnswer,
-    citations: INSIGHT.sources.map((s) => ({ title: s.title, date: s.date })),
+    answer,
+    summary: answer.split("\n\n")[0] ?? answer,
+    citations: sources.map((s) => ({ title: s.title, date: s.date })),
   };
 }
 
@@ -75,39 +86,6 @@ export function demoTaxSummary(portfolioName: string): TaxInsightData {
 }
 
 /** 포트폴리오 계산 결과. 기존 폴백과 같은 형태 — 상관행렬·세금 맵은 백엔드 산출물이라 null. */
-/**
- * PB가 입력한 현재 보유 비중을 "현재" 포트폴리오의 weights 에 얹는다.
- *
- * 도넛(PortfolioSection 의 toCalcUnitAllocation)과 스트레스 손실
- * (StressTestSection → runStress)이 같은 weights 를 읽으므로, 입력이 화면까지
- * 그대로 도달한다. 스트레스 손실은 엔진 상수·수식으로 실제 계산되는 값이다
- * (`lib/stressScenarios.ts` — SSOT 는 engine/engine/stress.py).
- *
- * 지표(기대수익률·변동성·MDD·소르티노)는 바꾸지 않는다. 임의 비중으로 다시
- * 계산하려면 자산별 수익률 시계열이 있어야 하는데 프론트 경로에는 없다
- * (`lib/sharpe.ts` 가 같은 이유로 샤프 외의 지표 계산을 두지 않았다).
- * 없는 값을 지어내지 않고 픽스처 값을 유지하며, 출처는 DataSourceBadge 가
- * "시연 고정 데이터"로 표시한다.
- *
- * 입력이 없거나 합계가 100%가 아니면 손대지 않는다 — 라이브 경로도
- * `isCurrentWeightsInputValid` 로 같은 입력을 막는다.
- */
-function withCurrentWeights(
-  portfolios: Portfolio[],
-  input?: CurrentWeightsInput,
-): Portfolio[] {
-  if (!input || sumCurrentWeightsInput(input) === 0) return portfolios;
-  if (!isCurrentWeightsInputValid(input)) return portfolios;
-
-  const weights = Object.fromEntries(
-    CALC_UNITS.map((u) => [u.id, input[u.id] ?? 0]),
-  ) as CalcUnitWeights;
-
-  return portfolios.map((pf) =>
-    pf.id === "current" ? { ...pf, weights, allocation: undefined } : pf,
-  );
-}
-
 export function demoPortfolioCalc(
   currentWeights?: CurrentWeightsInput,
 ): PortfolioCalcData {

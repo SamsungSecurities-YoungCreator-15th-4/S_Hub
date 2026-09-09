@@ -4,7 +4,6 @@
  */
 
 import { create } from "zustand";
-import type { StressScenarioKey } from "./stressScenarios";
 import {
   type ConsultMessage,
   type Customer,
@@ -16,6 +15,7 @@ import {
   MACRO_INDICATORS,
   PORTFOLIOS,
   SCENARIO_BASE,
+  withCurrentWeights,
 } from "./mockData";
 import type {
   ApiResult,
@@ -171,14 +171,6 @@ export interface DashboardState {
   isStressMode: boolean;
   stressPreset: "current" | "crisis" | "war" | null;
   setStressPreset: (preset: "current" | "crisis" | "war" | null) => void;
-  /**
-   * 스트레스 테스트 카드에서 고른 시나리오. null 이면 미선택.
-   * 카드 손실액은 lib/stressScenarios.ts 가 엔진 상수로 직접 계산하므로
-   * 백엔드 stress 엔드포인트(stressPreset)와는 별개의 상태다 — 백엔드는
-   * crisis_2008 / crisis_ru_war 두 종류만 받아 카드 3종과 대응되지 않는다.
-   */
-  stressScenarioKey: StressScenarioKey | null;
-  setStressScenarioKey: (key: StressScenarioKey | null) => void;
   /** portfolios를 basePortfolios로 복원, isStressMode: false */
   clearStressMode: () => void;
 
@@ -303,17 +295,6 @@ function seedFromProposal(
   ) as CurrentWeightsInput;
 }
 
-/**
- * 자산 비중 조절기의 "현재 보유" 초기값.
- *
- * 비워 두면 화면이 같은 값을 두 가지로 말한다 — 현재 카드는 도넛과 범례로
- * 25%·18%… 를 그리는데 입력칸은 전부 0 이었다. 카드가 그리는 그 비중을
- * 그대로 초기값으로 둔다. PB 가 고치면 그 값이 계산에 실린다.
- */
-const CURRENT_PORTFOLIO_WEIGHTS: CurrentWeightsInput = {
-  ...(PORTFOLIOS.find((p) => p.id === "current")?.weights ?? {}),
-};
-
 export const useDashboardStore = create<DashboardState>((set) => ({
   customers: [...CUSTOMERS],
   selectedCustomerId: CUSTOMERS[0].id,
@@ -331,7 +312,7 @@ export const useDashboardStore = create<DashboardState>((set) => ({
   scenario: { ratePct: SCENARIO_BASE.ratePct, fxKrw: SCENARIO_BASE.fxKrw },
   liveBase: { ratePct: SCENARIO_BASE.ratePct, fxKrw: SCENARIO_BASE.fxKrw },
   liveBaseLoaded: false,
-  currentWeightsInput: { ...CURRENT_PORTFOLIO_WEIGHTS },
+  currentWeightsInput: {},
   setCurrentWeightsInput: (patch) =>
     set((s) => ({
       currentWeightsInput: { ...s.currentWeightsInput, ...patch },
@@ -382,8 +363,6 @@ export const useDashboardStore = create<DashboardState>((set) => ({
   isStressMode: false,
   stressPreset: "current",
   setStressPreset: (preset) => set({ stressPreset: preset }),
-  stressScenarioKey: null,
-  setStressScenarioKey: (key) => set({ stressScenarioKey: key }),
   clearStressMode: () =>
     set((s) => ({ portfolios: s.basePortfolios, isStressMode: false })),
 
@@ -460,28 +439,50 @@ export const useDashboardStore = create<DashboardState>((set) => ({
     })),
   selectCustomer: (id) =>
     set((s) => {
-      // 신규 고객(상담 전)은 IPS도 빈 상태로 시작 — 더미 값을 보여주지 않는다.
       const target = s.customers.find((c) => c.id === id);
-      return {
+      /*
+        고객은 두 부류다.
+
+          상담 이력 있음 : 지난 회차의 IPS·보유 비중·분석 결과가 복원되고 확정도
+                          그대로 살아 있다. PB 가 이어서 보는 화면이다.
+          상담 전(isNew) : 좌·중·우가 전부 비어 있고 확정도 없다. IPS·비중·분석
+                          결과는 상담을 거쳐 사람이 채운다.
+
+        복원값의 출처는 고객 레코드 하나뿐이다(`lib/mockData.ts` CUSTOMERS).
+        여기서 숫자를 만들지 않는다.
+      */
+      const restored = !target?.isNew && target?.currentWeights
+        ? {
+            ips: { ...(target.ips ?? IPS_DEFAULT) },
+            currentWeightsInput: { ...target.currentWeights },
+            // 자산 배분만 이 고객의 비중으로 갈아 끼운다. 6지표·백테스트는
+            // 비중에서 산출할 경로가 프론트에 없어 픽스처 값을 그대로 쓴다
+            // (`lib/mockData.ts` withCurrentWeights 주석과 같은 이유).
+            portfolios: withCurrentWeights(PORTFOLIOS, target.currentWeights),
+            portfolioSource: "fallback" as DataSource,
+            portfolioNote: "지난 상담 회차의 결과입니다.",
+          }
+        : null;
+
+      const next: Partial<DashboardState> = {
         selectedCustomerId: id,
         // 고객 전환 시 이전 고객의 분석 결과·스트레스 상태 전체 초기화
         portfolioSource: "fallback" as DataSource,
         portfolios: PORTFOLIOS,
         basePortfolios: PORTFOLIOS,
         portfolioNote: undefined,
+        currentWeightsInput: {},
         correlationHeatmap: null,
         portfolioTax: null,
         stressTax: null,
         taxOptimizer: null,
         insightResult: null,
-        currentWeightsInput: { ...CURRENT_PORTFOLIO_WEIGHTS },
         analyzeRejected: false,
         weightsTab: "current",
         proposedWeightsInput: {},
         proposedWeightsDirty: false,
         isStressMode: false,
         stressPreset: "current",
-        stressScenarioKey: null,
         scenario: { ...s.liveBase }, // 슬라이더도 live 기준으로 초기화 → 자동분석는 항상 calculate
         // 실행 상태도 초기화 — 이전 고객의 상태 칩이 새 고객 화면에 남지 않게 한다.
         // 승인은 "이 고객의 이 리포트"에 대한 것이라 고객과 함께 폐기한다. 분석 결과·
@@ -498,9 +499,24 @@ export const useDashboardStore = create<DashboardState>((set) => ({
         consultationId: "",
         sttStatus: "idle" as SttStatus,
         sttNote: undefined,
-        // 신규 고객(상담 전)은 IPS도 빈 상태로 시작 — 더미 데이터 노출 금지.
-        // 기존 고객의 IPS는 직후 자동 복원(getPreviousDashboard→loadConsultationDetail)이 채운다.
+        // 상담 전 고객은 IPS도 빈 상태로 시작 — 없는 값을 보여주지 않는다.
         ...(target?.isNew ? { ips: EMPTY_IPS } : {}),
+        ...(restored ?? {}),
+      };
+
+      if (!restored) return next;
+
+      /*
+        지난 회차는 그때 PB 가 확정한 상태로 열린다 — 확정을 여기서 새로 받는 것이
+        아니라 남아 있던 것을 되살리는 것이라, 전이표를 거치지 않고 결과 상태를
+        그대로 쓴다. 스냅샷은 지금 복원한 안 그대로 만든다. 그래야 추출 조건
+        (locked AND 보는 안 === 확정 스냅샷)이 성립해 PDF 가 열린 채로 시작한다.
+      */
+      const seeded = { ...s, ...next } as DashboardState;
+      return {
+        ...next,
+        runStatus: RUN_STATUS.LOCKED,
+        lockedSnapshot: viewedPlan(seeded),
       };
     }),
   clearCustomerNew: (id) =>
@@ -567,6 +583,17 @@ export const selectRunStatus = (s: DashboardState): RunStatus => s.runStatus;
 /** blocked 사유. 차단 상태가 아니면 빈 문자열. */
 export const selectRunStatusReason = (s: DashboardState): string =>
   s.runStatusReason;
+
+/**
+ * 아직 분석 결과가 없는가 — 중앙 빈 화면·우측 인사이트·자세히 버튼이 함께 읽는다.
+ *
+ * 판정 식이 화면마다 흩어져 있으면 한 곳만 고쳐도 다른 곳이 따라오지 않아,
+ * 중앙은 비어 있는데 우측은 조회가 열려 있는 상태가 생긴다.
+ */
+export const selectAnalysisEmpty = (s: DashboardState): boolean =>
+  s.portfolioSource === "fallback" &&
+  s.portfolioNote === undefined &&
+  !s.analyzing;
 
 /** 컴포넌트용 구독 훅 — `const status = useRunStatus();` */
 export const useRunStatus = (): RunStatus =>

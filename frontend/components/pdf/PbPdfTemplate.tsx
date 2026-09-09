@@ -694,7 +694,6 @@ function MarketIpsPage() {
 // ── 페이지 3: 포트폴리오 비교 ────────────────────────────────────
 function PortfolioPage() {
   const storePortfolios = useDashboardStore((s) => s.portfolios);
-  const stressScenarioKey = useDashboardStore((s) => s.stressScenarioKey);
   const customers = useDashboardStore((s) => s.customers);
   const selectedCustomerId = useDashboardStore((s) => s.selectedCustomerId);
   const selectedPortfolioId = useDashboardStore((s) => s.selectedPortfolioId);
@@ -734,18 +733,33 @@ function PortfolioPage() {
   };
 
   // 예상 평가손익은 선택한 포트폴리오(selId) 기준으로 표시한다.
+  //
+  // 강조 행은 손실이 가장 큰 시나리오다. 예전에는 화면 카드에서 고른 시나리오
+  // (store 의 stressScenarioKey)를 따랐는데, 그 카드가 대시보드에서 빠지면서
+  // 값을 세울 경로가 사라져 늘 "현재(충격 없음)" 에 고정돼 있었다. 고를 사람이
+  // 없으면 리포트가 스스로 정해야 하고, 그 기준은 최악이 맞다 — 여기서 새로
+  // 정하지 않고 화면과 같은 runStress 로 계산해 고른다.
+  const stressLosses = STRESS_SCENARIOS.map((sc) => ({
+    sc,
+    loss: runStress(selectedPf.weights, stressTotalKrw, sc),
+  }));
+  // lossKrw 는 양수가 손실이다(lib/stressScenarios.ts StressLoss).
+  const worstKey = stressLosses.reduce((worst, row) =>
+    row.loss.lossKrw > worst.loss.lossKrw ? row : worst,
+  ).sc.key;
+
   const stressRows = [
     {
       name: "현재 (충격 없음)",
       shock: "—",
       pnl: { text: "기준", color: MUTED },
-      selected: stressScenarioKey === null,
+      selected: false,
     },
-    ...STRESS_SCENARIOS.map((sc) => ({
+    ...stressLosses.map(({ sc, loss }) => ({
       name: sc.label,
       shock: sc.shockSummary,
-      pnl: fmtLoss(runStress(selectedPf.weights, stressTotalKrw, sc).lossKrw),
-      selected: stressScenarioKey === sc.key,
+      pnl: fmtLoss(loss.lossKrw),
+      selected: sc.key === worstKey,
     })),
   ];
 

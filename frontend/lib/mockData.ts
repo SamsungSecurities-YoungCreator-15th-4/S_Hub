@@ -6,7 +6,13 @@
  *    이 파일을 API 응답으로 대체한다. 임의 수치를 실데이터처럼 쓰지 말 것.
  */
 
-import type { CalcUnitWeights } from "./assetMapping";
+import {
+  CALC_UNITS,
+  isCurrentWeightsInputValid,
+  sumCurrentWeightsInput,
+  type CalcUnitWeights,
+  type CurrentWeightsInput,
+} from "./assetMapping";
 import { withSharpe } from "./sharpe";
 
 // ── 헤더: 거시지표 ──────────────────────────────────────────────
@@ -77,6 +83,19 @@ export interface Customer {
    * 개설 시점이 정한다. 미지정이면 미개설=3년, 개설=0년으로 본다.
    */
   isaYearsUntilLiquid?: number;
+  /**
+   * 마지막 상담일(YYYY-MM-DD). 없으면 상담 이력이 없는 고객이다.
+   * `isNew` 와 같은 사실의 두 표현이라 함께 움직인다 — isNew 는 분기용,
+   * 이쪽은 화면 표기용이다.
+   */
+  lastConsultedAt?: string;
+  /**
+   * 상담 이력이 있는 고객이 화면에 열릴 때 복원할 IPS. 없으면 IPS_DEFAULT 를 쓴다.
+   * 신규 고객은 이 값을 두지 않는다 — 상담 전에 IPS 가 있을 수 없다.
+   */
+  ips?: typeof IPS_DEFAULT;
+  /** 상담 이력이 있는 고객의 현재 보유 비중(%). 합계 100. */
+  currentWeights?: CurrentWeightsInput;
   /** DB(client 테이블) UUID. 초기 mock 3명·미저장(데모) 고객은 없음. */
   clientId?: string;
   /** DB 저장 성공 여부. false = 데모(로컬에만 추가). undefined = mock 초기 고객. */
@@ -91,13 +110,102 @@ export interface Customer {
 
 export const CUSTOMERS: Customer[] = [
   {
-    // 시연 기준 고객. 33세 직장인 6년차 — 은퇴자산을 쌓으면서 3년 뒤 전세
-    // 보증금 인상분도 마련해야 하는, 절세계좌 lock-up 과 정면으로 부딪히는 사례다.
+    // 상담 이력이 있는 고객. 화면을 열면 지난 회차의 IPS·비중·확정 상태가 복원된다.
+    // 목록 첫 번째라 초기 선택 고객이기도 하다 — 처음 열었을 때 채워진 화면을 본다.
+    id: "cust-002",
+    name: "이사조",
+    grade: "일반",
+    pbCode: "PB-100483",
+    aumLabel: "운용자산 3억원",
+    aumEokwon: 3,
+    salaryManwon: 8000,
+    isaUsedManwon: 2000,
+    pensionUsedManwon: 900,
+    realizedLossManwon: 0,
+    marginalRatePct: 26.4,
+    age: 47,
+    horizonYears: 13,
+    nearTermNeedManwon: 0,
+    nearTermNeedYears: 0,
+    isaOpened: true,
+    lastConsultedAt: "2026-08-21",
+    ips: {
+      goal: "은퇴 후 현금흐름 확보",
+      assetLabel: "3억원",
+      returnPct: 5,
+      // 브리프의 "중립형"은 IpsState.risk 유니온(안정형·균형형·공격형)에 없는 값이라
+      // 같은 자리의 균형형으로 적는다. 유니온은 팀 데이터 계약이라 넓히지 않는다.
+      risk: "균형형" as "안정형" | "균형형" | "공격형",
+      timeYears: 13,
+      tax: "배당소득 원천징수",
+      liquidity: "낮음" as "낮음" | "중간" | "높음",
+      legal: "특이사항 없음",
+      unique: "배당 중심 선호 · ISA 한도 소진",
+    },
+    currentWeights: {
+      domesticEquity: 18,
+      overseasGrowthEquity: 14,
+      overseasDividendEquity: 16,
+      domesticBond: 22,
+      overseasBond: 10,
+      reits: 8,
+      gold: 6,
+      cash: 6,
+    },
+  },
+  {
+    // 상담 이력이 있는 고객. 위와 같은 성격, 값만 다르다.
+    id: "cust-003",
+    name: "박기업",
+    grade: "일반",
+    pbCode: "PB-100484",
+    aumLabel: "운용자산 5억원",
+    aumEokwon: 5,
+    salaryManwon: 6000,
+    isaUsedManwon: 2000,
+    pensionUsedManwon: 1800,
+    realizedLossManwon: 0,
+    marginalRatePct: 26.4,
+    age: 58,
+    horizonYears: 7,
+    nearTermNeedManwon: 0,
+    nearTermNeedYears: 0,
+    isaOpened: true,
+    lastConsultedAt: "2026-07-30",
+    ips: {
+      goal: "원금 보전 우선 · 정기 인출",
+      assetLabel: "5억원",
+      returnPct: 4,
+      // 브리프의 "안정추구형" → 유니온의 안정형. 위와 같은 이유다.
+      risk: "안정형" as "안정형" | "균형형" | "공격형",
+      timeYears: 7,
+      tax: "금융소득 종합과세 대상",
+      liquidity: "높음" as "낮음" | "중간" | "높음",
+      legal: "특이사항 없음",
+      unique: "3년 내 인출 계획 · 채권 비중 선호",
+    },
+    currentWeights: {
+      domesticEquity: 8,
+      overseasGrowthEquity: 6,
+      overseasDividendEquity: 10,
+      domesticBond: 30,
+      separateTaxBond: 12,
+      overseasBond: 12,
+      gold: 4,
+      cash: 18,
+    },
+  },
+  {
+    // 상담 전 고객. 좌·중·우가 전부 비어 있고 확정도 없다 — IPS·비중·분석 결과는
+    // 상담을 거쳐 사람이 채운다. isNew 가 그 분기를 담당한다(store.selectCustomer).
+    // 33세 직장인 6년차 — 은퇴자산을 쌓으면서 3년 뒤 전세 보증금 인상분도
+    // 마련해야 하는, 절세계좌 lock-up 과 정면으로 부딪히는 사례다.
     id: "cust-001",
     name: "김성삼",
     grade: "일반",
     pbCode: "PB-100482",
-    aumLabel: "운용자산 1억원",
+    // 분석 전이라 운용자산을 단정하지 않는다. 목록에는 이 자리에 상담 이력을 적는다.
+    aumLabel: "상담 이력 없음",
     aumEokwon: 1,
     salaryManwon: 5200, // 총급여 5,500만원 이하 → 연금 세액공제율 16.5%
     annualContributionManwon: 1500, // 연 납입여력
@@ -112,42 +220,42 @@ export const CUSTOMERS: Customer[] = [
     nearTermNeedYears: 3,
     isaOpened: true,
     isaYearsUntilLiquid: 2, // 작년 개설 — 2년 뒤 해제, 전세 시점(3년)보다 이르다
-  },
-  {
-    id: "cust-002",
-    name: "이사조",
-    grade: "VVIP",
-    pbCode: "PB-100483",
-    aumLabel: "운용자산 52억원",
-    aumEokwon: 52,
-    isaUsedManwon: 800, // ISA 여유 있음
-    pensionUsedManwon: 600,
-    realizedLossManwon: 3200,
-    marginalRatePct: 49.5,
-    age: 33,
-    horizonYears: 3, // 변경: 1년 → 3년
-    nearTermNeedManwon: 0, // 창업 대금(금액 미상) — 추후 입력
-    nearTermNeedYears: null,
-    isaOpened: true,
-  },
-  {
-    id: "cust-003",
-    name: "박기업",
-    grade: "VVIP",
-    pbCode: "PB-100484",
-    aumLabel: "운용자산 31억원",
-    aumEokwon: 31,
-    isaUsedManwon: 0, // ISA 미납입
-    pensionUsedManwon: 300,
-    realizedLossManwon: 0,
-    marginalRatePct: 38.5,
-    age: 62,
-    horizonYears: 10, // 초장기(10년 이상)
-    nearTermNeedManwon: 0, // 법인 운전자금은 별도 관리
-    nearTermNeedYears: null,
-    isaOpened: true,
+    isNew: true,
   },
 ];
+
+/**
+ * PB가 입력한 현재 보유 비중을 "현재" 포트폴리오의 weights 에 얹는다.
+ *
+ * 도넛(PortfolioSection 의 toCalcUnitAllocation)과 스트레스 손실
+ * (StressTestSection → runStress)이 같은 weights 를 읽으므로, 입력이 화면까지
+ * 그대로 도달한다. 스트레스 손실은 엔진 상수·수식으로 실제 계산되는 값이다
+ * (`lib/stressScenarios.ts` — SSOT 는 engine/engine/stress.py).
+ *
+ * 지표(기대수익률·변동성·MDD·소르티노)는 바꾸지 않는다. 임의 비중으로 다시
+ * 계산하려면 자산별 수익률 시계열이 있어야 하는데 프론트 경로에는 없다
+ * (`lib/sharpe.ts` 가 같은 이유로 샤프 외의 지표 계산을 두지 않았다).
+ * 없는 값을 지어내지 않고 픽스처 값을 유지하며, 출처는 DataSourceBadge 가
+ * "시연 고정 데이터"로 표시한다.
+ *
+ * 입력이 없거나 합계가 100%가 아니면 손대지 않는다 — 라이브 경로도
+ * `isCurrentWeightsInputValid` 로 같은 입력을 막는다.
+ */
+export function withCurrentWeights(
+  portfolios: Portfolio[],
+  input?: CurrentWeightsInput,
+): Portfolio[] {
+  if (!input || sumCurrentWeightsInput(input) === 0) return portfolios;
+  if (!isCurrentWeightsInputValid(input)) return portfolios;
+
+  const weights = Object.fromEntries(
+    CALC_UNITS.map((u) => [u.id, input[u.id] ?? 0]),
+  ) as CalcUnitWeights;
+
+  return portfolios.map((pf) =>
+    pf.id === "current" ? { ...pf, weights, allocation: undefined } : pf,
+  );
+}
 
 // ── 지난 상담 기록 목록 (더미) ─────────────────────────────────
 export interface PastConsultation {
@@ -417,7 +525,7 @@ export const BACKTEST_SERIES = [
 
 // ── 절세 최적화 시뮬레이터 ─────────────────────────────────────
 export const TAX_EFFECT = {
-  baseLabel: "기준 : 안정추구 · 18억",
+  baseLabel: "기준 : 안정추구",
   annualSavingManwon: 1080,
   subNote:
     "일반과세 대비 · 세후 수익률 +0.6%p · 해외주식 양도세 22%·공제 250만 반영",
@@ -604,4 +712,69 @@ export const INSIGHT = {
     { title: "samsung equity 202511 (house_view)", date: "2025-11-01" },
     { title: "nts taxguide 2026 vol1 (tax_law)", date: "2026-01-01" },
   ] as InsightSource[],
+  /**
+   * 질문 성격별 응답. 백엔드 미연결 시 `demoInsight(query)` 가 keywords 로 고른다.
+   *
+   * 하나뿐이면 무엇을 물어도 같은 답이 나와, RAG 가 질문을 읽는다는 사실 자체가
+   * 화면에서 확인되지 않는다. 질문의 성격(거시·하우스뷰·세제)에 따라 인용하는
+   * 코퍼스 카테고리가 갈리는 것이 이 기능의 핵심이라 그 갈림을 보이게 한다.
+   *
+   * sources 는 위 주석과 같은 규칙이다 — 코퍼스에 실제로 있는 문서만 적는다
+   * (`corpus/manifest.md` 21건). 없는 문서명을 지어내면 화면의 출처가 추적 불가가 된다.
+   *
+   * 첫 항목부터 순서대로 검사하므로, 좁은 질문을 위에 둔다.
+   */
+  scenarios: [
+    {
+      key: "individual_security",
+      // 개별 종목은 이 화면의 범위가 아니다. 답을 지어내지 않고 범위를 밝힌다 —
+      // 실재하는 회사의 시세·지표를 근거 없이 만들어 내는 것이 가장 나쁜 실패다.
+      keywords: ["종목", "주가", "시세", "티커", "몇 주", "매수", "매도"],
+      answer:
+        "이 화면은 자산군 단위로만 분석합니다. 개별 종목의 시세·재무 지표는 여기서 다루지 않습니다.\n\n" +
+        "이유는 두 가지입니다. 하나는 근거입니다 — 리스크 계량과 스트레스 시나리오는 자산군별 수익률·상관관계 위에서 계산되고, 개별 종목 단위의 시세·재무 데이터는 이 경로에 연결돼 있지 않습니다. 다른 하나는 성격입니다 — 개별 종목 매매 권유는 이 도구가 내는 판단이 아닙니다.\n\n" +
+        "보유 종목을 반영하려면 좌측 자산 비중 조절기에서 해당 자산군 비중으로 넣어 주십시오. 국내주식·해외성장주 같은 자산군 단위로 들어가면 VaR·스트레스 손실에 그대로 반영됩니다.",
+      sources: [] as InsightSource[],
+    },
+    {
+      key: "tax_account",
+      keywords: ["isa", "연금", "irp", "절세", "세금", "세액공제", "한도", "과세"],
+      answer:
+        "절세계좌는 납입 한도와 잠기는 기간을 함께 봐야 합니다. 한도만 보고 채우면 정작 필요한 시점에 꺼내지 못합니다.\n\n" +
+        "ISA는 연 2,000만원·총 1억원 한도이고 의무보유는 3년입니다. 채우지 못한 한도가 다음 해로 넘어가는 구조라, 개설 후 몇 해가 지났는지에 따라 올해 넣을 수 있는 금액이 달라집니다. 순소득 200만원(서민형 400만원)까지 비과세이고 초과분은 9.9% 분리과세입니다.\n\n" +
+        "연금계좌는 연금저축·IRP 합산 900만원까지 세액공제 대상이며, 연금저축 단독으로는 600만원이 상한입니다. 900만원을 전부 연금저축에 넣으면 600만원까지만 공제되므로 나머지는 IRP로 보내야 합니다. 공제율은 총급여 5,500만원(종합소득금액 4,500만원)을 경계로 16.5%와 13.2%로 갈립니다.\n\n" +
+        "연금계좌는 만 55세까지 잠깁니다. 근시일에 쓸 자금이 있으면 한도를 채우는 것이 답이 아닙니다 — 좌측 절세 최적화의 납입 배분에서 두 값이 어떻게 맞물리는지 확인하십시오.",
+      sources: [
+        { title: "nts taxguide 2026 vol1 (tax_law)", date: "2026-01-01" },
+        { title: "nts taxguide 2026 vol2 (tax_law)", date: "2026-01-01" },
+      ] as InsightSource[],
+    },
+    {
+      key: "house_view",
+      // "전망" 은 넣지 않는다 — "기준금리 전망" 이 거시 대신 여기로 잡힌다.
+      keywords: ["업종", "반도체", "하우스뷰", "섹터", "주식 비중", "자산배분"],
+      answer:
+        "하우스뷰 기준으로는 위험자산 비중 상한과 단일 자산 집중도를 먼저 봅니다.\n\n" +
+        "국내주식 비중이 큰 포트폴리오는 업종 사이클과 지수 변동이 같은 방향으로 겹칩니다. 특정 업종 전망이 좋더라도 그 노출이 이미 단일 위험자산 상한을 넘고 있으면, 전망의 방향과 무관하게 비중 자체가 리스크 요인이 됩니다. 좌측 리포트의 IPS 충돌 검사가 이 조건을 확인합니다.\n\n" +
+        "분산 측면에서는 해외배당주·채권·대체자산이 국내주식과 다른 방향으로 움직이는 구간을 확보하는 것이 우선입니다. 업종 판단으로 비중을 키우는 것보다, 그 판단이 틀렸을 때의 낙폭을 IPS 허용 범위 안에 두는 것이 먼저입니다.\n\n" +
+        "구체적인 업종 의견은 인용된 하우스뷰 원문을 확인하십시오. 이 화면은 그 의견을 자산군 비중으로 옮겼을 때의 리스크만 계산합니다.",
+      sources: [
+        { title: "samsung equity 202511 (house_view)", date: "2025-11-01" },
+        { title: "samsung equity 202510 (house_view)", date: "2025-10-01" },
+      ] as InsightSource[],
+    },
+    {
+      key: "macro",
+      keywords: ["금리", "환율", "연준", "fomc", "한국은행", "통화정책", "인플레", "달러"],
+      answer:
+        "금리와 환율은 포트폴리오의 서로 다른 자리에 닿습니다.\n\n" +
+        "금리는 채권 듀레이션에 먼저 반영됩니다. 인하 기대가 뒤로 밀리는 구간에서는 장기채의 가격 변동이 커지므로, 만기가 정해진 자금은 듀레이션을 짧게 유지하는 편이 목표 시점의 불확실성을 줄입니다.\n\n" +
+        "환율은 해외자산의 비헤지 비중에 걸립니다. 원화 강세 구간에서는 해외자산의 원화 환산 수익이 깎이므로, 비헤지 비중이 클수록 기초자산이 올라도 손에 남는 금액이 줄어듭니다. 헤지 전환은 비용이 붙으므로 목표 시점과 비중을 함께 보고 정해야 합니다.\n\n" +
+        "두 충격이 동시에 온 경우의 손실은 자세히 리포트의 스트레스 시나리오에서 확인할 수 있습니다. 시나리오별 손실액은 엔진 상수와 같은 수식으로 계산됩니다.",
+      sources: [
+        { title: "bok mpd 202605 (macro)", date: "2026-05-01" },
+        { title: "fed fomc 202604 (macro)", date: "2026-04-01" },
+      ] as InsightSource[],
+    },
+  ],
 };
