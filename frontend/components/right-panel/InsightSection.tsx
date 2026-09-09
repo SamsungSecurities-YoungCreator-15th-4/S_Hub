@@ -129,10 +129,17 @@ export default function InsightSection() {
         </Button>
       </form>
 
-      {/* 분석 결과 + 요약 + 출처 */}
+      {/*
+        분석 결과 : 분석 요약 : 출처 = 2:1:1 로 고정한다.
+        세 칸 모두 항상 렌더한다 — 검색 전후로 칸이 생겼다 사라지면 화면이 흔들리고,
+        출처가 들어올 자리를 미리 보여 주는 편이 읽기 쉽다.
+        각 칸은 flex-basis 0 이라 높이가 비율대로 나뉘고, 내용이 넘치면 칸 안에서
+        스크롤한다(아래 overflow-y-auto + min-h-0). min-h 도 같은 2:1:1 로 둬서
+        창이 짧아져도 비율이 먼저 깨지지 않게 한다.
+      */}
       <div className="flex flex-1 flex-col gap-2.5 min-h-0">
         {/* 분석 결과 */}
-        <div className="flex flex-[2] flex-col rounded-xl border border-brand/15 bg-brand/5 p-3 min-h-[150px]">
+        <div className="flex flex-[2] flex-col rounded-xl border border-brand/15 bg-brand/5 p-3 min-h-[120px]">
           <div className="mb-2 flex shrink-0 items-center gap-1.5">
             <Sparkles className="size-3 text-brand" />
             <span className="text-[13px] font-extrabold tracking-wide text-brand-dark">
@@ -165,7 +172,7 @@ export default function InsightSection() {
         </div>
 
         {/* 분석 요약 */}
-        <div className="flex flex-1 flex-col rounded-xl border border-brand/15 bg-brand/5 p-3 min-h-[130px]">
+        <div className="flex flex-[1] flex-col rounded-xl border border-brand/15 bg-brand/5 p-3 min-h-[60px]">
           <div className="mb-2 flex shrink-0 items-center gap-1.5">
             <Sparkles className="size-3 text-brand" />
             <span className="text-[13px] font-extrabold tracking-wide text-brand-dark">
@@ -185,14 +192,16 @@ export default function InsightSection() {
           </div>
         </div>
 
-        {/* 출처 / 인용 목록 — 인용이 없으면 라벨까지 통째로 감춘다 */}
-        {citations.length > 0 && (
-          <div className="flex flex-1 flex-col min-h-[130px]">
-            <p className="mb-1 shrink-0 text-[14px] font-bold">
-              출처 / 인용 목록
-            </p>
-            <div className="flex-1 overflow-y-auto min-h-0">
-              {citations.map((src, i) => {
+        {/* 출처 / 인용 목록 */}
+        <div className="flex flex-[1] flex-col min-h-[60px]">
+          <p className="mb-1 shrink-0 text-[14px] font-bold">출처 / 인용 목록</p>
+          <div className="flex-1 overflow-y-auto min-h-0">
+            {citations.length === 0 ? (
+              <p className="text-[13px] font-medium text-muted-foreground">
+                인용된 문서가 없습니다.
+              </p>
+            ) : (
+              citations.map((src, i) => {
                 const docInfo = lookupDocument(src.title);
                 const displayDate = docInfo?.date ?? src.date;
                 const inner = (
@@ -228,10 +237,10 @@ export default function InsightSection() {
                     {inner}
                   </div>
                 );
-              })}
-            </div>
+              })
+            )}
           </div>
-        )}
+        </div>
       </div>
     </Card>
   );
