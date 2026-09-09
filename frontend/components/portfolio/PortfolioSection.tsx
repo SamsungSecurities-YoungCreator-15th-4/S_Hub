@@ -126,18 +126,11 @@ export default function PortfolioSection() {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-          {/*
-            두 카드는 대등하지 않다. 왼쪽은 "지금 이렇습니다" 라는 기준선이고
-            오른쪽이 상담에서 실제로 이야기할 제안이다. 크기는 같게 두되(비교가
-            목적이라 도넛·타일이 같은 크기여야 한다) 배경·테두리·라벨로 위계를
-            준다. 헤더 줄은 원래 있던 자리라 높이는 늘지 않는다.
-          */}
           {current && (
             <PortfolioCard
               pf={current}
-              className="bg-muted/30"
               header={
-                <span className="text-[13px] font-extrabold text-muted-foreground">
+                <span className="text-[13px] font-extrabold">
                   {current.name}
                 </span>
               }
@@ -152,17 +145,12 @@ export default function PortfolioSection() {
           {(customPortfolio ?? selectedProposal) && (
             <PortfolioCard
               pf={(customPortfolio ?? selectedProposal)!}
-              className="ring-2 ring-brand shadow-[0_6px_20px_rgba(0,100,255,0.12)]"
               metricsUnavailableNote={
                 isCustom
                   ? "직접 조정한 비중의 지표는 자산군별 수익률·변동성 데이터가 연결되면 계산됩니다."
                   : undefined
               }
               header={
-                <>
-                <span className="text-[13px] font-extrabold text-brand-dark">
-                  제안
-                </span>
                 <div className="flex rounded-lg bg-muted p-0.5">
                   {proposals.map((pf) => {
                     const active = !isCustom && selectedProposal?.id === pf.id;
@@ -198,7 +186,6 @@ export default function PortfolioSection() {
                     사용자 정의
                   </button>
                 </div>
-                </>
               }
             />
           )}
