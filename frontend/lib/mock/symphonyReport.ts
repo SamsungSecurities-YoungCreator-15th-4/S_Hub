@@ -21,14 +21,14 @@ export const REPORT_META = {
 } as const;
 
 /** 라벨 + 비중(%) 한 줄. 배분 집계·기여도 표가 공유한다. */
-export interface AllocationRow {
+interface AllocationRow {
   label: string;
   weightPct: number;
 }
 
 // ── ② IPS 충돌 검사 ──────────────────────────────────────────────
 
-export interface ConflictRow {
+interface ConflictRow {
   rule: string;
   message: string;
   observed: string;
@@ -62,7 +62,7 @@ export const IPS_CONFLICT_NOTE =
 
 // ── ③ VaR / CVaR ────────────────────────────────────────────────
 
-export interface RiskMetricRow {
+interface RiskMetricRow {
   label: string;
   ratioPct: number;
   amountKrw: number;
@@ -93,7 +93,7 @@ export const CVAR_CONTRIBUTION_NOTE =
 
 // ── ⑤ 스트레스 시나리오 ─────────────────────────────────────────
 
-export interface StressRow {
+interface StressRow {
   key: string;
   label: string;
   lossPct: number;
@@ -115,7 +115,7 @@ export const STRESS_NOTE =
 
 // ── ⑥ 인용·출처 ─────────────────────────────────────────────────
 
-export interface CitationRow {
+interface CitationRow {
   no: number;
   source: string;
   locator: string;
@@ -151,7 +151,7 @@ export const CITATIONS: CitationRow[] = [
 
 // ── ⑦ 검증 항목 ─────────────────────────────────────────────────
 
-export interface VerificationRow {
+interface VerificationRow {
   label: string;
   /** 분수 표기가 필요한 항목만 채운다(퍼센트로 바꾸지 않는다). */
   ratio?: string;
@@ -173,7 +173,7 @@ export const VERIFICATION_NOTE =
 
 // ── ⑧ 재현성 해시 ───────────────────────────────────────────────
 
-export interface HashRow {
+interface HashRow {
   label: string;
   value: string;
 }
