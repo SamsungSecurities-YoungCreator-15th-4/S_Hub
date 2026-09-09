@@ -260,33 +260,14 @@ function PortfolioCard({
       ) : (
         <div className="mt-2.5 grid grid-cols-2 gap-px overflow-hidden rounded-lg bg-muted">
         {/*
-          2열 3행이다. 3열로 두면 좁은 "현재" 카드에서 타일이 100px 남짓이라
-          "-2억 6,280만원" 같은 원화 병기가 줄바꿈으로 깨지고, 그 바람에 두 카드의
-          같은 지표가 서로 다른 높이에 놓여 비교가 되지 않았다.
+          2열 3행. 왼쪽 열은 버는 쪽, 오른쪽 열은 잃는·흔들리는 쪽으로 세로를 맞춘다.
 
-          행마다 성격을 맞춰 묶는다 — 얼마나 잃을 수 있나 / 위험 대비 수익 /
-          얼마나 벌 수 있나. 쓸 날이 정해진 자금을 다루는 상담이라 손실이 맨 위다.
+            세후수익률 · MDD      원화 금액이 붙는 두 지표 — 벌 돈과 잃을 수 있는 돈
+            기대수익률 · 변동성    같은 두 축의 세전·비율 버전
+            샤프지수  · 소르티노   위험 대비 수익 비율. 소르티노는 하방만 보므로 오른쪽
+
+          금액이 붙는 두 지표를 같은 행에 둬야 행 높이도 어긋나지 않는다.
         */}
-        <Metric
-          k="MDD"
-          v={`${m.mddPct.toFixed(1)}%`}
-          rangeSub={m.mddRangeLabel}
-          sub={m.mddAmountLabel ?? pctOfAumLabel(m.mddPct, aumEokwon, "-")}
-          tone={m.mddPct > 0 ? "down" : undefined}
-          value={m.mddPct}
-        />
-        <Metric
-          k="변동성"
-          v={`${m.volatilityPct.toFixed(2)}%`}
-          sub={m.volatilityAmountLabel ?? pctOfAumLabel(m.volatilityPct, aumEokwon, "±")}
-          value={m.volatilityPct}
-        />
-        <Metric
-          k="소르티노"
-          v={m.sortino != null ? m.sortino.toFixed(2) : "-"}
-        />
-        <Metric k="샤프지수" v={formatSharpe(m.sharpe)} />
-        <Metric k="기대수익률" v={`${m.expectedReturnPct.toFixed(2)}%`} />
         <Metric
           k="세후수익률"
           v={`${Math.abs(m.afterTaxReturnPct).toFixed(1)}%`}
@@ -307,6 +288,26 @@ function PortfolioCard({
                 : undefined
           }
           value={m.afterTaxReturnPct}
+        />
+        <Metric
+          k="MDD"
+          v={`${m.mddPct.toFixed(1)}%`}
+          rangeSub={m.mddRangeLabel}
+          sub={m.mddAmountLabel ?? pctOfAumLabel(m.mddPct, aumEokwon, "-")}
+          tone={m.mddPct > 0 ? "down" : undefined}
+          value={m.mddPct}
+        />
+        <Metric k="기대수익률" v={`${m.expectedReturnPct.toFixed(2)}%`} />
+        <Metric
+          k="변동성"
+          v={`${m.volatilityPct.toFixed(2)}%`}
+          sub={m.volatilityAmountLabel ?? pctOfAumLabel(m.volatilityPct, aumEokwon, "±")}
+          value={m.volatilityPct}
+        />
+        <Metric k="샤프지수" v={formatSharpe(m.sharpe)} />
+        <Metric
+          k="소르티노"
+          v={m.sortino != null ? m.sortino.toFixed(2) : "-"}
         />
         </div>
       )}
