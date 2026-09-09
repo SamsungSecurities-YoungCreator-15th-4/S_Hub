@@ -88,13 +88,17 @@ export function useConsultPlayback() {
 
   const finish = useCallback(() => {
     clearTimers();
+    // 시연에서는 녹음 길이와 무관하게 종료 시 확정 상담 전체를 남긴다.
+    // 발표자가 첫 발화 전에 종료하거나 중간에 끊어도 상담 내역의 결과가 달라지지 않는다.
+    playedRef.current = [...CONSULT_LOG];
+    setTranscript(playedRef.current, "fallback");
     setIsPaused(false);
     setStatus("stopping");
     timeoutRef.current = setTimeout(() => {
       timeoutRef.current = null;
       setStatus("done");
     }, 400);
-  }, [clearTimers]);
+  }, [clearTimers, setTranscript]);
 
   const tick = useCallback(() => {
     virtualSecondsRef.current += (TICK_MS / 1000) * PLAYBACK_SPEED;
@@ -165,7 +169,7 @@ export function useConsultPlayback() {
     runInterval();
   }, [runInterval]);
 
-  /** 종료 — 그때까지 재생된 발화는 그대로 남긴다(실제 녹음을 끊는 것과 같은 결과). */
+  /** 종료 — 재생 지점과 무관하게 고정 상담 전체를 상담 내역에 확정한다. */
   const stop = useCallback(() => {
     finish();
   }, [finish]);
