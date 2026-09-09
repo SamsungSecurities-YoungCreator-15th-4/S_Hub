@@ -126,13 +126,15 @@ export const CUSTOMERS: Customer[] = [
     // 3년 전 개설. 이 값이 없으면 "올해 가입"으로 계산돼(조특법 누적 산식의
     // 경과연수 0) 상담 이력이 있는 고객인데 올해 한도만 남은 것으로 잡힌다.
     isaYearsSinceOpen: 3,
-    pensionUsedManwon: 900, // 연금 세액공제 한도 소진
+    pensionUsedManwon: 300, // 연금 900만 한도 중 300만 납입 — 600만 여력
     realizedLossManwon: 0,
     marginalRatePct: 26.4,
     age: 47,
     horizonYears: 13,
-    nearTermNeedManwon: 0,
-    nearTermNeedYears: 0,
+    // 3년 뒤 자녀 대학 등록금. 연금은 만 55세까지 8년 잠기므로, 한도를 채우면
+    // 이 돈이 모자란다 — 납입 배분 화면이 보여 주는 것이 그 트레이드오프다.
+    nearTermNeedManwon: 3000,
+    nearTermNeedYears: 3,
     isaOpened: true,
     lastConsultedAt: "2026-08-21",
     ips: {
@@ -144,9 +146,11 @@ export const CUSTOMERS: Customer[] = [
       risk: "균형형" as "안정형" | "균형형" | "공격형",
       timeYears: 13,
       tax: "배당소득 원천징수",
-      liquidity: "낮음" as "낮음" | "중간" | "높음",
+      // 3년 뒤 등록금이 있으므로 "낮음" 이 아니다 — 고객 레코드의
+      // nearTermNeed 와 어긋나지 않게 둔다.
+      liquidity: "중간" as "낮음" | "중간" | "높음",
       legal: "특이사항 없음",
-      unique: "배당 중심 선호 · 연금 세액공제 한도 소진",
+      unique: "배당 중심 선호 · 3년 뒤 자녀 대학 등록금 3,000만원 예정",
     },
     currentWeights: {
       domesticEquity: 18,
@@ -173,12 +177,12 @@ export const CUSTOMERS: Customer[] = [
     isaUsedManwon: 2000, // 누적 납입액
     // 개설 4년 이상 — 누적 산식의 경과연수 상한이라 총한도 1억이 그대로 쌓인다.
     isaYearsSinceOpen: 4,
-    // 연금저축·IRP 당해 납입액. 세액공제 한도(900만)를 넘겨 납입한 상태라
-    // 추가 납입에 대한 공제 여력은 없다.
-    pensionUsedManwon: 1800,
+    pensionUsedManwon: 200, // 연금 900만 한도 중 200만 납입 — 700만 여력
     realizedLossManwon: 0,
     marginalRatePct: 26.4,
-    age: 58,
+    // 만 55세 전이라 연금이 아직 3년 잠긴다. 55세를 넘기면 잠기는 기간이 0이 되어
+    // 납입 배분 화면이 보여 줄 트레이드오프 자체가 사라진다.
+    age: 52,
     horizonYears: 7,
     // IPS Unique 의 "3년 내 인출 계획" 을 금액·시점으로 옮긴 값. 운용자산 5억의
     // 10%를 3년 내 인출한다고 본다. 0 으로 두면 Unique 와 어긋난다.
