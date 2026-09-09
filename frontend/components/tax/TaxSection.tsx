@@ -6,7 +6,6 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AccountAllocation from "@/components/tax/AccountAllocation";
 import TaxWaterfall from "@/components/tax/TaxWaterfall";
-import AsOfNote from "@/components/common/AsOfNote";
 // 계좌별 활용도 막대(AccountAllocation)와 이름이 헷갈리지 않도록 "납입 배분"으로 둔다.
 import ContributionSplit from "@/components/tax/ContributionSplit";
 import { TAX_ADVICE } from "@/lib/mockData";
@@ -233,8 +232,6 @@ export default function TaxSection() {
               연동 완료
             </div>
           ) : null}
-          {/* 절세 수치는 백엔드 계산값이라 인용할 외부 출처가 없어 기준일만 적는다. */}
-          <AsOfNote source="KRW" />
         </div>
         <TabsList className="h-auto rounded-lg bg-muted p-0.5">
           <TabsTrigger
