@@ -874,8 +874,7 @@ export default function Sidebar() {
             중앙의 직전 결과는 그대로 두므로 화면이 비지 않는다. */}
         {analyzeRejected && (
           <p className="rounded-xl border border-dashed border-muted-foreground/30 bg-muted/40 px-3 py-2 text-[12px] font-semibold text-muted-foreground">
-            PB 검토 대기 — 승인을 거절해 분석을 실행하지 않았습니다. 입력을
-            확인한 뒤 분석하기를 다시 눌러 승인하세요.
+            검토 대기 · 분석 미실행
           </p>
         )}
       </aside>

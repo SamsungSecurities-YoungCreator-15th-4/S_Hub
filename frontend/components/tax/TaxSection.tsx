@@ -232,7 +232,7 @@ export default function TaxSection() {
                 </p>
               ) : (
                 <p className="mt-1.5 text-[13px] font-bold text-muted-foreground">
-                  분석하기를 실행하면 실제 절세 효과를 계산합니다
+                  분석 후 계산됩니다
                 </p>
               )}
               {selectedTax?.summary && (
