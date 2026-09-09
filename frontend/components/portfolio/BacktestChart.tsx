@@ -17,7 +17,8 @@ import HelpTooltip from "@/components/common/HelpTooltip";
 import { useDashboardStore } from "@/lib/store";
 
 const BACKTEST_HELP =
-  "과거 5년 시장 데이터를 기반으로 각 포트폴리오의 누적 수익률을 시뮬레이션한 결과입니다. 현재 포트폴리오(회색)와 제안 포트폴리오 A·B를 비교하며, 과거 성과가 미래 수익을 보장하지 않습니다.";
+  "지금 이 포트폴리오를 과거 5년 전에 투자했다면 어떻게 됐을지 보여줍니다.\n" +
+  "실제 투자 결과가 아니라 과거 시장 데이터를 이용해 계산한 결과입니다.";
 
 const BENCHMARKS = ["KOSPI", "S&P500", "MSCI ACWI"] as const;
 type Benchmark = (typeof BENCHMARKS)[number];
