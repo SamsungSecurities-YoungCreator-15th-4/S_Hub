@@ -18,7 +18,7 @@ import {
   fetchDartInsight,
   fetchRagInsight,
 } from "@/lib/api";
-import { useDashboardStore } from "@/lib/store";
+import { selectAnalysisEmpty, useDashboardStore } from "@/lib/store";
 import { lookupDocument } from "@/lib/documentLinks";
 
 /** 우측 하단: AI 인사이트 검색(RAG /rag/insight 실연결) + 결과 + 요약 + 출처/인용 */
@@ -74,6 +74,12 @@ export default function InsightSection() {
     }
   }
 
+  /*
+    분석 전에는 조회할 근거가 없다 — 인사이트는 이 고객의 포트폴리오·IPS 를 두고
+    묻는 것이라, 그 둘이 없는 상태에서 답을 내면 무엇에 대한 답인지 알 수 없다.
+    중앙 빈 화면과 같은 판정을 쓴다(lib/store.ts selectAnalysisEmpty).
+  */
+  const beforeAnalysis = useDashboardStore(selectAnalysisEmpty);
   const showInitial = result === null;
   const source = showInitial ? null : result.source;
   const note = showInitial ? null : result.note;
@@ -111,7 +117,10 @@ export default function InsightSection() {
           onChange={(e) => setQuery(e.target.value)}
           placeholder="예: 재무제표, RAG 문서, 분석 결과 요약"
           className="h-8 text-[13px] md:text-[13px]"
-          disabled={loading}
+          disabled={loading || beforeAnalysis}
+          title={
+            beforeAnalysis ? "분석 후 인사이트를 조회할 수 있습니다" : undefined
+          }
         />
         <Button
           type="submit"
@@ -119,7 +128,7 @@ export default function InsightSection() {
           className="font-bold"
           /* 빈 질의는 handleSubmit 이 조용히 return 하므로(:56) 버튼에서 막는다 —
              누르고도 아무 일이 없으면 고장으로 읽힌다. */
-          disabled={loading || query.trim() === ""}
+          disabled={loading || beforeAnalysis || query.trim() === ""}
         >
           {loading ? <Loader2 className="size-3.5 animate-spin" /> : "검색"}
         </Button>
@@ -153,7 +162,9 @@ export default function InsightSection() {
           <div className="flex-1 overflow-y-auto pr-1 min-h-0">
             {showInitial ? (
               <p className="text-[13px] font-medium text-muted-foreground">
-                질문을 입력하세요
+                {beforeAnalysis
+                  ? "분석 후 인사이트를 조회할 수 있습니다"
+                  : "질문을 입력하세요"}
               </p>
             ) : isEmpty ? (
               <p className="text-[13px] font-medium text-muted-foreground">

@@ -16,6 +16,7 @@ import { pctOfAumLabel } from "@/lib/formatKrw";
 import { formatSharpe } from "@/lib/sharpe";
 import { RUN_STATUS } from "@/lib/runStatus";
 import {
+  selectAnalysisEmpty,
   selectViewedPlanKey,
   useDashboardStore,
   useRunStatus,
@@ -79,15 +80,13 @@ export default function PortfolioSection() {
     setWeightsTab,
     portfolios,
     portfolioSource,
-    portfolioNote,
     analyzing,
   } = useDashboardStore();
   const [detailOpen, setDetailOpen] = useState(false);
   const runStatus = useRunStatus();
 
   // 분석 전(=빈 상태)에는 볼 리포트가 없으므로 자세히도 내보내지 않는다.
-  const isEmpty =
-    portfolioSource === "fallback" && portfolioNote === undefined && !analyzing;
+  const isEmpty = useDashboardStore(selectAnalysisEmpty);
   // draft 는 분석 승인 전(또는 거절·IPS 반영으로 되돌아온 뒤)이라 확정할 리포트가
   // 아직 없다. 버튼을 숨기지 않고 비활성으로 두어 이유가 보이게 한다.
   const detailBlockReason =
