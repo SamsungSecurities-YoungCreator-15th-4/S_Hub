@@ -303,6 +303,17 @@ function seedFromProposal(
   ) as CurrentWeightsInput;
 }
 
+/**
+ * 자산 비중 조절기의 "현재 보유" 초기값.
+ *
+ * 비워 두면 화면이 같은 값을 두 가지로 말한다 — 현재 카드는 도넛과 범례로
+ * 25%·18%… 를 그리는데 입력칸은 전부 0 이었다. 카드가 그리는 그 비중을
+ * 그대로 초기값으로 둔다. PB 가 고치면 그 값이 계산에 실린다.
+ */
+const CURRENT_PORTFOLIO_WEIGHTS: CurrentWeightsInput = {
+  ...(PORTFOLIOS.find((p) => p.id === "current")?.weights ?? {}),
+};
+
 export const useDashboardStore = create<DashboardState>((set) => ({
   customers: [...CUSTOMERS],
   selectedCustomerId: CUSTOMERS[0].id,
@@ -320,7 +331,7 @@ export const useDashboardStore = create<DashboardState>((set) => ({
   scenario: { ratePct: SCENARIO_BASE.ratePct, fxKrw: SCENARIO_BASE.fxKrw },
   liveBase: { ratePct: SCENARIO_BASE.ratePct, fxKrw: SCENARIO_BASE.fxKrw },
   liveBaseLoaded: false,
-  currentWeightsInput: {},
+  currentWeightsInput: { ...CURRENT_PORTFOLIO_WEIGHTS },
   setCurrentWeightsInput: (patch) =>
     set((s) => ({
       currentWeightsInput: { ...s.currentWeightsInput, ...patch },
@@ -463,7 +474,7 @@ export const useDashboardStore = create<DashboardState>((set) => ({
         stressTax: null,
         taxOptimizer: null,
         insightResult: null,
-        currentWeightsInput: {},
+        currentWeightsInput: { ...CURRENT_PORTFOLIO_WEIGHTS },
         analyzeRejected: false,
         weightsTab: "current",
         proposedWeightsInput: {},
