@@ -80,6 +80,24 @@ export interface DashboardState {
    *  기준선으로 그대로 전송된다. 미입력 시 백엔드가 현금 100%로 폴백한다. */
   currentWeightsInput: CurrentWeightsInput;
   setCurrentWeightsInput: (patch: CurrentWeightsInput) => void;
+  /**
+   * "이렇게 바꾸면?" 을 보기 위해 사람이 직접 조정하는 비중(%).
+   * 고객의 실제 보유인 currentWeightsInput 과 성격이 달라 따로 둔다 — 같은 값을
+   * 공유하면 가정을 만지다가 기준선을 덮어쓴다.
+   */
+  customWeightsInput: CurrentWeightsInput;
+  setCustomWeightsInput: (patch: CurrentWeightsInput) => void;
+  /**
+   * 비중 입력 폼이 지금 어느 쪽을 편집하는가. 중앙 제안 카드의 세그먼트와 같은
+   * 상태를 본다 — 왼쪽에서 사용자 정의를 만지는데 가운데가 다른 안을 보여주면
+   * 무엇을 조정하는 중인지 알 수 없다.
+   *
+   * selectedPortfolioId 에 "custom" 을 넣지 않은 것은 의도적이다. 세금·PDF·
+   * 인사이트가 그 값을 "current"|"a"|"b" 전제로 읽어, 모르는 값이 오면 오류
+   * 없이 조용히 폴백한다(예: PbPdfTemplate 은 "a" 로 취급).
+   */
+  weightsEditTarget: "current" | "custom";
+  setWeightsEditTarget: (target: "current" | "custom") => void;
 
   // ── STT/상담 연동 상태 ──
   /** 화면에 표시하는 상담 전사. 초기값은 mock(CONSULT_LOG). */
@@ -212,6 +230,25 @@ export const useDashboardStore = create<DashboardState>((set) => ({
   currentWeightsInput: {},
   setCurrentWeightsInput: (patch) =>
     set((s) => ({ currentWeightsInput: { ...s.currentWeightsInput, ...patch } })),
+  customWeightsInput: {},
+  setCustomWeightsInput: (patch) =>
+    set((s) => ({ customWeightsInput: { ...s.customWeightsInput, ...patch } })),
+  weightsEditTarget: "current",
+  setWeightsEditTarget: (target) =>
+    set((s) => {
+      if (target !== "custom") return { weightsEditTarget: target };
+      // 사용자 정의는 현재 보유에서 출발한다 — 빈 폼에서 11칸을 새로 채우게 하면
+      // 아무도 쓰지 않는다. 이미 조정한 값이 있으면 건드리지 않는다.
+      const untouched = Object.values(s.customWeightsInput).every(
+        (v) => v === undefined,
+      );
+      return untouched
+        ? {
+            weightsEditTarget: target,
+            customWeightsInput: { ...s.currentWeightsInput },
+          }
+        : { weightsEditTarget: target };
+    }),
 
   // 초기 포트폴리오는 mock(데모) — 출처를 fallback 으로 둬 배지로 명시한다.
   portfolios: PORTFOLIOS,
@@ -304,6 +341,8 @@ export const useDashboardStore = create<DashboardState>((set) => ({
         taxOptimizer: null,
         insightResult: null,
         currentWeightsInput: {},
+        customWeightsInput: {},
+        weightsEditTarget: "current",
         isStressMode: false,
         stressPreset: "current",
         stressScenarioKey: null,

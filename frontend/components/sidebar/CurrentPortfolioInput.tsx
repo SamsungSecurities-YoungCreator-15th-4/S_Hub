@@ -45,29 +45,41 @@ const PROXY_NOTE: Partial<Record<FieldId, string>> = {
  * 비중"이 되어 추적성이 깨지기 때문에, 여기서 정직하게 막는 쪽을 택했다.
  */
 export default function CurrentPortfolioInput() {
-  const { currentWeightsInput, setCurrentWeightsInput } = useDashboardStore();
-  const total = sumCurrentWeightsInput(currentWeightsInput);
+  const {
+    currentWeightsInput,
+    setCurrentWeightsInput,
+    customWeightsInput,
+    setCustomWeightsInput,
+    weightsEditTarget,
+    setWeightsEditTarget,
+  } = useDashboardStore();
+
+  const isCustom = weightsEditTarget === "custom";
+  const weights = isCustom ? customWeightsInput : currentWeightsInput;
+  const setWeights = isCustom ? setCustomWeightsInput : setCurrentWeightsInput;
+
+  const total = sumCurrentWeightsInput(weights);
   const hasAnyInput = total > 0;
-  const isValid = isCurrentWeightsInputValid(currentWeightsInput);
+  const isValid = isCurrentWeightsInputValid(weights);
 
   const handleChange = (id: FieldId, raw: string) => {
     const cleaned = raw.replace(/[^0-9.]/g, "");
     if (cleaned === "") {
-      setCurrentWeightsInput({ [id]: undefined });
+      setWeights({ [id]: undefined });
       return;
     }
     const parsed = Number(cleaned);
-    setCurrentWeightsInput({ [id]: Number.isFinite(parsed) ? parsed : undefined });
+    setWeights({ [id]: Number.isFinite(parsed) ? parsed : undefined });
   };
 
   return (
     <div className="rounded-xl border p-3">
       <div className="mb-2 flex items-center justify-between">
-        <p className="text-[14px] font-bold">현재 보유 자산 비중</p>
+        <p className="text-[14px] font-bold">자산 비중</p>
         {hasAnyInput && (
           <button
             type="button"
-            onClick={() => setCurrentWeightsInput(Object.fromEntries(
+            onClick={() => setWeights(Object.fromEntries(
               [...CALC_UNITS.map((u) => u.id), "cash"].map((id) => [id, undefined]),
             ))}
             className="text-[11px] font-semibold text-muted-foreground hover:text-foreground"
@@ -76,6 +88,38 @@ export default function CurrentPortfolioInput() {
           </button>
         )}
       </div>
+
+      {/*
+        같은 폼으로 두 값을 편집한다. 왼쪽은 고객이 실제 보유한 사실이고 오른쪽은
+        "이렇게 바꾸면?" 이라는 가정이라, 어느 쪽을 만지는 중인지 늘 보이게 한다.
+        중앙 제안 카드의 세그먼트와 같은 상태를 쓰므로 양쪽이 함께 움직인다.
+      */}
+      <div className="mb-2.5 flex rounded-lg bg-muted p-0.5">
+        {([
+          { key: "current" as const, label: "현재 자산" },
+          { key: "custom" as const, label: "사용자 정의" },
+        ]).map(({ key, label }) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setWeightsEditTarget(key)}
+            aria-pressed={weightsEditTarget === key}
+            className={`flex-1 rounded-md py-1 text-[11px] font-bold transition-colors ${
+              weightsEditTarget === key
+                ? "bg-white text-brand-dark shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <p className="mb-2 text-[10.5px] font-medium leading-snug text-muted-foreground">
+        {isCustom
+          ? "현재 자산에서 복사한 값입니다. 조정해도 고객의 실제 보유는 그대로입니다."
+          : "고객이 지금 실제로 들고 있는 비중입니다. 상담 기준선이 되므로 한 번만 입력합니다."}
+      </p>
 
       <div className="grid grid-cols-2 gap-x-3 gap-y-2">
         {GROUPS.map(({ group, ids }) => (
@@ -98,7 +142,7 @@ export default function CurrentPortfolioInput() {
                       <input
                         type="text"
                         inputMode="decimal"
-                        value={currentWeightsInput[id] ?? ""}
+                        value={weights[id] ?? ""}
                         onChange={(e) => handleChange(id, e.target.value)}
                         placeholder="0"
                         className="h-6 w-12 rounded-md border border-input bg-card px-1.5 text-right text-[12px] font-bold tabular-nums outline-none focus-visible:ring-1 focus-visible:ring-ring"

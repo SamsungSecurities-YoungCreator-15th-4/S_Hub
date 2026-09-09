@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import AssetDonut from "@/components/portfolio/AssetDonut";
 import {
   BACKEND_ASSET_COLORS,
+  CALC_UNITS,
   toCalcUnitAllocation,
 } from "@/lib/assetMapping";
 import { type Portfolio, type PortfolioMetrics } from "@/lib/mockData";
@@ -28,6 +29,15 @@ const METRIC_HELP: Record<string, string> = {
   MDD: "분석 기간 중 고점 대비 최대 하락폭(Maximum Drawdown)입니다. 최악의 시나리오에서의 손실 규모를 나타냅니다.",
 };
 
+/**
+ * 카드가 그릴 수 있는 포트폴리오.
+ *
+ * Portfolio.id 는 "current"|"a"|"b" 로 고정돼 있고 세금·PDF·인사이트가 그 전제로
+ * 읽는다. 화면에만 존재하는 "custom" 을 그 유니온에 넣으면 그쪽들이 오류 없이
+ * 조용히 폴백하므로, 카드 쪽에서만 id 를 넓혀 받는다.
+ */
+type CardPortfolio = Omit<Portfolio, "id"> & { id: string };
+
 /** 제안 카드 세그먼트 라벨. 두 안은 같은 축의 양끝이라 성향 이름으로 부른다. */
 const PROPOSAL_LABEL: Record<string, string> = {
   a: "안정추구",
@@ -39,6 +49,9 @@ export default function PortfolioSection() {
   const {
     selectedPortfolioId,
     selectPortfolio,
+    customWeightsInput,
+    weightsEditTarget,
+    setWeightsEditTarget,
     portfolios,
     portfolioSource,
     portfolioNote,
@@ -49,6 +62,28 @@ export default function PortfolioSection() {
   const proposals = portfolios.filter((pf) => pf.id !== "current");
   const selectedProposal =
     proposals.find((pf) => pf.id === selectedPortfolioId) ?? proposals[0];
+  const isCustom = weightsEditTarget === "custom";
+
+  /**
+   * 사용자 정의 안. 비중은 사람이 직접 조정한 값을 그대로 쓴다.
+   * 지표는 비워 둔다 — 임의 비중의 기대수익률·변동성·MDD 를 산출하려면 자산군별
+   * 수익률·공분산이 필요한데 프론트에 그 데이터가 없다. 근거 없는 숫자를 지어
+   * 넣지 않는다(lib/sharpe.ts 가 같은 이유로 샤프만 계산으로 승격했다).
+   */
+  const customBase = selectedProposal ?? proposals[0];
+  const customPortfolio: CardPortfolio | undefined = isCustom && customBase
+    ? {
+        ...customBase,
+        // 백엔드 원본 allocation 을 지운다 — 도넛이 사람이 조정한 weights 를 쓰게 한다.
+        allocation: undefined,
+        id: "custom",
+        name: "사용자 정의",
+        weights: CALC_UNITS.reduce(
+          (acc, unit) => ({ ...acc, [unit.id]: customWeightsInput[unit.id] ?? 0 }),
+          {} as Portfolio["weights"],
+        ),
+      }
+    : undefined;
 
   return (
     <section>
@@ -95,27 +130,50 @@ export default function PortfolioSection() {
             (안정 ↔ 수익)의 양끝이라 나란히 두는 것보다 하나를 바꿔 보는 편이
             비교가 된다. 폭은 두 카드가 쓰던 만큼(2/3)을 그대로 쓴다.
           */}
-          {selectedProposal && (
+          {(customPortfolio ?? selectedProposal) && (
             <PortfolioCard
-              pf={selectedProposal}
+              pf={(customPortfolio ?? selectedProposal)!}
               className="xl:col-span-2"
+              metricsUnavailableNote={
+                isCustom
+                  ? "직접 조정한 비중의 지표는 자산군별 수익률·변동성 데이터가 연결되면 계산됩니다."
+                  : undefined
+              }
               header={
                 <div className="flex rounded-lg bg-muted p-0.5">
-                  {proposals.map((pf) => (
-                    <button
-                      key={pf.id}
-                      type="button"
-                      onClick={() => selectPortfolio(pf.id)}
-                      aria-pressed={selectedProposal.id === pf.id}
-                      className={`rounded-md px-3 py-1 text-[11px] font-bold transition-colors ${
-                        selectedProposal.id === pf.id
-                          ? "bg-white text-brand-dark shadow-sm"
-                          : "text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      {PROPOSAL_LABEL[pf.id] ?? pf.name}
-                    </button>
-                  ))}
+                  {proposals.map((pf) => {
+                    const active = !isCustom && selectedProposal?.id === pf.id;
+                    return (
+                      <button
+                        key={pf.id}
+                        type="button"
+                        onClick={() => {
+                          setWeightsEditTarget("current");
+                          selectPortfolio(pf.id);
+                        }}
+                        aria-pressed={active}
+                        className={`rounded-md px-3 py-1 text-[11px] font-bold transition-colors ${
+                          active
+                            ? "bg-white text-brand-dark shadow-sm"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        {PROPOSAL_LABEL[pf.id] ?? pf.name}
+                      </button>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => setWeightsEditTarget("custom")}
+                    aria-pressed={isCustom}
+                    className={`rounded-md px-3 py-1 text-[11px] font-bold transition-colors ${
+                      isCustom
+                        ? "bg-white text-brand-dark shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    사용자 정의
+                  </button>
                 </div>
               }
             />
@@ -130,11 +188,14 @@ function PortfolioCard({
   pf,
   header,
   className,
+  metricsUnavailableNote,
 }: {
-  pf: Portfolio;
+  pf: CardPortfolio;
   /** 카드 상단 — 현재 카드는 이름, 제안 카드는 세그먼트 컨트롤이 온다. */
   header: React.ReactNode;
   className?: string;
+  /** 지표를 계산할 근거가 없을 때의 안내. 있으면 지표 격자 대신 이 문장을 보여준다. */
+  metricsUnavailableNote?: string;
 }) {
   // 지표의 원화 병기 기준. 고객 총자산이 없으면 pctOfAumLabel 이 병기를 생략한다.
   const aumEokwon = useDashboardStore(
@@ -179,7 +240,14 @@ function PortfolioCard({
         pctOfAumLabel(비율 × 고객 총자산)로 만든다. 어느 경로든 값의 출처가
         코드에서 하나로 추적된다.
       */}
-      <div className="mt-2.5 grid grid-cols-3 gap-px overflow-hidden rounded-lg bg-muted">
+      {metricsUnavailableNote ? (
+        <div className="mt-2.5 rounded-lg border border-dashed border-muted-foreground/25 bg-muted/30 px-3 py-5">
+          <p className="text-center text-[12px] font-semibold leading-relaxed text-muted-foreground">
+            {metricsUnavailableNote}
+          </p>
+        </div>
+      ) : (
+        <div className="mt-2.5 grid grid-cols-3 gap-px overflow-hidden rounded-lg bg-muted">
         <Metric
           k="MDD"
           v={`${m.mddPct.toFixed(1)}%`}
@@ -221,7 +289,8 @@ function PortfolioCard({
           value={m.afterTaxReturnPct}
         />
         <Metric k="샤프지수" v={formatSharpe(m.sharpe)} />
-      </div>
+        </div>
+      )}
       {/* 지표 타일의 기준일·통화. 백엔드 계산값이라 인용할 외부 출처가 없어 기준일만 적는다. */}
       <AsOfNote source="KRW" className="mt-1.5 text-[10px]" />
     </Card>
