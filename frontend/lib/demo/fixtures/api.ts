@@ -26,7 +26,7 @@ import type { InsightData } from "../../api/rag";
 import type { PortfolioCalcData, StressMetricsResult } from "../../api/portfolio";
 import type { SttConsultationData } from "../../api/stt";
 import type { TaxInsightData } from "../../api/tax";
-import type { Portfolio } from "../../mockData";
+import type { NearTermNeedKind, Portfolio } from "../../mockData";
 import type { CurrentWeightsInput } from "../../assetMapping";
 
 /** 상담 1건(전사 + IPS). stt.ts 의 업로드·상세조회 양쪽이 쓴다. */
@@ -83,6 +83,69 @@ export function demoTaxSummary(portfolioName: string): TaxInsightData {
       `- 세후수익률(추정): ${TAX_EFFECT.afterTaxReturn.from} → ${TAX_EFFECT.afterTaxReturn.to}`,
     ].join("\n"),
   };
+}
+
+/**
+ * 납입 배분 화면의 근거 문장 — **LLM 자리의 시연 대역**이다.
+ *
+ * 목표 모양: 상담 전사와 IPS 를 읽어 "왜 이 시점에 이 금액이 필요한지"와 "그래서
+ * 무엇을 양보할 수 없는지"를 문장으로 만든다. 지금은 그 호출을 붙일 수 없어 고정
+ * 문구로 대신하며, demoTaxSummary·demoInsight 와 같은 자리다.
+ *
+ * **목적에 따라 문장이 갈린다.** 금액과 시점만으로는 "못 미루는 돈"이라고 말할 수
+ * 없다 — 전세 보증금은 계약일에 묶이지만 창업 자금은 시점을 조절할 여지가 있어서,
+ * 같은 2,000만원이라도 조언이 달라진다. 실제 LLM 이 그렇게 답할 것이므로 대역도
+ * 하나로 뭉뚱그리지 않는다. 목적을 모르면 시점 경직성을 단정하지 않는다.
+ *
+ * 배분 슬라이더를 따라 바뀌지 않는다. 이 문장이 설명하는 것은 지금의 배분이 아니라
+ * **바꿀 수 없는 제약**이고, 실제 LLM 도 슬라이더를 움직일 때마다 다시 부르지 않는다.
+ *
+ * 엔드포인트가 생기면 이 함수를 fetch 로 갈아 끼우고 호출부는 그대로 둔다.
+ */
+export function demoContributionRationale(
+  need: {
+    manwon: number;
+    years: number;
+    kind?: NearTermNeedKind;
+    label?: string;
+  },
+  pensionLockupYears: number,
+): string {
+  const { manwon, years, kind, label } = need;
+  if (manwon <= 0 || years <= 0) return "";
+
+  const amount = `${manwon.toLocaleString()}만원`;
+  const locked = `연금에 넣어 ${pensionLockupYears}년 묶으면 그 시점에 손댈 수 없습니다.`;
+
+  switch (kind) {
+    case "lease":
+      return (
+        `${years}년 뒤 전세 재계약은 날짜가 정해진 지출이라 ${amount}은 미루거나 줄일 수 ` +
+        `있는 돈이 아닙니다. 은퇴자산은 시점을 넓게 두고 쌓을 수 있지만 이 돈은 그렇지 ` +
+        `않습니다 — ${locked}`
+      );
+    case "homePurchase":
+      return (
+        `주택 계약금은 계약일과 대출 실행일에 함께 묶여, ${years}년 뒤 ${amount}이 ` +
+        `현금으로 있어야 합니다. 하루 늦으면 계약 자체가 흔들립니다 — ${locked}`
+      );
+    case "startup":
+      return (
+        `창업 자금은 시점을 다소 조절할 수 있어 전세나 계약금만큼 경직되지는 않습니다. ` +
+        `다만 ${years}년을 크게 넘기면 준비해 온 기회를 놓치는 비용이 생깁니다 — ${locked}`
+      );
+    case "education":
+      return (
+        `학자금은 학기 일정에 묶여 ${years}년 뒤 ${amount}이 필요한 시점을 미룰 수 ` +
+        `없습니다. 한 학기를 건너뛰는 선택지가 사실상 없기 때문입니다 — ${locked}`
+      );
+    default:
+      // 목적을 모르면 "못 미루는 돈"이라고 단정하지 않는다. 금액과 시점만 말한다.
+      return (
+        `${years}년 뒤 ${label ? `${label} ` : ""}${amount}이 필요합니다. 시점을 미룰 수 ` +
+        `있는 지출인지 상담에서 확인해야 합니다 — ${locked}`
+      );
+  }
 }
 
 /** 포트폴리오 계산 결과. 기존 폴백과 같은 형태 — 상관행렬·세금 맵은 백엔드 산출물이라 null. */
