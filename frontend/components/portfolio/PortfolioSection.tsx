@@ -28,7 +28,13 @@ const METRIC_HELP: Record<string, string> = {
   MDD: "분석 기간 중 고점 대비 최대 하락폭(Maximum Drawdown)입니다. 최악의 시나리오에서의 손실 규모를 나타냅니다.",
 };
 
-/** 중앙 상단: 현재 / 포트폴리오 A / 포트폴리오 B — 카드 클릭으로 선택 */
+/** 제안 카드 세그먼트 라벨. 두 안은 같은 축의 양끝이라 성향 이름으로 부른다. */
+const PROPOSAL_LABEL: Record<string, string> = {
+  a: "안정추구",
+  b: "수익추구",
+};
+
+/** 중앙 상단: 현재(1/3) + 제안(2/3, 세그먼트 전환) */
 export default function PortfolioSection() {
   const {
     selectedPortfolioId,
@@ -38,6 +44,11 @@ export default function PortfolioSection() {
     portfolioNote,
     analyzing,
   } = useDashboardStore();
+
+  const current = portfolios.find((pf) => pf.id === "current");
+  const proposals = portfolios.filter((pf) => pf.id !== "current");
+  const selectedProposal =
+    proposals.find((pf) => pf.id === selectedPortfolioId) ?? proposals[0];
 
   return (
     <section>
@@ -69,15 +80,46 @@ export default function PortfolioSection() {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
-          {portfolios.map((pf) => (
+          {current && (
             <PortfolioCard
-              key={pf.id}
-              pf={pf}
-              isSelected={pf.id !== "current" && selectedPortfolioId === pf.id}
-              onSelect={() => selectPortfolio(pf.id)}
-              selectable={pf.id !== "current"}
+              pf={current}
+              header={
+                <span className="text-[13px] font-extrabold">
+                  {current.name}
+                </span>
+              }
             />
-          ))}
+          )}
+          {/*
+            제안 A·B 를 한 카드로 합치고 세그먼트로 전환한다. 두 안은 같은 축
+            (안정 ↔ 수익)의 양끝이라 나란히 두는 것보다 하나를 바꿔 보는 편이
+            비교가 된다. 폭은 두 카드가 쓰던 만큼(2/3)을 그대로 쓴다.
+          */}
+          {selectedProposal && (
+            <PortfolioCard
+              pf={selectedProposal}
+              className="xl:col-span-2"
+              header={
+                <div className="flex rounded-lg bg-muted p-0.5">
+                  {proposals.map((pf) => (
+                    <button
+                      key={pf.id}
+                      type="button"
+                      onClick={() => selectPortfolio(pf.id)}
+                      aria-pressed={selectedProposal.id === pf.id}
+                      className={`rounded-md px-3 py-1 text-[11px] font-bold transition-colors ${
+                        selectedProposal.id === pf.id
+                          ? "bg-white text-brand-dark shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {PROPOSAL_LABEL[pf.id] ?? pf.name}
+                    </button>
+                  ))}
+                </div>
+              }
+            />
+          )}
         </div>
       )}
     </section>
@@ -86,14 +128,13 @@ export default function PortfolioSection() {
 
 function PortfolioCard({
   pf,
-  isSelected,
-  onSelect,
-  selectable,
+  header,
+  className,
 }: {
   pf: Portfolio;
-  isSelected: boolean;
-  onSelect: () => void;
-  selectable: boolean;
+  /** 카드 상단 — 현재 카드는 이름, 제안 카드는 세그먼트 컨트롤이 온다. */
+  header: React.ReactNode;
+  className?: string;
 }) {
   // 지표의 원화 병기 기준. 고객 총자산이 없으면 pctOfAumLabel 이 병기를 생략한다.
   const aumEokwon = useDashboardStore(
@@ -117,42 +158,10 @@ function PortfolioCard({
     mddRangeLabel?: string;
   };
 
-  const portfolioType =
-    pf.id === "a" ? "안정추구형" : pf.id === "b" ? "수익추구형" : null;
-
   return (
-    <Card
-      tabIndex={selectable ? 0 : undefined}
-      className={`gap-0 p-3 transition-shadow focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-brand ${
-        selectable ? "cursor-pointer" : "cursor-default"
-      } ${
-        isSelected && selectable
-          ? "border-2 border-brand shadow-[0_6px_20px_rgba(0,100,255,0.14)]"
-          : selectable
-            ? "hover:shadow-md"
-            : ""
-      }`}
-      onClick={selectable ? onSelect : undefined}
-      onKeyDown={
-        selectable
-          ? (e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                onSelect();
-              }
-            }
-          : undefined
-      }
-    >
-      <div className="mb-2 flex items-center justify-between">
-        <div className="flex items-center gap-1.5 text-[13px] font-extrabold">
-          {pf.name}
-          {portfolioType && (
-            <span className="rounded-md bg-[#DCE9FF] px-1.5 py-0.5 text-[9px] font-extrabold text-brand-dark">
-              {portfolioType}
-            </span>
-          )}
-        </div>
+    <Card className={`gap-0 p-3 ${className ?? ""}`}>
+      <div className="mb-2 flex min-h-7 items-center justify-between">
+        {header}
       </div>
 
       <div className="flex min-h-72 items-stretch gap-2.5">
