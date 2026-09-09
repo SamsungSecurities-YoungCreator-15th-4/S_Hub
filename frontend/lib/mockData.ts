@@ -453,59 +453,89 @@ export interface TaxAdviceProduct {
   desc: string;
 }
 
-export const TAX_ADVICE = {
+/**
+ * Mass 고객용 절세 제안 카드가 참조하는 기존 계산 전략.
+ * 연금저축과 IRP는 백엔드의 연금계좌 합산 계산(pension_credit)을 공유한다.
+ */
+export type TaxAdviceSourceKey = "isa" | "pension_credit";
+
+export interface TaxAdviceDisplayCard {
+  key: "brokerage_isa" | "pension_savings" | "irp";
+  sourceKey: TaxAdviceSourceKey;
+  /** 같은 연금계좌 계산값을 두 번 합산하지 않기 위한 표시 역할. */
+  savingRole: "primary" | "included";
+  icon: string;
+  title: string;
+  body: string;
+  tag: string;
+  saving: string;
+  products: TaxAdviceProduct[];
+}
+
+export const TAX_ADVICE: {
+  cards: TaxAdviceDisplayCard[];
+  totalLabel: string;
+  totalSaving: string;
+} = {
   cards: [
     {
-      icon: "I",
-      title: "ISA 계좌 활용",
-      body: "이자·배당 자산 1,200만원을 ISA 잔여 한도로 이전 — 비과세 200만 + 초과분 9.9% 분리과세, 종합과세 합산 제외.",
-      tag: "비과세 자산 이전",
-      saving: "+21만원",
-      products: [] as TaxAdviceProduct[],
-    },
-    {
-      icon: "연",
-      title: "연금계좌 세액공제",
-      body: "연금저축+IRP 잔여 한도 0만원 납입 시 13.2% 세액공제 — 만 55세 이후 연금 수령.",
-      tag: "부적합·투자기간 3년 < 연금 수령까지 22년",
+      key: "brokerage_isa",
+      sourceKey: "isa",
+      savingRole: "primary",
+      icon: "ISA",
+      title: "중개형 ISA",
+      // 출처: 삼성증권 ISA 안내
+      // https://www.samsungpop.com/ux/kor/finance/isa/isainfo/intro.do
+      body: "계좌 안의 손익을 통산한 순소득 중 일반형 200만원·서민형 400만원까지 비과세되고, 초과분은 9.9%로 분리과세됩니다.",
+      tag: "연 2,000만원 · 의무보유 3년",
       saving: "",
-      products: [] as TaxAdviceProduct[],
+      products: [
+        {
+          name: "삼성증권 중개형 ISA",
+          desc: "중개형 ISA 제도와 가입 조건 확인",
+        },
+      ],
     },
     {
-      icon: "채",
-      title: "분리과세 채권",
-      body: "일반채·저쿠폰채 이자 중 종합과세 구간분을 장기채권 분리과세(33%)로 종결해 한계세율 과세를 회피.",
-      tag: "분리과세 전환",
-      saving: "+142만원",
-      products: [] as TaxAdviceProduct[],
+      key: "pension_savings",
+      sourceKey: "pension_credit",
+      savingRole: "primary",
+      icon: "연",
+      title: "개인연금 (연금저축)",
+      // 출처: 국세청 연금계좌 세액공제·삼성증권 개인연금 거래안내
+      // https://www.nts.go.kr/nts/cm/cntnts/cntntsView.do?cntntsId=7875&mi=6449
+      // https://www.samsungpop.com/ux/kor/customer/guide/workproductguide/personalAnnuity.do
+      body: "연금저축 납입액은 연 600만원까지 세액공제 대상이며, IRP·DC를 더하면 연금계좌 합산 연 900만원까지 적용됩니다.",
+      tag: "연금계좌 합산 절감액",
+      saving: "",
+      products: [
+        {
+          name: "삼성증권 연금저축계좌",
+          desc: "연금저축 세액공제와 거래 조건 확인",
+        },
+      ],
     },
     {
-      icon: "배",
-      title: "저율과세 배당주",
-      body: "고배당(해외배당·리츠) 중 종합과세 구간 배당을 저배당·자본이득형으로 조정해 추가과세 회피.",
-      tag: "저율과세 편입",
-      saving: "+1,419만원",
-      products: [] as TaxAdviceProduct[],
-    },
-    {
-      icon: "공",
-      title: "해외주식 양도 250만 공제",
-      body: "해외주식 양도차익을 연 250만원 기본공제 한도까지 실현해 비과세로 차익 확정.",
-      tag: "기본공제 활용",
-      saving: "+55만원",
-      products: [] as TaxAdviceProduct[],
-    },
-    {
-      icon: "L",
-      title: "Tax-loss Harvesting",
-      body: "평가손실을 확정해 해외주식 양도차익과 통산 → 통산액의 양도세(22%)만큼 절감.",
-      tag: "평가손실 확정",
-      saving: "+704만원",
-      products: [] as TaxAdviceProduct[],
+      key: "irp",
+      sourceKey: "pension_credit",
+      savingRole: "included",
+      icon: "IRP",
+      title: "개인형 IRP",
+      // 출처: 삼성증권 연금가이드(가입대상·세액공제 한도)
+      // https://www.samsungpop.com/mbw/finance/pensionAccount.do?cmd=guide&tab=DIRP
+      body: "소득이 있는 취업자가 가입할 수 있으며, 연금저축·DC와 합산해 연 900만원까지 세액공제 대상이 됩니다.",
+      tag: "연금저축과 900만원 한도 공유",
+      saving: "합산 절감액에 포함",
+      products: [
+        {
+          name: "삼성증권 개인형 IRP",
+          desc: "개인형 IRP 가입 조건과 세제 혜택 확인",
+        },
+      ],
     },
   ],
-  totalLabel: "절세 제안 적용 시 예상 추가 절감",
-  totalSaving: "+2,341만원",
+  totalLabel: "3대 절세계좌 활용 시 예상 추가 절감",
+  totalSaving: "분석 후 계산",
 };
 
 // ── 시나리오 Test (스트레스 테스트) ─────────────────────────────
@@ -536,7 +566,7 @@ export const INSIGHT = {
   query:
     "현재 고객 포트폴리오의 시장 환경 대응 전략 및 최적 자산 배분 방향을 분석해 주세요.",
   defaultAnswer:
-    "현재 고객 포트폴리오는 국내주식 20%, 해외배당주 22% 비중으로 선진국 배당 자산에 상대적으로 집중되어 있습니다. 최근 미 연준의 금리 동결 기조 장기화 가능성을 고려할 때, 단기 채권 듀레이션을 1~2년 이내로 유지하면서 투자등급 회사채 비중을 소폭 확대하는 전략이 유효합니다.\n\n환율 측면에서는 원/달러 환율이 1,380~1,420원 구간에서 등락하는 현 상황에서, 해외자산 중 비헤지 비중이 44%에 달해 환손실 리스크가 잠재합니다. 달러 익스포저의 30% 수준까지 환헤지 전환을 단계적으로 검토하시기 바랍니다.\n\n세후 수익률 기준으로는 포트폴리오 A(세후 5.5%)가 현재 포트폴리오(세후 4.0%) 대비 약 1.5%p 우위에 있으며, ISA 계좌 편입과 연금저축 한도 추가 납입을 통해 절세 여력이 연간 최대 1,080만원 추가로 확보 가능합니다.\n\n리스크 관리 측면에서 MDD -11.2% 수준은 VVIP 고객 손실 허용 범위(통상 -15% 이내) 내에 있으나, 글로벌 경기 둔화 시나리오 하에서 해외성장주 비중(12%)이 변동성 확대의 주요 원인이 될 수 있습니다. 포트폴리오 B의 해외성장주 22% 비중 확대안은 고수익 추구 성향 고객에 한해 선별 제안을 권고합니다.",
+    "현재 고객 포트폴리오는 국내주식 20%, 해외배당주 22% 비중으로 선진국 배당 자산에 상대적으로 집중되어 있습니다. 최근 미 연준의 금리 동결 기조 장기화 가능성을 고려할 때, 단기 채권 듀레이션을 1~2년 이내로 유지하면서 투자등급 회사채 비중을 소폭 확대하는 전략이 유효합니다.\n\n환율 측면에서는 원/달러 환율이 1,380~1,420원 구간에서 등락하는 현 상황에서, 해외자산 중 비헤지 비중이 44%에 달해 환손실 리스크가 잠재합니다. 달러 익스포저의 30% 수준까지 환헤지 전환을 단계적으로 검토하시기 바랍니다.\n\n세후 수익률 기준으로는 포트폴리오 A(세후 5.5%)가 현재 포트폴리오(세후 4.0%) 대비 약 1.5%p 우위에 있으며, ISA 계좌 편입과 연금저축 한도 추가 납입을 통해 절세 여력이 연간 최대 1,080만원 추가로 확보 가능합니다.\n\n리스크 관리 측면에서 MDD -11.2% 수준은 고객 손실 허용 범위(통상 -15% 이내) 내에 있으나, 글로벌 경기 둔화 시나리오 하에서 해외성장주 비중(12%)이 변동성 확대의 주요 원인이 될 수 있습니다. 포트폴리오 B의 해외성장주 22% 비중 확대안은 고수익 추구 성향 고객에 한해 선별 제안을 권고합니다.",
   /**
    * 시연·폴백용 인용 목록. 새로 지어낸 출처가 아니라 **실제 RAG 코퍼스 문서**다.
    *

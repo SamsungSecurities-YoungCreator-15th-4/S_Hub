@@ -148,7 +148,7 @@ export default function InsightSection() {
           <div className="flex-1 overflow-y-auto pr-1 min-h-0">
             {showInitial ? (
               <p className="text-[13px] font-medium text-muted-foreground">
-                질문을 입력하면 AI가 실데이터로 답합니다.
+                질문을 입력하세요
               </p>
             ) : isEmpty ? (
               <p className="text-[13px] font-medium text-muted-foreground">

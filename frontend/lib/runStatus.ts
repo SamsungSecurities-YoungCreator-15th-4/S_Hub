@@ -63,7 +63,7 @@ export const RUN_STATUS_LABEL: Readonly<Record<RunStatus, string>> = {
  *
  * 엔진의 `report_is_exportable`(`engine/nodes/assemble_report.py:369`)은 6개
  * 조건을 모두 만족할 때만 true를 돌려주는 실패 폐쇄 계약이며, 프론트의 실행
- * 상태에서는 그 결과가 `locked`로 나타난다. 아직 어느 화면에도 연결하지 않았다.
+ * 상태에서는 그 결과가 `locked`로 나타난다. 화면에서는 PDF 추출 버튼이 이 표를 읽는다.
  */
 export const RUN_STATUS_EXPORT_ALLOWED: Readonly<Record<RunStatus, boolean>> = {
   [RUN_STATUS.DRAFT]: false,

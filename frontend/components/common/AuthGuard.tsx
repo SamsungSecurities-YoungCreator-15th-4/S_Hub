@@ -2,7 +2,9 @@
 
 /**
  * 최소 인증 가드. 보호된 페이지를 감싸 Supabase 인증 상태를 구독하고,
- * 세션이 없으면 /login 으로 보낸다. 세션 확인 전에는 보호 콘텐츠를 렌더하지 않는다.
+ * 세션이 없으면 /start(진입 첫 화면)로 보낸다. 진입 흐름이 시작화면 → 로그인이라
+ * proxy 의 미인증 리다이렉트와 목적지를 맞춘다.
+ * 세션 확인 전에는 보호 콘텐츠를 렌더하지 않는다.
  *
  * onAuthStateChange 는 구독 즉시 현재 세션으로 한 번 호출되므로 초기 확인을 겸하고,
  * 이후 다른 탭 로그아웃·토큰 만료 등 런타임 상태 변화도 함께 반영한다.
@@ -34,7 +36,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     } = getSupabase().auth.onAuthStateChange((_event, session) => {
       if (!session) {
         setReady(false);
-        router.replace("/login");
+        router.replace("/start");
       } else {
         setReady(true);
       }

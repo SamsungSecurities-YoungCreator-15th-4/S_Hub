@@ -301,7 +301,7 @@ function extractPortfolioTax(
 export async function fetchPortfolioCalculate(
   opts: PortfolioCalcOptions,
 ): Promise<ApiResult<PortfolioCalcData>> {
-  if (IS_DEMO) return demo(demoPortfolioCalc());
+  if (IS_DEMO) return demo(demoPortfolioCalc(opts.currentWeights));
 
   const body = {
     client_id: opts.clientId ?? null,

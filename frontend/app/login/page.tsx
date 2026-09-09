@@ -101,9 +101,9 @@ export default function LoginPage() {
       <div className="relative w-full max-w-[340px]">
         {/* 로고 */}
         <div className="mb-[60px] flex flex-col items-center">
-          <Image src="/logo.png" alt="S.upervisor" width={72} height={72} className="rounded-3xl object-cover shadow-sm" />
-          <h1 className="mt-[36px] text-[52px] font-extrabold leading-none text-symphony-primary">S.upervisor</h1>
-          <p className="mt-[36px] text-[19px] text-symphony-text-muted">PB 전용 VVIP Asset Advisor Hub</p>
+          <Image src="/logo.png" alt="S.ymphony" width={72} height={72} className="rounded-3xl object-cover shadow-sm" />
+          <h1 className="mt-[36px] text-[52px] font-extrabold leading-none text-symphony-primary">S.ymphony</h1>
+          <p className="mt-[36px] text-[19px] text-symphony-text-muted">PB 상담 대시보드</p>
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">

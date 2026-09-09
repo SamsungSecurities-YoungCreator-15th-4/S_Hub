@@ -1,7 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import ReportDetailModal from "@/components/dashboard/ReportDetailModal";
 import AssetDonut from "@/components/portfolio/AssetDonut";
 import {
   BACKEND_ASSET_COLORS,
@@ -44,7 +47,7 @@ const METRIC_HELP: Record<string, string> = {
  * 카드가 그릴 수 있는 포트폴리오.
  *
  * Portfolio.id 는 "current"|"a"|"b" 로 고정돼 있고 세금·PDF·인사이트가 그 전제로
- * 읽는다. 화면에만 존재하는 "custom" 을 그 유니온에 넣으면 그쪽들이 오류 없이
+ * 읽는다. 화면에만 존재하는 "proposed" 를 그 유니온에 넣으면 그쪽들이 오류 없이
  * 조용히 폴백하므로, 카드 쪽에서만 id 를 넓혀 받는다.
  */
 type CardPortfolio = Omit<Portfolio, "id"> & { id: string };
@@ -60,37 +63,42 @@ export default function PortfolioSection() {
   const {
     selectedPortfolioId,
     selectPortfolio,
-    customWeightsInput,
-    weightsEditTarget,
-    setWeightsEditTarget,
+    proposedWeightsInput,
+    weightsTab,
+    setWeightsTab,
     portfolios,
     portfolioSource,
     portfolioNote,
     analyzing,
   } = useDashboardStore();
+  const [detailOpen, setDetailOpen] = useState(false);
+
+  // 분석 전(=빈 상태)에는 볼 리포트가 없으므로 자세히도 내보내지 않는다.
+  const isEmpty =
+    portfolioSource === "fallback" && portfolioNote === undefined && !analyzing;
 
   const current = portfolios.find((pf) => pf.id === "current");
   const proposals = portfolios.filter((pf) => pf.id !== "current");
   const selectedProposal =
     proposals.find((pf) => pf.id === selectedPortfolioId) ?? proposals[0];
-  const isCustom = weightsEditTarget === "custom";
+  const isProposedEdit = weightsTab === "proposed";
 
   /**
-   * 사용자 정의 안. 비중은 사람이 직접 조정한 값을 그대로 쓴다.
+   * 제안 조정 안. 비중은 PB 가 사이드바에서 손본 값(proposedWeightsInput)을 그대로 쓴다.
    * 지표는 비워 둔다 — 임의 비중의 기대수익률·변동성·MDD 를 산출하려면 자산군별
    * 수익률·공분산이 필요한데 프론트에 그 데이터가 없다. 근거 없는 숫자를 지어
    * 넣지 않는다(lib/sharpe.ts 가 같은 이유로 샤프만 계산으로 승격했다).
    */
-  const customBase = selectedProposal ?? proposals[0];
-  const customPortfolio: CardPortfolio | undefined = isCustom && customBase
+  const editBase = selectedProposal ?? proposals[0];
+  const adjustedPortfolio: CardPortfolio | undefined = isProposedEdit && editBase
     ? {
-        ...customBase,
+        ...editBase,
         // 백엔드 원본 allocation 을 지운다 — 도넛이 사람이 조정한 weights 를 쓰게 한다.
         allocation: undefined,
-        id: "custom",
-        name: "사용자 정의",
+        id: "proposed",
+        name: "제안 조정",
         weights: CALC_UNITS.reduce(
-          (acc, unit) => ({ ...acc, [unit.id]: customWeightsInput[unit.id] ?? 0 }),
+          (acc, unit) => ({ ...acc, [unit.id]: proposedWeightsInput[unit.id] ?? 0 }),
           {} as Portfolio["weights"],
         ),
       }
@@ -113,12 +121,22 @@ export default function PortfolioSection() {
             </div>
           ) : null}
         </div>
-        {portfolioSource !== "fallback" && <AsOfNote />}
+        <div className="flex items-center gap-2">
+          {portfolioSource !== "fallback" && <AsOfNote />}
+          {!isEmpty && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setDetailOpen(true)}
+              className="h-7 text-[12px] font-bold"
+            >
+              자세히
+            </Button>
+          )}
+        </div>
       </div>
 
-      {portfolioSource === "fallback" &&
-      portfolioNote === undefined &&
-      !analyzing ? (
+      {isEmpty ? (
         <div className="flex min-h-[240px] items-center justify-center rounded-2xl border border-dashed border-muted-foreground/20 bg-muted/30">
           <p className="text-[14px] font-semibold text-muted-foreground">
             분석 결과가 존재하지 않습니다
@@ -142,11 +160,11 @@ export default function PortfolioSection() {
             비교가 된다. 현재 카드와 같은 폭으로 둬 두 도넛·지표가 같은 크기로
             맞붙게 한다 — 비교가 이 화면의 목적이다.
           */}
-          {(customPortfolio ?? selectedProposal) && (
+          {(adjustedPortfolio ?? selectedProposal) && (
             <PortfolioCard
-              pf={(customPortfolio ?? selectedProposal)!}
+              pf={(adjustedPortfolio ?? selectedProposal)!}
               metricsUnavailableNote={
-                isCustom
+                isProposedEdit
                   ? "직접 조정한 비중의 지표는 자산군별 수익률·변동성 데이터가 연결되면 계산됩니다."
                   : undefined
               }
@@ -161,13 +179,13 @@ export default function PortfolioSection() {
                 <span className="text-[13px] font-extrabold">제안</span>
                 <div className="flex rounded-lg bg-muted p-0.5">
                   {proposals.map((pf) => {
-                    const active = !isCustom && selectedProposal?.id === pf.id;
+                    const active = !isProposedEdit && selectedProposal?.id === pf.id;
                     return (
                       <button
                         key={pf.id}
                         type="button"
                         onClick={() => {
-                          setWeightsEditTarget("current");
+                          setWeightsTab("current");
                           selectPortfolio(pf.id);
                         }}
                         aria-pressed={active}
@@ -183,15 +201,15 @@ export default function PortfolioSection() {
                   })}
                   <button
                     type="button"
-                    onClick={() => setWeightsEditTarget("custom")}
-                    aria-pressed={isCustom}
+                    onClick={() => setWeightsTab("proposed")}
+                    aria-pressed={isProposedEdit}
                     className={`rounded-md px-3 py-1 text-[11px] font-bold transition-colors ${
-                      isCustom
+                      isProposedEdit
                         ? "bg-white text-brand-dark shadow-sm"
                         : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
-                    사용자 정의
+                    제안 조정
                   </button>
                 </div>
                 </>
@@ -200,6 +218,8 @@ export default function PortfolioSection() {
           )}
         </div>
       )}
+
+      {detailOpen && <ReportDetailModal onClose={() => setDetailOpen(false)} />}
     </section>
   );
 }

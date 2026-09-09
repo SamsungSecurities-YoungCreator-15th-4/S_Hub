@@ -80,24 +80,17 @@ export interface DashboardState {
    *  기준선으로 그대로 전송된다. 미입력 시 백엔드가 현금 100%로 폴백한다. */
   currentWeightsInput: CurrentWeightsInput;
   setCurrentWeightsInput: (patch: CurrentWeightsInput) => void;
+  /** 제안 포트폴리오를 PB가 손본 비중(%) — 분석 결과가 있을 때만 입력할 수 있다.
+   *  현재 보유 비중과 달리 계산 요청에 실리지 않는다(표시·검토용). */
   /**
-   * "이렇게 바꾸면?" 을 보기 위해 사람이 직접 조정하는 비중(%).
-   * 고객의 실제 보유인 currentWeightsInput 과 성격이 달라 따로 둔다 — 같은 값을
-   * 공유하면 가정을 만지다가 기준선을 덮어쓴다.
+   * 비중 입력 폼이 지금 어느 쪽을 편집하는가.
+   * 중앙 제안 카드의 세그먼트가 같은 값을 보므로 좌·우가 함께 움직인다 —
+   * 왼쪽에서 조정하는데 가운데가 다른 안을 보여주면 무엇을 만지는지 알 수 없다.
    */
-  customWeightsInput: CurrentWeightsInput;
-  setCustomWeightsInput: (patch: CurrentWeightsInput) => void;
-  /**
-   * 비중 입력 폼이 지금 어느 쪽을 편집하는가. 중앙 제안 카드의 세그먼트와 같은
-   * 상태를 본다 — 왼쪽에서 사용자 정의를 만지는데 가운데가 다른 안을 보여주면
-   * 무엇을 조정하는 중인지 알 수 없다.
-   *
-   * selectedPortfolioId 에 "custom" 을 넣지 않은 것은 의도적이다. 세금·PDF·
-   * 인사이트가 그 값을 "current"|"a"|"b" 전제로 읽어, 모르는 값이 오면 오류
-   * 없이 조용히 폴백한다(예: PbPdfTemplate 은 "a" 로 취급).
-   */
-  weightsEditTarget: "current" | "custom";
-  setWeightsEditTarget: (target: "current" | "custom") => void;
+  weightsTab: "current" | "proposed";
+  setWeightsTab: (tab: "current" | "proposed") => void;
+  proposedWeightsInput: CurrentWeightsInput;
+  setProposedWeightsInput: (patch: CurrentWeightsInput) => void;
 
   // ── STT/상담 연동 상태 ──
   /** 화면에 표시하는 상담 전사. 초기값은 mock(CONSULT_LOG). */
@@ -168,7 +161,8 @@ export interface DashboardState {
 
   // ── 실행 상태(확정 수명주기) ──
   // 값·전이 규칙의 출처는 lib/runStatus.ts 하나뿐이다(엔진 계약을 그대로 옮긴 것).
-  // 아직 어느 화면에도 연결하지 않았다 — PDF 확정 게이트가 이 필드를 읽을 예정이다.
+  // 읽는 곳: 헤더 상태 칩·PDF 추출 잠금. 쓰는 곳: 분석 승인 게이트(Sidebar)·
+  // IPS 반영 승인(RightPanel)·확정 승인(ReportDetailModal)뿐이다.
   /** 현재 상담의 실행 상태. 초기값 draft. */
   runStatus: RunStatus;
   /** blocked 사유(엔진 governance.confirmation_blocked_reason에 대응). 없으면 빈 문자열. */
@@ -209,6 +203,24 @@ export interface DashboardState {
   setSttStatus: (status: SttStatus, note?: string) => void;
 }
 
+/**
+ * 비중이 바뀌면 직전 승인은 무효다.
+ *
+ * 승인은 "그때 그 비중으로 계산한 리포트"에 대한 것이라, 입력이 바뀌면 확정을
+ * 그대로 둘 수 없다 — 승인받지 않은 내용이 확정본으로 나간다. 되돌리는 방향이
+ * reviewed·locked → draft 라 전이표에 없는 전이이므로, 전이가 아니라 초기화로 처리한다.
+ * 이미 draft 면 바꿀 것이 없어 사유도 남기지 않는다.
+ */
+function unlockOnWeightChange(
+  s: DashboardState,
+): Partial<DashboardState> {
+  if (s.runStatus === INITIAL_RUN_STATUS) return {};
+  return {
+    runStatus: INITIAL_RUN_STATUS,
+    runStatusReason: "비중 변경 · 재분석 필요",
+  };
+}
+
 export const useDashboardStore = create<DashboardState>((set) => ({
   customers: [...CUSTOMERS],
   selectedCustomerId: CUSTOMERS[0].id,
@@ -229,26 +241,18 @@ export const useDashboardStore = create<DashboardState>((set) => ({
   otherIncomeManwon: TAX_THRESHOLD.otherIncomeDefault,
   currentWeightsInput: {},
   setCurrentWeightsInput: (patch) =>
-    set((s) => ({ currentWeightsInput: { ...s.currentWeightsInput, ...patch } })),
-  customWeightsInput: {},
-  setCustomWeightsInput: (patch) =>
-    set((s) => ({ customWeightsInput: { ...s.customWeightsInput, ...patch } })),
-  weightsEditTarget: "current",
-  setWeightsEditTarget: (target) =>
-    set((s) => {
-      if (target !== "custom") return { weightsEditTarget: target };
-      // 사용자 정의는 현재 보유에서 출발한다 — 빈 폼에서 11칸을 새로 채우게 하면
-      // 아무도 쓰지 않는다. 이미 조정한 값이 있으면 건드리지 않는다.
-      const untouched = Object.values(s.customWeightsInput).every(
-        (v) => v === undefined,
-      );
-      return untouched
-        ? {
-            weightsEditTarget: target,
-            customWeightsInput: { ...s.currentWeightsInput },
-          }
-        : { weightsEditTarget: target };
-    }),
+    set((s) => ({
+      currentWeightsInput: { ...s.currentWeightsInput, ...patch },
+      ...unlockOnWeightChange(s),
+    })),
+  weightsTab: "current",
+  setWeightsTab: (tab) => set({ weightsTab: tab }),
+  proposedWeightsInput: {},
+  setProposedWeightsInput: (patch) =>
+    set((s) => ({
+      proposedWeightsInput: { ...s.proposedWeightsInput, ...patch },
+      ...unlockOnWeightChange(s),
+    })),
 
   // 초기 포트폴리오는 mock(데모) — 출처를 fallback 으로 둬 배지로 명시한다.
   portfolios: PORTFOLIOS,
@@ -341,13 +345,16 @@ export const useDashboardStore = create<DashboardState>((set) => ({
         taxOptimizer: null,
         insightResult: null,
         currentWeightsInput: {},
-        customWeightsInput: {},
-        weightsEditTarget: "current",
+        weightsTab: "current",
+        proposedWeightsInput: {},
         isStressMode: false,
         stressPreset: "current",
         stressScenarioKey: null,
         scenario: { ...s.liveBase }, // 슬라이더도 live 기준으로 초기화 → 자동분석는 항상 calculate
         // 실행 상태도 초기화 — 이전 고객의 상태 칩이 새 고객 화면에 남지 않게 한다.
+        // 승인은 "이 고객의 이 리포트"에 대한 것이라 고객과 함께 폐기한다. 분석 결과·
+        // IPS·비중을 전부 지우는데 확정만 남으면, 아무도 승인하지 않은 새 고객의
+        // 리포트가 곧바로 추출 가능해진다.
         runStatus: INITIAL_RUN_STATUS,
         runStatusReason: "",
         // 고객 전환 시 이전 고객의 상담 내역·상담 ID·STT 상태는 신규/기존 구분 없이 항상 초기화한다.
