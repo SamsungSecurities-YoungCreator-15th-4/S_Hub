@@ -34,7 +34,7 @@ export default function LogoutButton() {
     // 시연 배포에서 throw 하므로 아예 호출하지 않는다.
     if (IS_DEMO) {
       clearDemoSession();
-      router.replace("/login");
+      router.replace("/start");
       return;
     }
 
@@ -45,8 +45,9 @@ export default function LogoutButton() {
     } catch (err) {
       console.error("예기치 못한 로그아웃 오류:", err);
     } finally {
-      // 성공·실패와 무관하게 로그인 화면으로 이동(로컬 세션은 이미 비워짐).
-      router.replace("/login");
+      // 성공·실패와 무관하게 첫 화면으로 이동(로컬 세션은 이미 비워짐).
+      // 진입 흐름이 시작화면 → 로그인이라, 다음 사람도 첫 장면부터 본다.
+      router.replace("/start");
     }
   }
 

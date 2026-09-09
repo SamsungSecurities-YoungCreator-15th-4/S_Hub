@@ -22,8 +22,12 @@ import { NextResponse, type NextRequest } from "next/server";
 import { IS_DEMO } from "@/lib/demo/flag";
 import { DEMO_SESSION_COOKIE } from "@/lib/demo/session";
 
-// 인증 없이 접근 가능한 공개 경로(로그인 화면). 무한 리다이렉트 방지에도 쓴다.
-const PUBLIC_PATHS = ["/login"];
+// 인증 없이 접근 가능한 공개 경로. 무한 리다이렉트 방지에도 쓴다.
+// 진입 흐름은 시작화면(/start) → 로그인(/login) → 대시보드(/) 이므로 둘 다 공개다.
+const PUBLIC_PATHS = ["/start", "/login"];
+
+/** 미인증 사용자를 보낼 첫 화면. 로그인 앞에 브랜드 관문이 한 장 있다. */
+const ENTRY_PATH = "/start";
 
 function isPublic(pathname: string): boolean {
   return PUBLIC_PATHS.some(
@@ -60,11 +64,11 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   if (IS_DEMO) {
     const hasDemoSession = request.cookies.has(DEMO_SESSION_COOKIE);
 
-    // 미로그인 + 보호 경로 → 로그인으로. 시연은 항상 첫 장면부터 시작한다.
+    // 미로그인 + 보호 경로 → 시작화면으로. 시연은 항상 첫 장면부터 시작한다.
     if (!hasDemoSession && !isPublic(pathname)) {
-      return redirectTo(request, "/login");
+      return redirectTo(request, ENTRY_PATH);
     }
-    // 로그인됨 + 로그인 화면 → 홈으로(Supabase 경로와 같은 동작).
+    // 로그인됨 + 진입 화면(시작·로그인) → 홈으로(Supabase 경로와 같은 동작).
     if (hasDemoSession && isPublic(pathname)) {
       return redirectTo(request, "/");
     }
@@ -74,12 +78,12 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  // env 누락 시 보호를 우회시키지 않는다(fail-closed). 단 /login 은 통과시켜
+  // env 누락 시 보호를 우회시키지 않는다(fail-closed). 단 진입 화면은 통과시켜
   // 무한 리다이렉트를 막는다.
   if (!supabaseUrl || !supabaseAnonKey) {
     return isPublic(pathname)
       ? NextResponse.next({ request })
-      : redirectTo(request, "/login");
+      : redirectTo(request, ENTRY_PATH);
   }
 
   // Supabase 가 토큰을 갱신하면 이 response 의 쿠키에 새 세션을 다시 심는다.
@@ -108,12 +112,12 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // 미인증 + 보호 경로 → 로그인으로(만료로 삭제된 세션 쿠키도 함께 정리).
+  // 미인증 + 보호 경로 → 시작화면으로(만료로 삭제된 세션 쿠키도 함께 정리).
   if (!user && !isPublic(pathname)) {
-    return redirectTo(request, "/login", response);
+    return redirectTo(request, ENTRY_PATH, response);
   }
 
-  // 인증됨 + 로그인 화면 → 홈으로(갱신된 세션 쿠키 보존).
+  // 인증됨 + 진입 화면 → 홈으로(갱신된 세션 쿠키 보존).
   if (user && isPublic(pathname)) {
     return redirectTo(request, "/", response);
   }
