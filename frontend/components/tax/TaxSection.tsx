@@ -259,6 +259,12 @@ export default function TaxSection() {
                   {baseLabel}
                 </span>
               </div>
+              {/*
+                절세 효과 금액이 없으면 아무것도 적지 않는다. "분석 후 계산됩니다"
+                라고 적어 두었는데, 같은 패널의 세후 수익률·세금 흐름·계좌 배치는
+                이미 값을 보여주고 있어 화면이 스스로 어긋났다. 분석해도 이 숫자만
+                채워지지 않는 상태라 안내가 지켜지지도 않았다.
+              */}
               {annualSavingManwon != null ? (
                 <p
                   className={`mt-1.5 flex items-baseline gap-1.5 text-[13px] font-bold ${annualSavingManwon > 0 ? "text-up" : "text-foreground"}`}
@@ -270,11 +276,7 @@ export default function TaxSection() {
                   </b>
                   <span className="text-[12px] font-extrabold">만원</span>
                 </p>
-              ) : (
-                <p className="mt-1.5 text-[13px] font-bold text-muted-foreground">
-                  분석 후 계산됩니다
-                </p>
-              )}
+              ) : null}
               {selectedTax?.summary && (
                 <p className="mt-1 text-[13px] font-semibold text-muted-foreground">
                   {selectedTax.summary}
