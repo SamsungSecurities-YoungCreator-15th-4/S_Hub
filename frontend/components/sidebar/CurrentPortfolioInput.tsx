@@ -55,9 +55,13 @@ const PROXY_HELP =
  *   제안 조정 : 제안 포트폴리오를 PB가 손보는 값. 분석 결과가 있어야 연다 —
  *               비교 대상이 없는 상태에서 "제안을 조정"한다는 말이 성립하지 않는다.
  *
- * 어느 탭이든 값이 바뀌면 store 의 setter 가 실행 상태를 draft 로 되돌린다
- * (`lib/store.ts`의 unlockOnWeightChange). 승인은 그때 그 비중에 대한 것이라,
- * 입력이 바뀐 뒤에도 확정이 남아 있으면 승인받지 않은 내용이 확정본으로 나간다.
+ * 제안 조정은 빈 칸에서 시작하지 않는다. 분석 결과가 나오거나 중앙에서 다른 제안을
+ * 고르면 store 가 그 안의 비중을 여기에 심는다(`selectPortfolio`·`setPortfolios`).
+ * 그 값을 실제로 고쳐야 비로소 별개의 안이 되고, 중앙 카드도 그때 조정안으로 넘어간다.
+ *
+ * 제안 조정 값이 바뀌면 확정본과 갈라지므로 PDF 추출이 잠긴다(`selectExportAllowed`).
+ * 승인은 그때 그 비중에 대한 것이라, 입력이 바뀐 뒤에도 추출이 열려 있으면
+ * 승인받지 않은 내용이 확정본으로 나간다.
  *
  * 합계가 100이 아니면 분석하기를 막는다(Sidebar.tsx의 isCurrentWeightsInputValid
  * 게이트) — 백엔드가 조용히 100%로 재정규화해버리면 "화면 합계 ≠ 실제 계산에 쓰인
@@ -71,6 +75,9 @@ export default function CurrentPortfolioInput() {
   const proposedWeightsInput = useDashboardStore((s) => s.proposedWeightsInput);
   const setProposedWeightsInput = useDashboardStore(
     (s) => s.setProposedWeightsInput,
+  );
+  const resetProposedToSelected = useDashboardStore(
+    (s) => s.resetProposedToSelected,
   );
   const portfolioSource = useDashboardStore((s) => s.portfolioSource);
 
@@ -102,12 +109,25 @@ export default function CurrentPortfolioInput() {
     setValue({ [id]: Number.isFinite(parsed) ? parsed : undefined });
   };
 
-  const handleReset = () =>
-    setValue(
+  /**
+   * 초기화의 뜻이 탭마다 다르다.
+   *
+   *   현재 보유 : 비운다. 아직 아무것도 없던 상태로 돌아가는 것이 초기 상태다.
+   *   제안 조정 : 고른 제안의 비중으로 되돌린다. 여기서의 출발점은 빈 칸이 아니라
+   *              그 제안이고, 0으로 비우면 손대지 않은 상태가 아니라 "전부 0인
+   *              조정안"이 되어 중앙 카드가 빈 도넛으로 넘어간다.
+   */
+  const handleReset = () => {
+    if (active === "proposed") {
+      resetProposedToSelected();
+      return;
+    }
+    setCurrentWeightsInput(
       Object.fromEntries(
         ALL_FIELD_IDS.map((id) => [id, undefined]),
       ) as CurrentWeightsInput,
     );
+  };
 
   return (
     <div className="rounded-xl border p-3">
