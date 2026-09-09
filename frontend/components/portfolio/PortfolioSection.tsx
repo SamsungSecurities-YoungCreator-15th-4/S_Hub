@@ -125,7 +125,7 @@ export default function PortfolioSection() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
           {current && (
             <PortfolioCard
               pf={current}
@@ -139,13 +139,12 @@ export default function PortfolioSection() {
           {/*
             제안 A·B 를 한 카드로 합치고 세그먼트로 전환한다. 두 안은 같은 축
             (안정 ↔ 수익)의 양끝이라 나란히 두는 것보다 하나를 바꿔 보는 편이
-            비교가 된다. 폭은 두 카드가 쓰던 만큼(2/3)을 그대로 쓴다.
+            비교가 된다. 현재 카드와 같은 폭으로 둬 두 도넛·지표가 같은 크기로
+            맞붙게 한다 — 비교가 이 화면의 목적이다.
           */}
           {(customPortfolio ?? selectedProposal) && (
             <PortfolioCard
               pf={(customPortfolio ?? selectedProposal)!}
-              className="xl:col-span-2"
-              legendCols={3}
               metricsUnavailableNote={
                 isCustom
                   ? "직접 조정한 비중의 지표는 자산군별 수익률·변동성 데이터가 연결되면 계산됩니다."
@@ -201,7 +200,6 @@ function PortfolioCard({
   header,
   className,
   metricsUnavailableNote,
-  legendCols,
 }: {
   pf: CardPortfolio;
   /** 카드 상단 — 현재 카드는 이름, 제안 카드는 세그먼트 컨트롤이 온다. */
@@ -209,7 +207,6 @@ function PortfolioCard({
   className?: string;
   /** 지표를 계산할 근거가 없을 때의 안내. 있으면 지표 격자 대신 이 문장을 보여준다. */
   metricsUnavailableNote?: string;
-  legendCols?: 2 | 3;
 }) {
   // 지표의 원화 병기 기준. 고객 총자산이 없으면 pctOfAumLabel 이 병기를 생략한다.
   const aumEokwon = useDashboardStore(
@@ -241,7 +238,7 @@ function PortfolioCard({
 
       <div className="flex min-h-72 items-stretch gap-2.5">
         <div className="flex flex-1 flex-col items-center">
-          <AssetDonut allocation={allocation} legendCols={legendCols} />
+          <AssetDonut allocation={allocation} />
         </div>
       </div>
 
