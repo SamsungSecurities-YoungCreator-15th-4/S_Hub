@@ -9,10 +9,8 @@ import DataSourceBadge from "@/components/common/DataSourceBadge";
 import HelpTooltip from "@/components/common/HelpTooltip";
 
 const INSIGHT_HELP =
-  "질문을 입력하면 AI가 답합니다. ① 일반 질의(금리·세무·하우스뷰)는 사내 문서를 검색해 " +
-  "출처와 함께 답하고, ② '삼성전자 재무제표'처럼 회사명을 넣으면 DART 전자공시에서 최신 재무를 " +
-  "가져오며, ③ '분석 결과 요약'처럼 물으면 현재 대시보드를 요약합니다. 모든 수치는 출처가 " +
-  "추적되고 AI가 임의로 지어내지 않습니다.";
+  "투자하면서 궁금한 내용을 AI에게 직접 물어보고 답을 받을 수 있습니다. " +
+  "금리·세금·종목 등을 질문할 수 있으며 답변의 근거와 출처도 함께 확인할 수 있습니다.";
 import { buildDashboardInsightContext } from "@/lib/dashboardInsightContext";
 import {
   type InsightCitation,

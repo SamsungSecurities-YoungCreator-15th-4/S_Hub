@@ -82,6 +82,22 @@ export interface DashboardState {
   setCurrentWeightsInput: (patch: CurrentWeightsInput) => void;
   /** 제안 포트폴리오를 PB가 손본 비중(%) — 분석 결과가 있을 때만 입력할 수 있다.
    *  현재 보유 비중과 달리 계산 요청에 실리지 않는다(표시·검토용). */
+  /**
+   * 비중 입력 폼이 지금 어느 쪽을 편집하는가.
+   * 중앙 제안 카드의 세그먼트가 같은 값을 보므로 좌·우가 함께 움직인다 —
+   * 왼쪽에서 조정하는데 가운데가 다른 안을 보여주면 무엇을 만지는지 알 수 없다.
+   */
+  /**
+   * 직전 분석 게이트에서 거절했는가.
+   *
+   * runStatusReason 으로 대신할 수 없다 — 거절 시점이 draft 면 draft → blocked
+   * 전이가 전이표에 없어(lib/runStatus.ts) setRunStatus 가 조용히 무시되고
+   * 사유도 남지 않는다. 그래서 표시용 플래그를 따로 둔다.
+   */
+  analyzeRejected: boolean;
+  setAnalyzeRejected: (v: boolean) => void;
+  weightsTab: "current" | "proposed";
+  setWeightsTab: (tab: "current" | "proposed") => void;
   proposedWeightsInput: CurrentWeightsInput;
   setProposedWeightsInput: (patch: CurrentWeightsInput) => void;
 
@@ -236,12 +252,18 @@ export const useDashboardStore = create<DashboardState>((set) => ({
   setCurrentWeightsInput: (patch) =>
     set((s) => ({
       currentWeightsInput: { ...s.currentWeightsInput, ...patch },
+      analyzeRejected: false,
       ...unlockOnWeightChange(s),
     })),
+  analyzeRejected: false,
+  setAnalyzeRejected: (v) => set({ analyzeRejected: v }),
+  weightsTab: "current",
+  setWeightsTab: (tab) => set({ weightsTab: tab }),
   proposedWeightsInput: {},
   setProposedWeightsInput: (patch) =>
     set((s) => ({
       proposedWeightsInput: { ...s.proposedWeightsInput, ...patch },
+      analyzeRejected: false,
       ...unlockOnWeightChange(s),
     })),
 
@@ -336,6 +358,8 @@ export const useDashboardStore = create<DashboardState>((set) => ({
         taxOptimizer: null,
         insightResult: null,
         currentWeightsInput: {},
+        analyzeRejected: false,
+        weightsTab: "current",
         proposedWeightsInput: {},
         isStressMode: false,
         stressPreset: "current",

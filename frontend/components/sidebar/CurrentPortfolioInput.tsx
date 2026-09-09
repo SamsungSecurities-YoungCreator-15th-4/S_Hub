@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import {
   CALC_UNITS,
   type CalcUnitId,
@@ -9,6 +8,7 @@ import {
   sumCurrentWeightsInput,
 } from "@/lib/assetMapping";
 import { isTrusted } from "@/lib/api/result";
+import HelpTooltip from "@/components/common/HelpTooltip";
 import { useDashboardStore } from "@/lib/store";
 
 type FieldId = CalcUnitId | "cash";
@@ -42,6 +42,12 @@ const PROXY_NOTE: Partial<Record<FieldId, string>> = {
 
 type WeightTab = "current" | "proposed";
 
+/** 별표(*)가 붙은 자산의 계산 근거. 화면 글자를 줄이려고 하단 주석 대신 여기 둔다. */
+const PROXY_HELP =
+  "고객이 지금 들고 있는 비중과, 제안을 직접 손본 비중을 각각 입력합니다. " +
+  "별표(*)가 붙은 신흥국주식·해외채권·인프라펀드는 자산 매핑이 확정되기 전이라 " +
+  "각각 나스닥·달러인덱스·원자재로 계산됩니다.";
+
 /**
  * 자산 비중 입력 — 탭 2개.
  *
@@ -67,9 +73,10 @@ export default function CurrentPortfolioInput() {
     (s) => s.setProposedWeightsInput,
   );
   const portfolioSource = useDashboardStore((s) => s.portfolioSource);
-  const runStatusReason = useDashboardStore((s) => s.runStatusReason);
 
-  const [tab, setTab] = useState<WeightTab>("current");
+  // 탭 상태는 스토어에 둔다 — 중앙 제안 카드의 세그먼트가 같은 값을 보고 함께 움직인다.
+  const tab = useDashboardStore((s) => s.weightsTab);
+  const setTab = useDashboardStore((s) => s.setWeightsTab);
 
   // 제안 조정은 분석 결과가 있을 때만 연다. live·demo 둘 다 결과가 있는 상태다.
   const proposedEnabled = isTrusted(portfolioSource);
@@ -83,6 +90,7 @@ export default function CurrentPortfolioInput() {
   const total = sumCurrentWeightsInput(value);
   const hasAnyInput = total > 0;
   const isValid = isCurrentWeightsInputValid(value);
+  const helpMode = useDashboardStore((s) => s.helpMode);
 
   const handleChange = (id: FieldId, raw: string) => {
     const cleaned = raw.replace(/[^0-9.]/g, "");
@@ -103,23 +111,27 @@ export default function CurrentPortfolioInput() {
 
   return (
     <div className="rounded-xl border p-3">
+      {/*
+        제목과 초기화를 한 줄에 두고 세그먼트는 아래에서 폭을 다 쓴다 —
+        같은 줄에 두면 세그먼트가 눌려 두 탭이 무엇을 고르는 것인지 잘 안 읽힌다.
+        제목은 사이드바의 다른 카드(고객 선택·상담 입력·IPS 조율기)와 같은 규격이다.
+      */}
       <div className="mb-2 flex items-center justify-between">
-        <div className="flex items-center gap-0.5 rounded-lg bg-muted p-0.5">
-          <TabButton
-            active={active === "current"}
-            onClick={() => setTab("current")}
-          >
-            현재 보유
-          </TabButton>
-          <TabButton
-            active={active === "proposed"}
-            onClick={() => setTab("proposed")}
-            disabled={!proposedEnabled}
-            reason="분석 후 활성"
-          >
-            제안 조정
-          </TabButton>
-        </div>
+        <HelpTooltip text={PROXY_HELP} placement="bottom">
+          {/* 도움말 모드에서 제목에 표시를 남긴다 — 백테스트·지표 등 다른 도움말
+              대상과 같은 규격이라, 어디에 설명이 붙어 있는지 한눈에 보인다. */}
+          <p className="cursor-default text-[14px] font-bold">
+            <span
+              className={
+                helpMode
+                  ? "rounded border border-brand/40 bg-brand/[0.06] px-1"
+                  : ""
+              }
+            >
+              자산 비중 조절기
+            </span>
+          </p>
+        </HelpTooltip>
         {hasAnyInput && (
           <button
             type="button"
@@ -131,26 +143,41 @@ export default function CurrentPortfolioInput() {
         )}
       </div>
 
-      {!proposedEnabled && (
-        <p className="mb-2 text-[10px] font-semibold text-muted-foreground">
-          제안 조정은 분석 후 열립니다
-        </p>
-      )}
+      <div className="mb-2 flex rounded-lg bg-muted p-0.5">
+        <TabButton
+          active={active === "current"}
+          onClick={() => setTab("current")}
+        >
+          현재 보유
+        </TabButton>
+        <TabButton
+          active={active === "proposed"}
+          onClick={() => setTab("proposed")}
+          disabled={!proposedEnabled}
+          reason="분석 후 활성"
+        >
+          제안 조정
+        </TabButton>
+      </div>
 
-      <div className="grid grid-cols-2 gap-x-3 gap-y-2">
-        {GROUPS.map(({ group, ids }) => (
-          <div key={group} className="col-span-2">
-            <p className="mb-1 text-[10px] font-bold text-muted-foreground">{group}</p>
-            <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
+      <div className="grid grid-cols-2 gap-x-3">
+        {GROUPS.map(({ group, ids }, gi) => (
+          <div
+            key={group}
+            className={`col-span-2 ${gi > 0 ? "mt-3 border-t border-muted pt-3" : ""}`}
+          >
+            <p className="mb-2 text-[10px] font-bold text-muted-foreground">{group}</p>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
               {ids.map((id) => {
                 const proxyNote = PROXY_NOTE[id];
                 return (
                   <label
                     key={id}
-                    className="flex items-center justify-between gap-1"
+                    className="flex items-center justify-between gap-0.5"
                     title={proxyNote ? `계산상 ${proxyNote} 자산으로 반영됨 (자산 매핑 확정 전)` : undefined}
                   >
-                    <span className="text-[12px] font-semibold text-foreground/80">
+                    {/* whitespace-nowrap: "국내일반채권" 처럼 긴 이름이 두 줄로 깨지지 않게. */}
+                    <span className="whitespace-nowrap text-[11px] font-semibold text-foreground/80">
                       {LABELS[id]}
                       {proxyNote && <span className="text-up">*</span>}
                     </span>
@@ -161,7 +188,7 @@ export default function CurrentPortfolioInput() {
                         value={value[id] ?? ""}
                         onChange={(e) => handleChange(id, e.target.value)}
                         placeholder="0"
-                        className="h-6 w-12 rounded-md border border-input bg-card px-1.5 text-right text-[12px] font-bold tabular-nums outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                        className="h-6 w-11 shrink-0 rounded-md border border-input bg-card px-1 text-right text-[12px] font-bold tabular-nums outline-none focus-visible:ring-1 focus-visible:ring-ring"
                       />
                       <span className="text-[11px] text-muted-foreground">%</span>
                     </span>
@@ -177,25 +204,16 @@ export default function CurrentPortfolioInput() {
         <span className="text-[11px] font-semibold text-muted-foreground">합계</span>
         <span
           className={`text-[13px] font-extrabold tabular-nums ${
-            !hasAnyInput ? "text-muted-foreground" : isValid ? "text-brand-dark" : "text-down"
+            !hasAnyInput
+              ? "text-muted-foreground"
+              : isValid
+                ? "text-brand-dark"
+                : "text-destructive"
           }`}
         >
           {total.toLocaleString()}%
         </span>
       </div>
-      {!isValid && (
-        <p className="mt-1 text-[11px] font-semibold text-down">
-          합계가 100%가 아닙니다. 맞춰야 분석하기를 실행할 수 있습니다.
-        </p>
-      )}
-      {/* 확정이 풀린 이유 — 왜 PDF가 다시 잠겼는지 여기서만 보인다. */}
-      {runStatusReason && (
-        <p className="mt-1 text-[11px] font-semibold text-down">{runStatusReason}</p>
-      )}
-      <p className="mt-1 text-[10px] leading-snug text-muted-foreground">
-        * 자산 매핑 확정 전이라 신흥국주식·해외채권·인프라펀드는 각각 나스닥·달러인덱스·원자재로
-        계산됩니다.
-      </p>
     </div>
   );
 }
@@ -220,9 +238,11 @@ function TabButton({
       onClick={onClick}
       disabled={disabled}
       title={disabled ? reason : undefined}
-      className={`rounded-md px-2 py-1 text-[12px] font-bold transition-colors ${
+      // 중앙 제안 카드의 세그먼트와 같은 규격이다 — 좌·우가 같은 상태를 보므로
+      // 생김새도 같아야 두 곳이 한 컨트롤임이 드러난다.
+      className={`flex-1 rounded-md px-3 py-1 text-[11px] font-bold transition-colors ${
         active
-          ? "bg-card text-foreground shadow-sm"
+          ? "bg-white text-brand-dark shadow-sm"
           : "text-muted-foreground hover:text-foreground"
       } disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-muted-foreground`}
     >

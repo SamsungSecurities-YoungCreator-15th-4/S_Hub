@@ -3,6 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useDashboardStore } from "@/lib/store";
 
+/** 툴팁 폭(px). 아래 className 의 w-64 와 같아야 한다. */
+const TOOLTIP_WIDTH = 256;
+/** 화면 가장자리와의 최소 여백(px). */
+const VIEWPORT_MARGIN = 8;
+
 /**
  * 도움말 모드가 ON일 때만 hover 시 툴팁을 표시하는 래퍼.
  * fixed 포지셔닝을 사용해 overflow:hidden 부모에 잘리지 않는다.
@@ -26,10 +31,15 @@ export default function HelpTooltip({
   const handleMouseEnter = () => {
     if (!ref.current) return;
     const r = ref.current.getBoundingClientRect();
-    setPos({
-      x: r.left + r.width / 2,
-      y: placement === "bottom" ? r.bottom : r.top,
-    });
+    // 툴팁은 x 를 중심으로 좌우로 펼쳐지므로(translateX(-50%)), 대상이 화면
+    // 가장자리에 있으면 밖으로 잘린다. 뷰포트 안으로 밀어 넣는다.
+    const half = TOOLTIP_WIDTH / 2;
+    const center = r.left + r.width / 2;
+    const x = Math.min(
+      Math.max(center, half + VIEWPORT_MARGIN),
+      window.innerWidth - half - VIEWPORT_MARGIN,
+    );
+    setPos({ x, y: placement === "bottom" ? r.bottom : r.top });
   };
 
   const handleMouseLeave = () => setPos(null);
@@ -60,7 +70,7 @@ export default function HelpTooltip({
 
       {helpMode && pos && (
         <div
-          className="pointer-events-none fixed z-[9999] w-60 rounded-xl bg-foreground px-3 py-2.5 text-[13px] font-semibold leading-relaxed text-background shadow-xl"
+          className="pointer-events-none fixed z-[9999] w-64 rounded-xl bg-foreground px-3 py-2.5 text-[13px] font-semibold leading-relaxed text-background shadow-xl"
           style={{
             left: pos.x,
             top: placement === "bottom" ? pos.y + 8 : pos.y - 8,

@@ -8,6 +8,7 @@ import ReportDetailModal from "@/components/dashboard/ReportDetailModal";
 import AssetDonut from "@/components/portfolio/AssetDonut";
 import {
   BACKEND_ASSET_COLORS,
+  CALC_UNITS,
   toCalcUnitAllocation,
 } from "@/lib/assetMapping";
 import { type Portfolio, type PortfolioMetrics } from "@/lib/mockData";
@@ -17,25 +18,54 @@ import { useDashboardStore } from "@/lib/store";
 import HelpTooltip from "@/components/common/HelpTooltip";
 import AsOfNote from "@/components/common/AsOfNote";
 
+/**
+ * 지표 도움말 — 고객이 함께 보는 화면이라 전문용어 대신 일상어로 적는다.
+ * 각 문구는 "무엇을 보여주는가" 한 줄 + "어떻게 읽는가" 한 줄로 끊는다.
+ */
 const METRIC_HELP: Record<string, string> = {
-  기대수익률:
-    "연간 기대 수익률입니다. 과거 수익률과 자산별 위험 프리미엄을 바탕으로 추정한 값으로, 실제 수익을 보장하지 않습니다.",
-  샤프지수:
-    "위험 1단위당 초과 수익을 나타냅니다. 값이 클수록 위험 대비 수익이 높으며, 1.0 이상이면 우수한 수준으로 평가합니다.",
-  소르티노:
-    "하락 위험(손실 변동성)만을 고려한 위험 조정 수익률입니다. 샤프지수보다 손실 가능성을 더 엄밀하게 반영합니다.",
-  세후수익률:
-    "세금 효과를 반영한 실질 수익률입니다. ISA·연금 계좌 활용 등 절세 전략 적용 시 수치가 높아집니다.",
+  MDD:
+    "투자하면서 내 돈이 가장 많이 줄어들었던 순간이 얼마나 컸는지 보여줍니다. " +
+    "예를 들어 1,000만 원이 800만 원까지 떨어졌다면 MDD는 -20%입니다.",
   변동성:
-    "포트폴리오 수익률의 표준편차로 측정한 위험 수준입니다. 값이 낮을수록 수익이 안정적입니다.",
-  MDD: "분석 기간 중 고점 대비 최대 하락폭(Maximum Drawdown)입니다. 최악의 시나리오에서의 손실 규모를 나타냅니다.",
+    "투자금이 평소 얼마나 크게 오르내리는지 보여줍니다. " +
+    "높을수록 수익도 손실도 크게 움직여 투자금의 변화가 커질 수 있습니다.",
+  소르티노:
+    "돈을 잃을 때의 위험에 비해 얼마나 수익을 냈는지 보여줍니다. " +
+    "값이 높을수록 손실은 상대적으로 적고 수익은 잘 낸 투자입니다.",
+  샤프지수:
+    "투자하면서 감수한 위험에 비해 얼마나 수익을 냈는지 보여줍니다. " +
+    "값이 높을수록 비슷한 위험으로 더 많은 수익을 낸 투자입니다.",
+  기대수익률:
+    "과거 데이터를 바탕으로 앞으로 1년 동안 얼마나 벌 수 있을지 예상한 값입니다. " +
+    "예상치일 뿐이라 실제로 이만큼 벌 수 있다는 보장은 없습니다.",
+  세후수익률:
+    "투자로 번 돈에서 세금까지 내고 실제로 남는 수익이 얼마나 되는지 보여줍니다. " +
+    "따라서 실제로 내 손에 남는 돈을 비교할 때 유용합니다.",
 };
 
-/** 중앙 상단: 현재 / 포트폴리오 A / 포트폴리오 B — 카드 클릭으로 선택 */
+/**
+ * 카드가 그릴 수 있는 포트폴리오.
+ *
+ * Portfolio.id 는 "current"|"a"|"b" 로 고정돼 있고 세금·PDF·인사이트가 그 전제로
+ * 읽는다. 화면에만 존재하는 "proposed" 를 그 유니온에 넣으면 그쪽들이 오류 없이
+ * 조용히 폴백하므로, 카드 쪽에서만 id 를 넓혀 받는다.
+ */
+type CardPortfolio = Omit<Portfolio, "id"> & { id: string };
+
+/** 제안 카드 세그먼트 라벨. 두 안은 같은 축의 양끝이라 성향 이름으로 부른다. */
+const PROPOSAL_LABEL: Record<string, string> = {
+  a: "안정추구",
+  b: "수익추구",
+};
+
+/** 중앙 상단: 현재(1/3) + 제안(2/3, 세그먼트 전환) */
 export default function PortfolioSection() {
   const {
     selectedPortfolioId,
     selectPortfolio,
+    proposedWeightsInput,
+    weightsTab,
+    setWeightsTab,
     portfolios,
     portfolioSource,
     portfolioNote,
@@ -46,6 +76,33 @@ export default function PortfolioSection() {
   // 분석 전(=빈 상태)에는 볼 리포트가 없으므로 자세히도 내보내지 않는다.
   const isEmpty =
     portfolioSource === "fallback" && portfolioNote === undefined && !analyzing;
+
+  const current = portfolios.find((pf) => pf.id === "current");
+  const proposals = portfolios.filter((pf) => pf.id !== "current");
+  const selectedProposal =
+    proposals.find((pf) => pf.id === selectedPortfolioId) ?? proposals[0];
+  const isProposedEdit = weightsTab === "proposed";
+
+  /**
+   * 제안 조정 안. 비중은 PB 가 사이드바에서 손본 값(proposedWeightsInput)을 그대로 쓴다.
+   * 지표는 비워 둔다 — 임의 비중의 기대수익률·변동성·MDD 를 산출하려면 자산군별
+   * 수익률·공분산이 필요한데 프론트에 그 데이터가 없다. 근거 없는 숫자를 지어
+   * 넣지 않는다(lib/sharpe.ts 가 같은 이유로 샤프만 계산으로 승격했다).
+   */
+  const editBase = selectedProposal ?? proposals[0];
+  const adjustedPortfolio: CardPortfolio | undefined = isProposedEdit && editBase
+    ? {
+        ...editBase,
+        // 백엔드 원본 allocation 을 지운다 — 도넛이 사람이 조정한 weights 를 쓰게 한다.
+        allocation: undefined,
+        id: "proposed",
+        name: "제안 조정",
+        weights: CALC_UNITS.reduce(
+          (acc, unit) => ({ ...acc, [unit.id]: proposedWeightsInput[unit.id] ?? 0 }),
+          {} as Portfolio["weights"],
+        ),
+      }
+    : undefined;
 
   return (
     <section>
@@ -86,16 +143,79 @@ export default function PortfolioSection() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
-          {portfolios.map((pf) => (
+        <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+          {current && (
             <PortfolioCard
-              key={pf.id}
-              pf={pf}
-              isSelected={pf.id !== "current" && selectedPortfolioId === pf.id}
-              onSelect={() => selectPortfolio(pf.id)}
-              selectable={pf.id !== "current"}
+              pf={current}
+              header={
+                <span className="text-[13px] font-extrabold">
+                  {current.name}
+                </span>
+              }
             />
-          ))}
+          )}
+          {/*
+            제안 A·B 를 한 카드로 합치고 세그먼트로 전환한다. 두 안은 같은 축
+            (안정 ↔ 수익)의 양끝이라 나란히 두는 것보다 하나를 바꿔 보는 편이
+            비교가 된다. 현재 카드와 같은 폭으로 둬 두 도넛·지표가 같은 크기로
+            맞붙게 한다 — 비교가 이 화면의 목적이다.
+          */}
+          {(adjustedPortfolio ?? selectedProposal) && (
+            <PortfolioCard
+              pf={(adjustedPortfolio ?? selectedProposal)!}
+              metricsUnavailableNote={
+                isProposedEdit
+                  ? "직접 조정한 비중의 지표는 자산군별 수익률·변동성 데이터가 연결되면 계산됩니다."
+                  : undefined
+              }
+              header={
+                <>
+                {/*
+                  왼쪽 카드에는 "현재" 라는 이름이 있는데 오른쪽에는 세그먼트만
+                  있어 무엇을 보는 화면인지 드러나지 않았다. 같은 무게의 라벨을
+                  붙여 현재 ↔ 제안으로 짝을 맞춘다. 세그먼트가 이미 쓰던 줄이라
+                  높이는 늘지 않는다.
+                */}
+                <span className="text-[13px] font-extrabold">제안</span>
+                <div className="flex rounded-lg bg-muted p-0.5">
+                  {proposals.map((pf) => {
+                    const active = !isProposedEdit && selectedProposal?.id === pf.id;
+                    return (
+                      <button
+                        key={pf.id}
+                        type="button"
+                        onClick={() => {
+                          setWeightsTab("current");
+                          selectPortfolio(pf.id);
+                        }}
+                        aria-pressed={active}
+                        className={`rounded-md px-3 py-1 text-[11px] font-bold transition-colors ${
+                          active
+                            ? "bg-white text-brand-dark shadow-sm"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        {PROPOSAL_LABEL[pf.id] ?? pf.name}
+                      </button>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => setWeightsTab("proposed")}
+                    aria-pressed={isProposedEdit}
+                    className={`rounded-md px-3 py-1 text-[11px] font-bold transition-colors ${
+                      isProposedEdit
+                        ? "bg-white text-brand-dark shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    제안 조정
+                  </button>
+                </div>
+                </>
+              }
+            />
+          )}
         </div>
       )}
 
@@ -106,14 +226,16 @@ export default function PortfolioSection() {
 
 function PortfolioCard({
   pf,
-  isSelected,
-  onSelect,
-  selectable,
+  header,
+  className,
+  metricsUnavailableNote,
 }: {
-  pf: Portfolio;
-  isSelected: boolean;
-  onSelect: () => void;
-  selectable: boolean;
+  pf: CardPortfolio;
+  /** 카드 상단 — 현재 카드는 이름, 제안 카드는 세그먼트 컨트롤이 온다. */
+  header: React.ReactNode;
+  className?: string;
+  /** 지표를 계산할 근거가 없을 때의 안내. 있으면 지표 격자 대신 이 문장을 보여준다. */
+  metricsUnavailableNote?: string;
 }) {
   // 지표의 원화 병기 기준. 고객 총자산이 없으면 pctOfAumLabel 이 병기를 생략한다.
   const aumEokwon = useDashboardStore(
@@ -137,42 +259,10 @@ function PortfolioCard({
     mddRangeLabel?: string;
   };
 
-  const portfolioType =
-    pf.id === "a" ? "안정추구형" : pf.id === "b" ? "수익추구형" : null;
-
   return (
-    <Card
-      tabIndex={selectable ? 0 : undefined}
-      className={`gap-0 p-3 transition-shadow focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-brand ${
-        selectable ? "cursor-pointer" : "cursor-default"
-      } ${
-        isSelected && selectable
-          ? "border-2 border-brand shadow-[0_6px_20px_rgba(0,100,255,0.14)]"
-          : selectable
-            ? "hover:shadow-md"
-            : ""
-      }`}
-      onClick={selectable ? onSelect : undefined}
-      onKeyDown={
-        selectable
-          ? (e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                onSelect();
-              }
-            }
-          : undefined
-      }
-    >
-      <div className="mb-2 flex items-center justify-between">
-        <div className="flex items-center gap-1.5 text-[13px] font-extrabold">
-          {pf.name}
-          {portfolioType && (
-            <span className="rounded-md bg-[#DCE9FF] px-1.5 py-0.5 text-[9px] font-extrabold text-brand-dark">
-              {portfolioType}
-            </span>
-          )}
-        </div>
+    <Card className={`gap-0 p-3 ${className ?? ""}`}>
+      <div className="mb-2 flex min-h-7 items-center justify-between">
+        {header}
       </div>
 
       <div className="flex min-h-72 items-stretch gap-2.5">
@@ -190,26 +280,23 @@ function PortfolioCard({
         pctOfAumLabel(비율 × 고객 총자산)로 만든다. 어느 경로든 값의 출처가
         코드에서 하나로 추적된다.
       */}
-      <div className="mt-2.5 grid grid-cols-3 gap-px overflow-hidden rounded-lg bg-muted">
-        <Metric
-          k="MDD"
-          v={`${m.mddPct.toFixed(1)}%`}
-          rangeSub={m.mddRangeLabel}
-          sub={m.mddAmountLabel ?? pctOfAumLabel(m.mddPct, aumEokwon, "-")}
-          tone={m.mddPct > 0 ? "down" : undefined}
-          value={m.mddPct}
-        />
-        <Metric
-          k="변동성"
-          v={`${m.volatilityPct.toFixed(2)}%`}
-          sub={m.volatilityAmountLabel ?? pctOfAumLabel(m.volatilityPct, aumEokwon, "±")}
-          value={m.volatilityPct}
-        />
-        <Metric
-          k="소르티노"
-          v={m.sortino != null ? m.sortino.toFixed(2) : "-"}
-        />
-        <Metric k="기대수익률" v={`${m.expectedReturnPct.toFixed(2)}%`} />
+      {metricsUnavailableNote ? (
+        <div className="mt-2.5 rounded-lg border border-dashed border-muted-foreground/25 bg-muted/30 px-3 py-5">
+          <p className="text-center text-[12px] font-semibold leading-relaxed text-muted-foreground">
+            {metricsUnavailableNote}
+          </p>
+        </div>
+      ) : (
+        <div className="mt-2.5 grid grid-cols-2 gap-px overflow-hidden rounded-lg bg-muted">
+        {/*
+          2열 3행. 왼쪽 열은 버는 쪽, 오른쪽 열은 잃는·흔들리는 쪽으로 세로를 맞춘다.
+
+            세후수익률 · MDD      원화 금액이 붙는 두 지표 — 벌 돈과 잃을 수 있는 돈
+            기대수익률 · 변동성    같은 두 축의 세전·비율 버전
+            샤프지수  · 소르티노   위험 대비 수익 비율. 소르티노는 하방만 보므로 오른쪽
+
+          금액이 붙는 두 지표를 같은 행에 둬야 행 높이도 어긋나지 않는다.
+        */}
         <Metric
           k="세후수익률"
           v={`${Math.abs(m.afterTaxReturnPct).toFixed(1)}%`}
@@ -231,10 +318,28 @@ function PortfolioCard({
           }
           value={m.afterTaxReturnPct}
         />
+        <Metric
+          k="MDD"
+          v={`${m.mddPct.toFixed(1)}%`}
+          rangeSub={m.mddRangeLabel}
+          sub={m.mddAmountLabel ?? pctOfAumLabel(m.mddPct, aumEokwon, "-")}
+          tone={m.mddPct > 0 ? "down" : undefined}
+          value={m.mddPct}
+        />
+        <Metric k="기대수익률" v={`${m.expectedReturnPct.toFixed(2)}%`} />
+        <Metric
+          k="변동성"
+          v={`${m.volatilityPct.toFixed(2)}%`}
+          sub={m.volatilityAmountLabel ?? pctOfAumLabel(m.volatilityPct, aumEokwon, "±")}
+          value={m.volatilityPct}
+        />
         <Metric k="샤프지수" v={formatSharpe(m.sharpe)} />
-      </div>
-      {/* 지표 타일의 기준일·통화. 백엔드 계산값이라 인용할 외부 출처가 없어 기준일만 적는다. */}
-      <AsOfNote source="KRW" className="mt-1.5 text-[10px]" />
+        <Metric
+          k="소르티노"
+          v={m.sortino != null ? m.sortino.toFixed(2) : "-"}
+        />
+        </div>
+      )}
     </Card>
   );
 }
@@ -281,7 +386,7 @@ function Metric({
           원화 병기가 없는 지표(샤프·소르티노 등)는 비율·수치가 그대로 큰 값이 된다.
         */}
         <div
-          className={`mt-1 text-[14px] font-extrabold leading-none tabular-nums ${toneCls}`}
+          className={`mt-1 whitespace-nowrap text-[14px] font-extrabold leading-none tabular-nums ${toneCls}`}
         >
           {/* 금액은 부호(+ · - · ±)만 달고 삼각형은 아래 비율이 가져간다. */}
           {sub ? (
@@ -298,7 +403,7 @@ function Metric({
           )}
         </div>
         {sub && (
-          <div className={`mt-0.5 text-[12px] font-bold tabular-nums ${toneCls}`}>
+          <div className={`mt-0.5 whitespace-nowrap text-[12px] font-bold tabular-nums ${toneCls}`}>
             {arrow && <span className="mr-0.5">{arrow}</span>}
             {v}
           </div>
