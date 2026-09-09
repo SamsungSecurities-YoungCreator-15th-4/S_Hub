@@ -3,9 +3,10 @@ import LiveClock from "@/components/header/LiveClock";
 import MacroTicker from "@/components/header/MacroTicker";
 import HelpModeToggle from "@/components/header/HelpModeToggle";
 import PdfExportButton from "@/components/header/PdfExportButton";
+import RunStatusChip from "@/components/header/RunStatusChip";
 import LogoutButton from "@/components/header/LogoutButton";
 
-/** 상단 헤더: 로고 · 거시지표 6개 · 가이드 · PDF 추출 · 로그아웃 */
+/** 상단 헤더: 로고 · 거시지표 6개 · 실행 상태 · 가이드 · PDF 추출 · 로그아웃 */
 export default function Header() {
   return (
     <header className="flex h-14.5 items-center gap-3 rounded-2xl border bg-card px-4 shadow-sm">
@@ -34,6 +35,9 @@ export default function Header() {
 
       {/* 모바일에서 버튼을 오른쪽으로 밀기 */}
       <div className="flex-1 md:hidden" />
+
+      {/* 실행 상태 — 읽기 전용 표시 */}
+      <RunStatusChip />
 
       <HelpModeToggle />
 
