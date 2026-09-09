@@ -4,7 +4,24 @@
  */
 
 import { STRESS_SCENARIOS, runStress } from "@/lib/stressScenarios";
+import {
+  CITATIONS,
+  CVAR_CONTRIBUTIONS,
+  CVAR_CONTRIBUTION_NOTE,
+  DISCLAIMERS,
+  IPS_CONFLICTS,
+  IPS_CONFLICT_NOTE,
+  REPORT_AS_OF,
+  REPORT_META,
+  REPRODUCIBILITY_HASHES,
+  REPRODUCIBILITY_NOTE,
+  RISK_METRICS,
+  VERIFICATIONS,
+  VERIFICATION_NOTE,
+  formatWon,
+} from "@/lib/mock/symphonyReport";
 import { useDashboardStore } from "@/lib/store";
+import { useViewedPortfolio } from "@/lib/viewedPortfolio";
 import { buildPdfAllocation, buildPdfMacroCell, buildPdfPerfRows } from "@/lib/pdfPortfolioData";
 import {
   buildPdfTaxEffect,
@@ -188,16 +205,27 @@ function AssetBar({
   label,
   pct,
   color,
+  /** 제안 조정 열이 붙어 4열이 되면 한 열이 좁아진다. 라벨을 줄여 막대를 살린다. */
+  compact = false,
 }: {
   label: string;
   pct: number;
   color: string;
+  compact?: boolean;
 }) {
   return (
     <div
-      style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 5 }}
+      // 11종으로 늘면서 한 열이 11줄이 된다. 줄 간격을 좁혀 페이지를 넘기지 않게 한다.
+      style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}
     >
-      <span style={{ width: 48, fontSize: 11, color: MUTED, flexShrink: 0 }}>
+      <span
+        style={{
+          width: compact ? 48 : 60,
+          fontSize: compact ? 9 : 10,
+          color: MUTED,
+          flexShrink: 0,
+        }}
+      >
         {label}
       </span>
       <div
@@ -220,8 +248,8 @@ function AssetBar({
       </div>
       <span
         style={{
-          width: 26,
-          fontSize: 11,
+          width: compact ? 24 : 26,
+          fontSize: compact ? 10 : 11,
           fontWeight: 700,
           textAlign: "right" as const,
           color,
@@ -686,7 +714,7 @@ function MarketIpsPage() {
         </table>
       </div>
 
-      <PageFooter page={2} total={5} />
+      <PageFooter page={2} total={7} />
     </div>
   );
 }
@@ -700,21 +728,57 @@ function PortfolioPage() {
   const aumEokwon =
     (customers.find((c) => c.id === selectedCustomerId) ?? customers[0])?.aumEokwon ?? 50;
 
+  // 훅은 early return 앞에서 호출(react-hooks/rules-of-hooks).
+  /*
+    강조·계산 대상은 지금 확정 대상인 안이다 — PB 가 제안 조정으로 손본 뒤 확정했는데
+    리포트가 조정 전 안을 보여주면 승인한 것과 다른 문서가 나간다.
+  */
+  const { viewed: adjustedPf, isAdjusted } = useViewedPortfolio();
+  const adjusted = isAdjusted ? adjustedPf : null;
+
   const current = storePortfolios.find((p) => p.id === "current");
   const portA = storePortfolios.find((p) => p.id === "a");
   const portB = storePortfolios.find((p) => p.id === "b");
   if (!current || !portA || !portB) return null;
 
-  // 대시보드에서 선택한 포트폴리오(a/b)에 따라 강조·예상손익 대상을 결정한다.
   const selId: "a" | "b" = selectedPortfolioId === "b" ? "b" : "a";
 
+  /*
+    조정하지 않았으면 "제안 조정" 열은 선택한 제안과 같은 값이라 같은 것을 두 번
+    보여주게 된다. 손댔을 때만 넷째 열을 세운다.
+  */
   const cols = [
-    { p: current, alloc: buildPdfAllocation(current), label: "현재 포트폴리오", badge: "", badgeColor: "#6B7280", headerColor: "#6B7280", selected: false },
-    { p: portA, alloc: buildPdfAllocation(portA), label: "안정추구", badge: "", badgeColor: BRAND, headerColor: BRAND, selected: selId === "a" },
-    { p: portB, alloc: buildPdfAllocation(portB), label: "수익추구", badge: "", badgeColor: "#2C7BFF", headerColor: "#2C7BFF", selected: selId === "b" },
+    { key: "current", p: current, alloc: buildPdfAllocation(current), label: "현재 포트폴리오", badge: "", badgeColor: "#6B7280", headerColor: "#6B7280", selected: false },
+    { key: "a", p: portA, alloc: buildPdfAllocation(portA), label: "안정추구", badge: "", badgeColor: BRAND, headerColor: BRAND, selected: !isAdjusted && selId === "a" },
+    { key: "b", p: portB, alloc: buildPdfAllocation(portB), label: "수익추구", badge: "", badgeColor: "#2C7BFF", headerColor: "#2C7BFF", selected: !isAdjusted && selId === "b" },
+    ...(adjusted
+      ? [{ key: "adjusted", p: adjusted, alloc: buildPdfAllocation(adjusted), label: "제안 조정", badge: "", badgeColor: BRAND_DARK, headerColor: BRAND_DARK, selected: true }]
+      : []),
   ];
 
-  const perfRows = buildPdfPerfRows(storePortfolios);
+  /*
+    buildPdfPerfRows 는 스토어의 세 안만 계산한다. 조정안은 별도로 한 번 더 돌려
+    같은 행 순서·같은 서식으로 넷째 값을 만든 뒤 각 행에 이어 붙인다.
+  */
+  const basePerfRows = buildPdfPerfRows(storePortfolios, aumEokwon);
+  /*
+    buildPdfPerfRows 는 current·a·b 세 자리가 다 차야 계산한다. 조정안 하나만
+    넣을 수는 없어 a·b 두 자리에 같은 조정안을 넣고 그중 한 칸만 꺼내 쓴다.
+  */
+  const adjustedPerfRows =
+    adjusted && current
+      ? buildPdfPerfRows(
+          [current, { ...adjusted, id: "a" }, { ...adjusted, id: "b" }],
+          aumEokwon,
+        )
+      : null;
+  const perfRows = adjustedPerfRows
+    ? basePerfRows.map((row, i) => ({
+        ...row,
+        vals: [...row.vals, adjustedPerfRows[i].vals[1]],
+      }))
+    : basePerfRows;
+
 
   // ── Stress Test ─────────────────────────────────────────────────
   // 화면 카드(StressTestSection)와 같은 runStress 를 쓴다 — 리포트 숫자가
@@ -723,7 +787,8 @@ function PortfolioPage() {
   // 이전에는 isStressMode(백엔드 stress 엔드포인트) 기준이었으나, 금리·환율
   // 슬라이더가 없어지면서 그 플래그를 켤 경로가 사라져 섹션 자체가 렌더되지
   // 않았다. 시나리오가 자산군 충격 기반이므로 금리·환율 열도 충격 가정으로 바꾼다.
-  const selectedPf = selId === "a" ? portA : portB;
+  // 스트레스는 비중만 있으면 계산되므로 조정안이 있으면 그 비중으로 낸다.
+  const selectedPf = adjusted ?? (selId === "a" ? portA : portB);
   const stressTotalKrw = aumEokwon * 100_000_000;
 
   const fmtLoss = (lossKrw: number): { text: string; color: string } => {
@@ -783,7 +848,7 @@ function PortfolioPage() {
 
       <div style={{ padding: "28px 40px 80px", wordBreak: "keep-all" }}>
         <div
-          style={{ display: "flex", alignItems: "center", marginBottom: 28 }}
+          style={{ display: "flex", alignItems: "center", marginBottom: 16 }}
         >
           <SectionBar />
           <div style={{ fontSize: 14, fontWeight: 800, color: TEXT }}>
@@ -791,15 +856,15 @@ function PortfolioPage() {
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 12, marginBottom: 40 }}>
-          {cols.map(({ p, alloc, label, badge, badgeColor, selected }) => (
+        <div style={{ display: "flex", gap: isAdjusted ? 8 : 12, marginBottom: 22 }}>
+          {cols.map(({ key, alloc, label, badge, badgeColor, selected }) => (
             <div
-              key={p.id}
+              key={key}
               style={{
                 flex: 1,
                 border: selected ? `2px solid ${BRAND}` : `1px solid ${BORDER}`,
                 borderRadius: 10,
-                padding: "13px 14px",
+                padding: isAdjusted ? "12px 10px" : "13px 14px",
                 background: "white",
               }}
             >
@@ -835,6 +900,7 @@ function PortfolioPage() {
                   label={slice.label}
                   pct={Math.round(slice.weight)}
                   color={slice.color}
+                  compact={isAdjusted}
                 />
               ))}
             </div>
@@ -842,7 +908,7 @@ function PortfolioPage() {
         </div>
 
         <div
-          style={{ display: "flex", alignItems: "center", marginBottom: 28 }}
+          style={{ display: "flex", alignItems: "center", marginBottom: 16 }}
         >
           <SectionBar />
           <div style={{ fontSize: 14, fontWeight: 800, color: TEXT }}>
@@ -855,14 +921,14 @@ function PortfolioPage() {
             width: "100%",
             borderCollapse: "collapse",
             tableLayout: "fixed",
-            marginBottom: 40,
+            marginBottom: 22,
           }}
         >
           <colgroup>
             <col style={{ width: 150 }} />
-            <col />
-            <col />
-            <col />
+            {cols.map((c) => (
+              <col key={c.key} />
+            ))}
           </colgroup>
           <thead>
             <tr style={{ background: BG_ALT }}>
@@ -880,7 +946,7 @@ function PortfolioPage() {
               </th>
               {cols.map((c) => (
                 <th
-                  key={c.p.id}
+                  key={c.key}
                   style={{
                     padding: "8px 10px",
                     textAlign: "center",
@@ -1016,7 +1082,7 @@ function PortfolioPage() {
         )}
       </div>
 
-      <PageFooter page={3} total={5} />
+      <PageFooter page={3} total={7} />
     </div>
   );
 }
@@ -1638,7 +1704,7 @@ function TaxPage() {
         </div>
       </div>
 
-      <PageFooter page={4} total={5} />
+      <PageFooter page={4} total={7} />
     </div>
   );
 }
@@ -1677,7 +1743,7 @@ function AiPage() {
       }}
     >
       <PageHeader
-        pageNum="④"
+        pageNum="⑦"
         title="AI 인사이트"
         subtitle="RAG 기반 포트폴리오 분석 · 시장 환경 대응 제안"
       />
@@ -1842,7 +1908,317 @@ function AiPage() {
         )}
       </div>
 
-      <PageFooter page={5} total={5} />
+      <PageFooter page={7} total={7} />
+    </div>
+  );
+}
+
+// ── 페이지 5·6: S.ymphony 리스크 리포트 ─────────────────────────
+//
+// "자세히" 화면(components/dashboard/ReportDetailModal)이 보여 주는 내용을
+// 그대로 싣는다. PB 리포트는 근거·검증·재현성까지 남기는 문서라 전부 넣는다.
+// 값의 출처는 lib/mock/symphonyReport.ts 하나이며 여기서 계산하지 않는다.
+
+const RTH: React.CSSProperties = {
+  padding: "7px 10px",
+  textAlign: "left",
+  fontSize: 10.5,
+  fontWeight: 700,
+  color: MUTED,
+  background: BG_ALT,
+  borderBottom: `1px solid ${BORDER}`,
+};
+const RTD: React.CSSProperties = {
+  padding: "7px 10px",
+  fontSize: 10.5,
+  fontWeight: 600,
+  color: TEXT,
+  borderBottom: `1px solid ${BORDER}`,
+};
+
+function ReportSection({
+  title,
+  note,
+  children,
+}: {
+  title: string;
+  note?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div style={{ marginBottom: 18 }}>
+      <div style={{ display: "flex", alignItems: "center", marginBottom: 9 }}>
+        <SectionBar />
+        <div style={{ fontSize: 14, fontWeight: 800, color: TEXT }}>{title}</div>
+      </div>
+      {children}
+      {note && (
+        <p style={{ margin: "7px 0 0", fontSize: 10, color: MUTED, lineHeight: 1.6 }}>
+          {note}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function RiskReportPage() {
+  const contributionTotal = CVAR_CONTRIBUTIONS.reduce(
+    (acc, r) => acc + r.weightPct,
+    0,
+  );
+  return (
+    <div
+      data-pdf-page=""
+      style={{
+        width: W,
+        height: H,
+        fontFamily: "Pretendard, Apple SD Gothic Neo, sans-serif",
+        background: "white",
+        position: "relative",
+        overflow: "hidden",
+      }}
+    >
+      <PageHeader
+        pageNum="⑤"
+        title="S.ymphony 리스크 리포트"
+        subtitle={`IPS 충돌 검사 · VaR/CVaR · 손실 기여도 · 기준일 ${REPORT_AS_OF}`}
+      />
+
+      <div style={{ padding: "22px 40px 80px", wordBreak: "keep-all" }}>
+        <ReportSection
+          title={`IPS 충돌 검사 ${IPS_CONFLICTS.length}건`}
+          note={IPS_CONFLICT_NOTE}
+        >
+          {IPS_CONFLICTS.map((c) => (
+            <div
+              key={c.rule}
+              style={{
+                border: `1px solid ${BORDER}`,
+                borderRadius: 8,
+                padding: "9px 11px",
+                marginBottom: 7,
+                background: BG_ALT,
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 7,
+                  marginBottom: 3,
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 9,
+                    fontWeight: 800,
+                    color: "#92400E",
+                    background: "#FEF3C7",
+                    padding: "2px 6px",
+                    borderRadius: 4,
+                  }}
+                >
+                  {c.severity.toUpperCase()}
+                </span>
+                <span style={{ fontSize: 11.5, fontWeight: 800, color: TEXT }}>
+                  {c.message}
+                </span>
+                <span style={{ fontSize: 9, color: MUTED }}>{c.rule}</span>
+              </div>
+              <div style={{ fontSize: 10.5, color: TEXT, marginBottom: 2 }}>
+                관측값 {c.observed} · 기준값 {c.threshold}
+              </div>
+              <div style={{ fontSize: 10, color: MUTED }}>{c.basis}</div>
+            </div>
+          ))}
+        </ReportSection>
+
+        <ReportSection
+          title={`VaR / CVaR 신뢰수준 ${REPORT_META.confidenceLevelPct}% · ${formatWon(REPORT_META.totalValuationKrw)} 기준`}
+        >
+          <table
+            style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}
+          >
+            <colgroup>
+              <col style={{ width: 130 }} />
+              <col />
+              <col />
+              <col style={{ width: 165 }} />
+            </colgroup>
+            <thead>
+              <tr>
+                <th style={RTH}>지표</th>
+                <th style={{ ...RTH, textAlign: "right" }}>비율</th>
+                <th style={{ ...RTH, textAlign: "right" }}>금액</th>
+                <th style={{ ...RTH, textAlign: "right" }}>90% 신뢰구간</th>
+              </tr>
+            </thead>
+            <tbody>
+              {RISK_METRICS.map((m) => (
+                <tr key={m.label}>
+                  <td style={{ ...RTD, fontWeight: 800 }}>{m.label}</td>
+                  <td style={{ ...RTD, textAlign: "right" }}>
+                    {m.ratioPct.toFixed(2)}%
+                  </td>
+                  <td style={{ ...RTD, textAlign: "right", color: BRAND }}>
+                    -{formatWon(m.amountKrw)}
+                  </td>
+                  <td style={{ ...RTD, textAlign: "right", color: MUTED }}>
+                    {m.ciPct[0].toFixed(2)}% ~ {m.ciPct[1].toFixed(2)}%
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </ReportSection>
+
+        <ReportSection
+          title={`CVaR 자산군 기여도 합계 ${contributionTotal.toFixed(1)}%`}
+          note={CVAR_CONTRIBUTION_NOTE}
+        >
+          <table
+            style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}
+          >
+            <tbody>
+              {CVAR_CONTRIBUTIONS.map((r) => (
+                <tr key={r.label}>
+                  <td style={{ ...RTD, fontWeight: 700 }}>{r.label}</td>
+                  <td style={{ ...RTD, textAlign: "right" }}>
+                    {r.weightPct.toFixed(1)}%
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </ReportSection>
+      </div>
+
+      <PageFooter page={5} total={7} />
+    </div>
+  );
+}
+
+function EvidencePage() {
+  const passed = VERIFICATIONS.filter((v) => v.passed).length;
+  return (
+    <div
+      data-pdf-page=""
+      style={{
+        width: W,
+        height: H,
+        fontFamily: "Pretendard, Apple SD Gothic Neo, sans-serif",
+        background: "white",
+        position: "relative",
+        overflow: "hidden",
+      }}
+    >
+      <PageHeader
+        pageNum="⑥"
+        title="근거 · 검증 · 재현성"
+        subtitle={`인용 ${CITATIONS.length}건 · 검증 ${passed}/${VERIFICATIONS.length} 통과 · 엔진 ${REPORT_META.engineVersion}`}
+      />
+
+      <div style={{ padding: "22px 40px 80px", wordBreak: "keep-all" }}>
+        <ReportSection title={`인용·출처 ${CITATIONS.length}건`}>
+          <table
+            style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}
+          >
+            <colgroup>
+              <col style={{ width: 26 }} />
+              <col />
+              <col style={{ width: 175 }} />
+            </colgroup>
+            <thead>
+              <tr>
+                <th style={RTH}>#</th>
+                <th style={RTH}>출처</th>
+                <th style={RTH}>인용 위치</th>
+              </tr>
+            </thead>
+            <tbody>
+              {CITATIONS.map((c) => (
+                <tr key={c.no}>
+                  <td style={{ ...RTD, color: MUTED }}>{c.no}</td>
+                  <td style={RTD}>{c.source}</td>
+                  <td style={{ ...RTD, color: MUTED }}>{c.locator}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </ReportSection>
+
+        <ReportSection
+          title={`검증 항목 ${passed}/${VERIFICATIONS.length} 통과`}
+          note={VERIFICATION_NOTE}
+        >
+          <table
+            style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}
+          >
+            <colgroup>
+              <col style={{ width: 62 }} />
+              <col />
+            </colgroup>
+            <tbody>
+              {VERIFICATIONS.map((v) => (
+                <tr key={v.label}>
+                  <td
+                    style={{
+                      ...RTD,
+                      fontWeight: 800,
+                      color: v.passed ? BRAND : UP,
+                    }}
+                  >
+                    {v.passed ? "통과" : "미통과"}
+                  </td>
+                  <td style={RTD}>{v.label}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </ReportSection>
+
+        <ReportSection title="재현성 해시" note={REPRODUCIBILITY_NOTE}>
+          <table
+            style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}
+          >
+            <colgroup>
+              <col style={{ width: 140 }} />
+              <col />
+            </colgroup>
+            <tbody>
+              {REPRODUCIBILITY_HASHES.map((h) => (
+                <tr key={h.label}>
+                  <td style={{ ...RTD, fontWeight: 700 }}>{h.label}</td>
+                  <td
+                    style={{
+                      ...RTD,
+                      fontFamily: "monospace",
+                      fontSize: 9,
+                      color: MUTED,
+                      wordBreak: "break-all",
+                    }}
+                  >
+                    {h.value}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </ReportSection>
+
+        <ReportSection title="면책">
+          {DISCLAIMERS.map((d) => (
+            <p
+              key={d.code}
+              style={{ margin: "0 0 5px", fontSize: 10, color: MUTED, lineHeight: 1.7 }}
+            >
+              · {d.text}
+            </p>
+          ))}
+        </ReportSection>
+      </div>
+
+      <PageFooter page={6} total={7} />
     </div>
   );
 }
@@ -1855,6 +2231,8 @@ export default function PbPdfTemplate() {
       <MarketIpsPage />
       <PortfolioPage />
       <TaxPage />
+      <RiskReportPage />
+      <EvidencePage />
       <AiPage />
     </div>
   );

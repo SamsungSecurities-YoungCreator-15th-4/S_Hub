@@ -127,13 +127,13 @@ export const CITATIONS: CitationRow[] = [
     no: 1,
     source: "한국은행 통화정책방향 결정문 (2026-08)",
     locator: "기준금리 3.00%",
-    usedIn: "③ ⑤",
+    usedIn: "VaR/CVaR · 스트레스",
   },
   {
     no: 2,
     source: "사내 House View 2026 3Q",
     locator: "자산배분 가이드 · 위험자산 상한",
-    usedIn: "② ④",
+    usedIn: "IPS 충돌 · 손실 기여도",
   },
   {
     no: 3,
