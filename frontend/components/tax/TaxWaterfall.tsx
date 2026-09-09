@@ -228,12 +228,12 @@ export default function TaxWaterfall({
           </span>
         </p>
       </HelpTooltip>
-      <div className="mb-2 flex items-center justify-between rounded-lg bg-muted/60 px-2.5 py-1.5">
+      <div className="mb-2 flex items-center justify-between gap-2 rounded-lg bg-muted/60 px-2.5 py-1.5">
         <span className="text-[12px] font-semibold text-muted-foreground">
           {totalLabel}
         </span>
         <span
-          className={`text-[13px] font-extrabold tabular-nums ${
+          className={`shrink-0 whitespace-nowrap text-[13px] font-extrabold tabular-nums ${
             flow ? "text-brand-dark" : "text-up"
           }`}
         >
