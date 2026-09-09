@@ -21,6 +21,8 @@ export default function RightPanel() {
   const [isOpen, setIsOpen] = useAutoCollapse(1280);
 
   const [confirmOpen, setConfirmOpen] = useState(false);
+  /** 직전 IPS 반영을 거절했는지 — 무엇이 실행되지 않았는지 남긴다. */
+  const [reflectRejected, setReflectRejected] = useState(false);
   const { insightResult, ips, setIps, setRunStatus, resetRunStatus } =
     useDashboardStore();
   const runStatus = useRunStatus();
@@ -30,6 +32,7 @@ export default function RightPanel() {
 
   const handleIpsReflect = () => {
     if (!summary) return;
+    setReflectRejected(false);
     setConfirmOpen(true);
   };
 
@@ -38,6 +41,7 @@ export default function RightPanel() {
     const prev = (ips.unique ?? "").trim();
     setIps({ unique: prev ? `${prev}\n${summary}` : summary });
     setConfirmOpen(false);
+    setReflectRejected(false);
     // PB가 IPS 변경을 승인했으므로 reviewed 로 올린다.
     // locked·blocked 에서는 reviewed 로 가는 전이가 전이표에 없다(lib/runStatus.ts:48).
     // IPS 가 바뀌면 확정본 내용도 함께 바뀌므로, 확정을 유지한 채 두지 않고
@@ -89,6 +93,13 @@ export default function RightPanel() {
         </Button>
       </HelpTooltip>
 
+      {/* 좌측 분석 게이트 거절 표기와 같은 문형으로 적는다. */}
+      {reflectRejected && (
+        <p className="-mt-1 text-[11px] font-semibold text-down">
+          PB가 IPS 반영을 거절했습니다
+        </p>
+      )}
+
       {/* IPS 승인 확인 — 닫기(X) 없이 승인/거절만 두던 기존 UI를 그대로 두고,
           ESC·백드롭 클릭·포커스 트랩만 Dialog 프리미티브에서 얻는다. */}
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
@@ -112,7 +123,10 @@ export default function RightPanel() {
             <Button
               variant="outline"
               className="flex-1"
-              onClick={() => setConfirmOpen(false)}
+              onClick={() => {
+                setConfirmOpen(false);
+                setReflectRejected(true);
+              }}
             >
               거절
             </Button>

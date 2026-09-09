@@ -130,6 +130,7 @@ export default function Sidebar() {
     currentWeightsInput,
     setRunStatus,
     resetRunStatus,
+    setAnalyzeRejected,
   } = useDashboardStore();
   const customer =
     customers.find((c) => c.id === selectedCustomerId) ?? customers[0];
@@ -143,7 +144,6 @@ export default function Sidebar() {
   const [loadingId, setLoadingId] = useState<string | null>(null);
   /** 분석 승인 게이트 — 열림 여부와, 직전에 거절당했는지. */
   const [gateOpen, setGateOpen] = useState(false);
-  const [analyzeRejected, setAnalyzeRejected] = useState(false);
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [newName, setNewName] = useState("");
   const [newAum, setNewAum] = useState("");
@@ -870,14 +870,6 @@ export default function Sidebar() {
           )}
         </Button>
 
-        {/* 거절 후 — 남길 사실은 "거절했다" 가 아니라 "지금 입력이 아직 분석되지
-            않았다" 다. 거절은 아무것도 바꾸지 않아 상태는 draft 그대로이고 막힌
-            것도 없으므로, 오류색을 쓰지 않는다. 중앙의 직전 결과는 그대로 둔다. */}
-        {analyzeRejected && (
-          <p className="-mt-1 text-center text-[11px] font-semibold text-muted-foreground">
-            아직 분석하지 않음
-          </p>
-        )}
       </aside>
 
       <AnalyzeGateDialog
