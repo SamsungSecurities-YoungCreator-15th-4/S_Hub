@@ -375,7 +375,7 @@ export default function Sidebar() {
   const handleGateReject = () => {
     setGateOpen(false);
     setAnalyzeRejected(true);
-    setRunStatus(RUN_STATUS.BLOCKED, "PB가 분석 승인을 거절했습니다");
+    setRunStatus(RUN_STATUS.BLOCKED, "분석 승인을 거절했습니다");
   };
 
   if (!customer) return null;
@@ -875,7 +875,7 @@ export default function Sidebar() {
             )}
             {analyzeRejected && (
               <p className="text-[11px] font-semibold text-destructive">
-                PB가 분석 승인을 거절했습니다
+                분석 승인을 거절했습니다
               </p>
             )}
             {runStatusReason && (
