@@ -756,12 +756,29 @@ function PortfolioPage() {
       : []),
   ];
 
-  const perfRows = buildPdfPerfRows(storePortfolios, aumEokwon);
   /*
-    지표는 자산군별 수익률·변동성 계열이 있어야 나오는데 조정안에는 그 계열이 없다.
-    없는 값을 채우느니 지표 표는 세 안만 두고 아래 한 줄로 이유를 밝힌다.
+    buildPdfPerfRows 는 스토어의 세 안만 계산한다. 조정안은 별도로 한 번 더 돌려
+    같은 행 순서·같은 서식으로 넷째 값을 만든 뒤 각 행에 이어 붙인다.
   */
-  const perfCols = cols.slice(0, 3);
+  const basePerfRows = buildPdfPerfRows(storePortfolios, aumEokwon);
+  /*
+    buildPdfPerfRows 는 current·a·b 세 자리가 다 차야 계산한다. 조정안 하나만
+    넣을 수는 없어 a·b 두 자리에 같은 조정안을 넣고 그중 한 칸만 꺼내 쓴다.
+  */
+  const adjustedPerfRows =
+    adjusted && current
+      ? buildPdfPerfRows(
+          [current, { ...adjusted, id: "a" }, { ...adjusted, id: "b" }],
+          aumEokwon,
+        )
+      : null;
+  const perfRows = adjustedPerfRows
+    ? basePerfRows.map((row, i) => ({
+        ...row,
+        vals: [...row.vals, adjustedPerfRows[i].vals[1]],
+      }))
+    : basePerfRows;
+
 
   // ── Stress Test ─────────────────────────────────────────────────
   // 화면 카드(StressTestSection)와 같은 runStress 를 쓴다 — 리포트 숫자가
@@ -909,9 +926,9 @@ function PortfolioPage() {
         >
           <colgroup>
             <col style={{ width: 150 }} />
-            <col />
-            <col />
-            <col />
+            {cols.map((c) => (
+              <col key={c.p.id} />
+            ))}
           </colgroup>
           <thead>
             <tr style={{ background: BG_ALT }}>
@@ -927,7 +944,7 @@ function PortfolioPage() {
               >
                 지표
               </th>
-              {perfCols.map((c) => (
+              {cols.map((c) => (
                 <th
                   key={c.p.id}
                   style={{
@@ -964,10 +981,10 @@ function PortfolioPage() {
                       textAlign: "center",
                       fontSize: 11,
                       fontWeight: j === 0 ? 500 : 700,
-                      color: row.upColor ?? perfCols[j].headerColor,
+                      color: row.upColor ?? cols[j].headerColor,
                       whiteSpace: "pre-line" as const,
                       lineHeight: 1.4,
-                      background: perfCols[j].selected ? `${BRAND}0D` : "inherit",
+                      background: cols[j].selected ? `${BRAND}0D` : "inherit",
                     }}
                   >
                     {v}
@@ -977,12 +994,6 @@ function PortfolioPage() {
             ))}
           </tbody>
         </table>
-
-        {isAdjusted && (
-          <div style={{ fontSize: 10, color: MUTED, marginTop: -16, marginBottom: 22, lineHeight: 1.5 }}>
-            직접 조정한 비중의 지표는 자산군별 수익률·변동성 데이터가 연결되면 계산됩니다.
-          </div>
-        )}
 
         {stressRows.length > 0 && (
           <>

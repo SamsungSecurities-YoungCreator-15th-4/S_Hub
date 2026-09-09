@@ -708,11 +708,10 @@ function PortfolioPage() {
     고객 문서에는 확정 대상인 안 하나만 싣는다. 조정했으면 조정안이다 —
     상담에서 함께 손본 비중과 다른 문서를 건네지 않기 위해서다.
   */
-  const { base, viewed: selectedPf, isAdjusted } = useViewedPortfolio();
-  if (!portCurrent || !selectedPf || !base) return null;
+  const { viewed: selectedPf } = useViewedPortfolio();
+  if (!portCurrent || !selectedPf) return null;
   const cur = portCurrent.metrics;
-  // 지표는 조정 전 제안의 값이다 — 조정 비중으로 다시 계산할 데이터가 아직 없다.
-  const sel = base.metrics;
+  const sel = selectedPf.metrics;
   const assetLabelsSelected = buildPdfAllocation(selectedPf).map(
     (s) => `${s.label} ${Math.round(s.weight)}%`,
   );
@@ -890,11 +889,6 @@ function PortfolioPage() {
             <div style={{ fontSize: 13, fontWeight: 800, color: BRAND }}>
               {selectedPf.name}
             </div>
-            {isAdjusted && (
-              <div style={{ fontSize: 10, color: MUTED }}>
-                지표는 조정 전 {base.name} 기준입니다
-              </div>
-            )}
           </div>
           <div
             style={{
