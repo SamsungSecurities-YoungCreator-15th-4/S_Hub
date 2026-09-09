@@ -44,10 +44,19 @@ export const BASE_TIME = "17:20";
 export interface Customer {
   id: string;
   name: string;
-  grade: "VVIP";
+  /** 자산 규모 구분. 1억원대 직장인 고객이 들어오면서 VVIP 단일 값에서 넓혔다. */
+  grade: "VVIP" | "일반";
   pbCode: string;
   aumLabel: string; // 표시용
   aumEokwon: number; // 계산용 (억원)
+  /**
+   * 연간 총급여(만원). 연금계좌 세액공제율이 총급여 5,500만원(종합소득금액
+   * 4,500만원) 경계에서 16.5% / 13.2% 로 갈리므로 판정에 반드시 필요하다.
+   * 한계세율만으로는 이 경계를 알 수 없다 — 둘은 다른 기준(과세표준 vs 총급여)이다.
+   */
+  salaryManwon?: number;
+  /** 연간 신규 납입 여력(만원) — 절세계좌에 배분할 수 있는 금액 (IPS Unique). */
+  annualContributionManwon?: number;
   // 절세계좌 기납입액·세부담 입력값(만원/%) — 절세 제안 실계산용 고객 데이터.
   // 실서비스에서는 PB가 입력/연동(준호님 DB 반영 예정). 여기선 현실적 자리표시자.
   isaUsedManwon: number; // ISA 당해 기납입액 (법정 연 한도 2,000만)
@@ -74,20 +83,24 @@ export interface Customer {
 
 export const CUSTOMERS: Customer[] = [
   {
+    // 시연 기준 고객. 33세 직장인 6년차 — 은퇴자산을 쌓으면서 3년 뒤 전세
+    // 보증금 인상분도 마련해야 하는, 절세계좌 lock-up 과 정면으로 부딪히는 사례다.
     id: "cust-001",
     name: "김성삼",
-    grade: "VVIP",
+    grade: "일반",
     pbCode: "PB-100482",
-    aumLabel: "운용자산 18억원",
-    aumEokwon: 18,
-    isaUsedManwon: 2000, // ISA 연 한도 소진
-    pensionUsedManwon: 900, // 연금계좌 세액공제 한도 소진
-    realizedLossManwon: 1800,
-    marginalRatePct: 38.5,
-    age: 54,
-    horizonYears: 10, // 장기 증여 준비
-    nearTermNeedManwon: 30000, // 내년 가을 자녀 전세 3억
-    nearTermNeedYears: 1,
+    aumLabel: "운용자산 1억원",
+    aumEokwon: 1,
+    salaryManwon: 5200, // 총급여 5,500만원 이하 → 연금 세액공제율 16.5%
+    annualContributionManwon: 1500, // 연 납입여력
+    isaUsedManwon: 800, // 작년 개설, 연 2,000만 한도 미소진
+    pensionUsedManwon: 0, // 연금계좌 미개설 — 900만 한도가 통째로 남아 있다
+    realizedLossManwon: 0,
+    marginalRatePct: 16.5, // 과세표준 1,400~5,000만 구간(15%) + 지방소득세
+    age: 33,
+    horizonYears: 22, // 만 55세 연금 수령까지 남은 기간과 같다 — 적합성 경계
+    nearTermNeedManwon: 2000, // 3년 내 전세 보증금 인상분
+    nearTermNeedYears: 3,
     isaOpened: true,
   },
   {
@@ -150,64 +163,69 @@ export interface ConsultMessage {
 export const CONSULT_DURATION = "02:14";
 
 export const CONSULT_LOG: ConsultMessage[] = [
+  // 이 전사가 IPS 의 근거다. IPS Unique 를 바꾸면 여기도 같이 바꿔야 앞뒤가 맞는다.
+  // (store 의 transcript 초기값이라 사이드바 상담 내역에 그대로 찍힌다.)
   {
     speaker: "PB",
-    text: "최근 변동성 확대에 대한 고객님의 우려를 확인했습니다.",
+    text: "은퇴자산을 길게 가져가고 싶다고 하셨는데, 중간에 목돈 나갈 일이 있으실까요?",
     time: "00:07",
   },
   {
     speaker: "고객",
-    text: "세후 수익률을 높이고 변동성을 줄이는 전략이 필요해요.",
-    time: "00:12",
+    text: "3년 뒤에 전세 재계약이 있어요. 보증금 인상분이 2,000만원쯤 될 것 같습니다.",
+    time: "00:15",
   },
   {
     speaker: "PB",
-    text: "절세 전략과 대체자산을 활용한 분산을 제안드립니다.",
-    time: "00:30",
+    text: "그 자금은 따로 확보해 두고 나머지를 굴리는 쪽으로 잡겠습니다. 현재 계좌는 어떻게 운용 중이신가요?",
+    time: "00:28",
   },
   {
     speaker: "고객",
-    text: "ISA 계좌 활용은 이전에도 말씀드렸는데, 한도가 얼마죠?",
-    time: "00:48",
+    text: "국내 반도체주 비중이 좀 큽니다. ISA는 작년에 만들어서 800만원 정도 넣었고요.",
+    time: "00:40",
   },
   {
     speaker: "PB",
-    text: "연간 2,000만원 한도이며, 비과세 혜택과 분리과세 9.9%가 적용됩니다.",
-    time: "00:55",
+    text: "ISA 한도는 미사용분이 다음 해로 쌓입니다. 작년 미납분까지 하면 올해는 3,200만원까지 가능합니다.",
+    time: "00:52",
   },
   {
     speaker: "고객",
-    text: "그럼 해외 배당주 비중은 좀 더 늘릴 수 있나요?",
-    time: "01:10",
+    text: "연금저축은 아직 안 만들었어요. 세액공제가 크다고는 들었는데 55세까지 못 뺀다고 해서요.",
+    time: "01:08",
   },
   {
     speaker: "PB",
-    text: "포트폴리오 A 기준 해외배당주를 22%까지 확대하면 세후 수익률이 5.5%로 개선됩니다.",
+    text: "연 900만원까지 세액공제 대상이고 총급여 5,500만원 이하면 공제율이 16.5%입니다. 다만 말씀대로 만 55세까지 묶입니다.",
     time: "01:20",
   },
   {
     speaker: "고객",
-    text: "좋네요. 증여 계획도 같이 검토해주실 수 있나요?",
-    time: "01:45",
+    text: "매년 1,500만원 정도는 넣을 수 있는데, 3년 뒤 전세금까지 생각하면 얼마씩 나눠야 할지 모르겠네요.",
+    time: "01:42",
   },
   {
     speaker: "PB",
-    text: "자녀 증여세 공제 한도(10년 5천만원)와 분할 증여 전략을 함께 안내드리겠습니다.",
-    time: "01:58",
+    text: "절세와 유동성이 반대로 움직이는 구간이라 배분을 같이 보면서 정하겠습니다.",
+    time: "01:55",
   },
 ];
 
 // ── IPS 조율기 초기값 ──────────────────────────────────────────
 export const IPS_DEFAULT = {
-  goal: "자녀 전세자금 및 장기 증여 준비",
-  assetLabel: "18억원",
-  returnPct: 8,
-  risk: "균형형" as "안정형" | "균형형" | "공격형",
-  timeYears: 10,
-  tax: "금융소득종합과세 · 양도세 · 증여세",
+  goal: "은퇴자산 형성 + 3년 내 전세 재계약 대비",
+  assetLabel: "1억원",
+  returnPct: 7,
+  risk: "공격형" as "안정형" | "균형형" | "공격형",
+  // 만 55세까지 22년. 연금 수령 요건과 정확히 같은 값이라 적합성 판정이 경계에 선다.
+  timeYears: 22,
+  tax: "해외주식 양도세 · 배당소득 원천징수",
   liquidity: "중간" as "낮음" | "중간" | "높음",
-  legal: "증여세법 · 자금출처조사 대비",
-  unique: "전체 자금 3억 · 미국 배당주·장기채 선호",
+  legal: "특이사항 없음",
+  unique:
+    "국내 반도체주 비중이 큼 · 3년 내 전세 보증금 인상분 약 2,000만원 필요 · " +
+    "연 납입여력 1,500만원 · ISA 운용 중이나 한도 미소진, 연금계좌 미개설",
 };
 
 // ── 포트폴리오 3종 (현재 / A 베스트 / B 추천) ──────────────────
@@ -430,17 +448,6 @@ export const TAX_EFFECT = {
       caption: "국내·해외 ETF 중심으로 금융소득종합과세 구간 회피",
     },
   ],
-};
-
-// 종합과세 임계선 (금융소득종합과세 기준선 2,000만원 — 소득세법 §14③6)
-export const TAX_THRESHOLD = {
-  thresholdManwon: 2000,
-  gaugeMaxManwon: 3000,
-  otherIncomeDefault: 1650,
-  otherIncomeMax: 2480,
-  portfolioDividendManwon: 520, // 포트폴리오 A 예상 이자·배당 (더미)
-  separateRateLabel: "15.4%",
-  comprehensiveRateLabel: "최고 49.5%",
 };
 
 /**

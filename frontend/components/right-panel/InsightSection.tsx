@@ -29,7 +29,6 @@ export default function InsightSection() {
     ips,
     consultationId,
     liveBase,
-    otherIncomeManwon,
     scenario,
     selectedCustomerId,
     selectedPortfolioId,
@@ -67,7 +66,6 @@ export default function InsightSection() {
               ips,
               scenario,
               liveBase,
-              otherIncomeManwon,
             }),
           });
       setInsightResult(res);
