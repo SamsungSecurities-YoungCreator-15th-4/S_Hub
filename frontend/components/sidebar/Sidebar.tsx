@@ -496,7 +496,7 @@ export default function Sidebar() {
       return;
     }
     setHistoryLoading(true);
-    const res = await listConsultations(customer.clientId);
+    const res = await listConsultations(customer.clientId, customer.name);
     setPastList(res.data);
     if (!isTrusted(res.source))
       setHistoryError(res.note ?? "불러오지 못했습니다.");
