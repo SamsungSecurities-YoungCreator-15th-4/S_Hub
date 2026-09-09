@@ -412,19 +412,37 @@ function AdviceCards({ liveCards, plan }: AdviceCardsProps) {
       : card.key === "irp"
         ? plan.irpManwon
         : plan.pensionSavingsManwon;
-    // 연금저축과 IRP 는 합산 한도를 공유하지만 연금저축에는 단독 한도가 따로 있다.
-    // 카드마다 자기에게 걸리는 한도를 말해야 두 장이 같은 900만원을 보여주지 않는다.
+    /*
+     * 카드마다 걸리는 한도가 다르다. 연금저축에는 단독 한도 600만원이 따로 있고,
+     * IRP 는 연금저축과 900만원 통을 나눠 쓴다. 그래서 IRP 의 소진 여부는 자기
+     * 배분액이 아니라 **연금 배분 합계**로 판단해야 한다 — irpManwon 으로 재면
+     * "900 중 300" 이 되어 600만원이 남은 것처럼 읽히는데, 그 600만원은 옆 카드
+     * (연금저축)가 이미 쓴 돈이다.
+     */
     const cap = isIsa
-      ? { manwon: plan.isa.headroomManwon, label: "잔여 한도" }
+      ? { limit: plan.isa.headroomManwon, used: plan.isaManwon, full: "한도 소진", left: "잔여" }
       : card.key === "irp"
-        ? { manwon: plan.pension.headroomManwon, label: "연금계좌 합산 잔여" }
-        : { manwon: plan.pensionSavingsRoomManwon, label: "연금저축 단독 잔여" };
+        ? {
+            limit: plan.pension.headroomManwon,
+            used: plan.pensionManwon,
+            full: `합산 ${plan.pension.headroomManwon.toLocaleString()}만원 소진`,
+            left: "합산 한도 잔여",
+          }
+        : {
+            limit: plan.pensionSavingsRoomManwon,
+            used: plan.pensionSavingsManwon,
+            full: "단독 한도 소진",
+            left: "단독 한도 잔여",
+          };
+    const remaining = Math.max(cap.limit - cap.used, 0);
+    const capText =
+      remaining > 0 ? `${cap.left} ${remaining.toLocaleString()}만원` : cap.full;
+
     return {
       applicable: account.eligible,
       reason: account.reason,
       allocatedManwon: allocated,
-      capManwon: cap.manwon,
-      capLabel: cap.label,
+      capText,
       headroomManwon: account.headroomManwon,
       savingManwon: isIsa ? plan.isaSavingManwon : plan.pensionSavingManwon,
       note: isIsa
@@ -460,11 +478,11 @@ function AdviceCards({ liveCards, plan }: AdviceCardsProps) {
       summary = "적용 불가";
       explain = [reason];
     } else if (calc) {
+      // 배분액이 답이라 앞에, 한도는 맥락이라 뒤에 둔다.
       summary =
         calc.allocatedManwon > 0
-          ? `${calc.capLabel} ${calc.capManwon.toLocaleString()}만원 중 ` +
-            `${calc.allocatedManwon.toLocaleString()}만원 배분`
-          : `${calc.capLabel} ${calc.capManwon.toLocaleString()}만원`;
+          ? `${calc.allocatedManwon.toLocaleString()}만원 배분 · ${calc.capText}`
+          : `배분 없음 · ${calc.capText}`;
       // 판정 근거(일반형/서민형, 연금저축 단독 한도)도 설명 쪽이다.
       explain = [...copy.helpLines, calc.note];
     } else if (transferManwon != null) {
