@@ -49,6 +49,12 @@ interface Props {
   needManwon: number;
   needYears: number;
   /**
+   * 그 돈의 이름(전세 보증금 인상분·자녀 대학 등록금·인출 예정 자금…).
+   * 고객마다 다르므로 화면에 문구를 박아 두지 않는다 — 박아 두면 등록금이
+   * 필요한 고객에게 "전세 자금이 모자랍니다" 라고 말하게 된다.
+   */
+  needLabel: string;
+  /**
    * 목표 시점 필요액을 지키면서 연금에 넣을 수 있는 최대 납입액(만원).
    * 유동액과 같은 규칙으로 구해야 해서 lib/taxAccounts.ts 가 계산하고 여기는 받기만
    * 한다. 어떤 배분으로도 못 맞추면 null 이다.
@@ -70,7 +76,7 @@ interface Props {
  * 연 납입여력을 연금계좌와 ISA 에 어떻게 나눌 것인가.
  *
  * 세액공제만 보면 연금 한도를 꽉 채우는 것이 답이다. 그런데 연금은 만 55세까지
- * 잠기고, 이 고객은 3년 뒤 전세 보증금이 필요하다. 한쪽을 최대화하면 다른 쪽이
+ * 잠기고, 고객마다 근시일에 써야 할 돈이 있다. 한쪽을 최대화하면 다른 쪽이
  * 무너지는 구조라 슬라이더 하나로 양쪽을 동시에 보여준다.
  *
  * 유동성은 **누적 납입액**만 센다. 기존 보유자산은 넣지 않는다 — 매도 시점의
@@ -84,6 +90,7 @@ export default function ContributionSplit({
   onPensionRequestChange,
   needManwon,
   needYears,
+  needLabel,
   maxPensionKeepingNeed,
   targetReturnPct,
   horizonYears,
@@ -226,7 +233,7 @@ export default function ContributionSplit({
         ) : shortfall > 0 ? (
           <>
             <p className="text-[13px] font-extrabold text-up">
-              전세 자금 {fmt(shortfall)}만원 부족
+              {needLabel} {fmt(shortfall)}만원 부족
             </p>
             <p className="mt-0.5 text-[12px] font-semibold text-muted-foreground">
               연금 <b className="text-foreground">{fmt(pensionDrop)}만원</b> 줄이면
@@ -250,7 +257,7 @@ export default function ContributionSplit({
             </p>
             <p className="mt-0.5 text-[12px] font-semibold text-muted-foreground">
               {maxPensionKeepingNeed != null
-                ? `연금 상한 ${fmt(maxPensionKeepingNeed)}만원 · 더 넣으면 전세 자금이 모자랍니다`
+                ? `연금 상한 ${fmt(maxPensionKeepingNeed)}만원 · 더 넣으면 ${needLabel}이 모자랍니다`
                 : `연금 한도까지 ${fmt(sliderMax - plan.pensionManwon)}만원 남았습니다`}
             </p>
           </>

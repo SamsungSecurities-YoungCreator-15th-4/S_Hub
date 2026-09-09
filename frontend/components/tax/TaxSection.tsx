@@ -390,6 +390,7 @@ export default function TaxSection() {
               onPensionRequestChange={setPensionRequest}
               needManwon={customer.nearTermNeedManwon}
               needYears={customer.nearTermNeedYears ?? 0}
+              needLabel={customer.nearTermNeedLabel ?? "근시일 필요자금"}
               maxPensionKeepingNeed={pensionCeilingForNeed}
               targetReturnPct={ips.returnPct}
               horizonYears={customer.horizonYears}

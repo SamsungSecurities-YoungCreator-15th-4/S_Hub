@@ -91,28 +91,6 @@ export const CVAR_CONTRIBUTIONS: AllocationRow[] = [
 export const CVAR_CONTRIBUTION_NOTE =
   "국내주식은 보유 비중 42.0%보다 손실 기여도가 높습니다.";
 
-// ── ⑤ 스트레스 시나리오 ─────────────────────────────────────────
-
-interface StressRow {
-  key: string;
-  label: string;
-  lossPct: number;
-  lossKrw: number;
-}
-
-/** 손실은 음수로 둔다 — 화면에서 부호를 붙이지 않고 값 그대로 읽게 한다. */
-export const STRESS_SCENARIOS: StressRow[] = [
-  { key: "gfc_2008", label: "2008 글로벌 금융위기", lossPct: -32.4, lossKrw: -32_400_000 },
-  { key: "covid_2020", label: "2020 팬데믹 급락", lossPct: -21.7, lossKrw: -21_700_000 },
-  { key: "rates_2022", label: "2022 금리 급등", lossPct: -16.8, lossKrw: -16_800_000 },
-];
-
-/** 최악 시나리오 키 — 화면이 강조할 행. */
-export const WORST_STRESS_KEY = "gfc_2008";
-
-export const STRESS_NOTE =
-  "2020 시나리오 기준 손실액이 근시일 필요자금 2,000만원을 상회합니다.";
-
 // ── ⑥ 인용·출처 ─────────────────────────────────────────────────
 
 interface CitationRow {

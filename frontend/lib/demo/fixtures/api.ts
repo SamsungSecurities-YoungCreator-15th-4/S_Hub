@@ -195,9 +195,19 @@ export function demoClientList(): ListedClient[] {
   return [];
 }
 
-/** 지난 상담 목록. mockData 의 PAST_CONSULTATIONS 를 목록 타입으로 옮긴다. */
-export function demoConsultationList(): ConsultationSummaryItem[] {
-  return PAST_CONSULTATIONS.map((c) => ({
+/**
+ * 지난 상담 목록. mockData 의 PAST_CONSULTATIONS 를 목록 타입으로 옮긴다.
+ *
+ * 고객 이름으로 거른다 — 거르지 않으면 다른 고객의 상담 기록이 목록에 뜨고,
+ * 상담 전 고객 화면에도 이름이 남는다.
+ */
+export function demoConsultationList(
+  customerName?: string,
+): ConsultationSummaryItem[] {
+  const rows = customerName
+    ? PAST_CONSULTATIONS.filter((c) => c.title.includes(customerName))
+    : PAST_CONSULTATIONS;
+  return rows.map((c) => ({
     consultationId: c.id,
     transcriptTitle: c.title,
     consultationDate: "",

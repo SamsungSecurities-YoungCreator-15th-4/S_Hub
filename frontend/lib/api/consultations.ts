@@ -30,11 +30,17 @@ export interface ConsultationSummaryItem {
   consultationDate: string;
 }
 
-/** 선택 고객의 지난 상담 목록(최신순). 실패 시 빈 목록 + 사유. */
+/**
+ * 선택 고객의 지난 상담 목록(최신순). 실패 시 빈 목록 + 사유.
+ *
+ * `customerName` 은 백엔드 없이 도는 경로에서만 쓴다 — 라이브는 client_id 로
+ * 서버가 이미 거르므로 무시된다.
+ */
 export async function listConsultations(
   clientId: string,
+  customerName?: string,
 ): Promise<ApiResult<ConsultationSummaryItem[]>> {
-  if (IS_DEMO) return demo(demoConsultationList());
+  if (IS_DEMO) return demo(demoConsultationList(customerName));
 
   try {
     const res = await apiGet<ConsultationListResponse>(

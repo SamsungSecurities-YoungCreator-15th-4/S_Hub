@@ -1010,6 +1010,13 @@ function PortfolioPage() {
               <SectionBar />
               <div style={{ fontSize: 14, fontWeight: 800, color: TEXT }}>
                 Stress Test
+                {/* 어느 안의 손실인지 밝힌다 — 리스크 리포트의 같은 이름 표는
+                    현재 포트폴리오를 보므로 값이 다른 것이 정상이다. */}
+                <span
+                  style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: MUTED }}
+                >
+                  {selectedPf.name} 기준
+                </span>
               </div>
             </div>
 
