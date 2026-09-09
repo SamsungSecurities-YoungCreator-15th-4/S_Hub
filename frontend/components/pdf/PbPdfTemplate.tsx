@@ -714,7 +714,7 @@ function PortfolioPage() {
     { p: portB, alloc: buildPdfAllocation(portB), label: "수익추구", badge: "", badgeColor: "#2C7BFF", headerColor: "#2C7BFF", selected: selId === "b" },
   ];
 
-  const perfRows = buildPdfPerfRows(storePortfolios);
+  const perfRows = buildPdfPerfRows(storePortfolios, aumEokwon);
 
   // ── Stress Test ─────────────────────────────────────────────────
   // 화면 카드(StressTestSection)와 같은 runStress 를 쓴다 — 리포트 숫자가

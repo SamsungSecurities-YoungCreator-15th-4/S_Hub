@@ -1,6 +1,6 @@
 /**
  * 고객용 PDF 템플릿 — A4 세로(794×1123px) 고정, 5페이지.
- * 구조: 표지 → 시장&IPS → 포트폴리오 비교&지표 → 절세&계좌 → 분산투자&상관관계
+ * 구조: 표지 → 시장&IPS → 포트폴리오 비교&지표 → 절세&계좌
  */
 
 import { useDashboardStore } from "@/lib/store";
@@ -8,9 +8,6 @@ import { formatSharpe } from "@/lib/sharpe";
 import {
   buildPdfAllocation,
   buildPdfMacroCell,
-  buildPdfCorrHeatmap,
-  heatBg,
-  heatTextColor,
 } from "@/lib/pdfPortfolioData";
 import {
   buildPdfTaxEffect,
@@ -643,7 +640,7 @@ function MarketIpsPage() {
         </div>
       </div>
 
-      <PageFooter page={2} total={5} />
+      <PageFooter page={2} total={4} />
     </div>
   );
 }
@@ -1067,7 +1064,7 @@ function PortfolioPage() {
         </div>
       </div>
 
-      <PageFooter page={3} total={5} />
+      <PageFooter page={3} total={4} />
     </div>
   );
 }
@@ -1707,323 +1704,7 @@ function TaxPage() {
         </div>
       </div>
 
-      <PageFooter page={4} total={5} />
-    </div>
-  );
-}
-
-// ── Page 5: 분산투자 & 상관관계 ────────────────────────────────────
-
-// 상관관계 히트맵은 이제 PDF 에만 남아 있다(대시보드 컴포넌트는 제거됨).
-// 색상 공식: rgba(0,100,255, 0.06 + v * 0.8) — 이 파일이 기준이다.
-const ASSET_CARDS = [
-  {
-    title: "저쿠폰 장기채",
-    corr: "주식과 상관계수: −0.3 ~ −0.5",
-    body: "금리가 내릴 때 가격이 크게 오르는 채권입니다. 주식 시장 하락 시 포트폴리오를 안정시키는 역할을 합니다.",
-  },
-  {
-    title: "해외 배당주",
-    corr: "국내주식과 상관계수: 0.4~0.6",
-    body: "미국 등 해외 고배당 주식은 국내 주식과 완전히 같이 움직이지 않아 분산 효과가 있습니다. 환율 상승 시 추가 이익도 기대할 수 있습니다.",
-  },
-  {
-    title: "분리과세 채권 ETF",
-    corr: "주식과 상관계수: 0.1~0.2",
-    body: "세금 면에서 유리하게 설계된 채권 ETF입니다. 주식과 거의 독립적으로 움직여 안정적인 수익을 제공하면서 세금도 줄여줍니다.",
-  },
-  {
-    title: "리츠 (부동산 ETF)",
-    corr: "주식과 상관계수: 0.5~0.7",
-    body: "부동산에 간접 투자하는 방법으로, 정기적인 배당 수익을 기대할 수 있습니다. 실물 부동산보다 유동성이 높아 필요 시 빠르게 현금화됩니다.",
-  },
-];
-
-// 히트맵 레이아웃 — 자산 개수에 따라 셀 너비를 동적으로 계산(페이지 폭 안에 맞춤)
-const HEATMAP_AVAIL = 714; // 794 - 좌우 패딩 40*2
-const HEATMAP_LABEL_COL = 56;
-const HEATMAP_GAP = 2;
-
-function DiversificationPage() {
-  const heatmap = useDashboardStore((s) => s.correlationHeatmap);
-  const selectedPortfolioId = useDashboardStore((s) => s.selectedPortfolioId);
-  const storePortfolios = useDashboardStore((s) => s.portfolios);
-  // 대시보드와 동일하게 '선택한 포트폴리오'의 비중>0 자산 기준으로 히트맵을 구성한다.
-  const selectedPf =
-    storePortfolios.find((p) => p.id === selectedPortfolioId) ??
-    storePortfolios.find((p) => p.id === "a") ??
-    storePortfolios[0];
-  const {
-    labels: corrLabels,
-    matrix: corrMatrix,
-    isFallback: corrIsFallback,
-  } = buildPdfCorrHeatmap(heatmap, selectedPf);
-  const heatCellW = Math.max(
-    40,
-    Math.min(
-      96,
-      Math.floor((HEATMAP_AVAIL - HEATMAP_LABEL_COL) / corrLabels.length) -
-        HEATMAP_GAP,
-    ),
-  );
-  const heatTableW =
-    HEATMAP_LABEL_COL + corrLabels.length * (heatCellW + HEATMAP_GAP);
-  return (
-    <div
-      data-pdf-page=""
-      style={{
-        width: 794,
-        height: 1123,
-        fontFamily: "Pretendard, Apple SD Gothic Neo, sans-serif",
-        background: "white",
-        position: "relative",
-        overflow: "hidden",
-      }}
-    >
-      {/* 페이지 헤더 바 */}
-      <div
-        style={{
-          background: `linear-gradient(90deg, ${BRAND_DARK} 0%, ${BRAND} 100%)`,
-          padding: "19px 40px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}
-      >
-        <div>
-          <div style={{ fontSize: 18, fontWeight: 800, color: "white" }}>
-            분산투자 효과 — 상관관계가 낮은 대체자산이란?
-          </div>
-          <div
-            style={{
-              fontSize: 13,
-              color: "rgba(255,255,255,0.75)",
-              marginTop: 2,
-            }}
-          >
-            왜 여러 자산을 함께 보유해야 하는지 이해하기
-          </div>
-        </div>
-      </div>
-
-      <div style={{ padding: "24px 40px 80px", wordBreak: "keep-all" }}>
-        {/* 상관관계 설명 박스 */}
-        <div
-          style={{
-            background: BG_ALT,
-            border: `1px solid ${BORDER}`,
-            borderRadius: 10,
-            padding: "14px 18px",
-            marginBottom: 22,
-          }}
-        >
-          <div
-            style={{
-              fontSize: 13,
-              fontWeight: 800,
-              color: BRAND,
-              marginBottom: 6,
-            }}
-          >
-            상관관계(Correlation)란?
-          </div>
-          <p style={{ fontSize: 12, color: TEXT, lineHeight: 1.7, margin: 0 }}>
-            두 자산이 함께 움직이는 정도를 나타냅니다. −1에 가까울수록 반대로
-            움직이고, +1에 가까울수록 같이 움직입니다. 주식과{" "}
-            <strong>상관관계가 낮거나 음(−)인 자산을 함께 보유하면</strong>,
-            주식이 하락할 때 손실을 줄여주는 효과가 있습니다.
-          </p>
-        </div>
-
-        {/* 상관관계 매트릭스 — 백엔드 correlation_heatmap 응답 기준 */}
-        <div style={{ marginBottom: 40 }}>
-          <div
-            style={{
-              fontSize: 12,
-              fontWeight: 800,
-              color: TEXT,
-              marginBottom: 10,
-            }}
-          >
-            자산별 상관관계 히트맵
-          </div>
-
-          {/* 히트맵 테이블 — 선택 포트폴리오의 비중>0 자산 기준(대시보드 동일) */}
-          <table style={{ borderCollapse: "separate", borderSpacing: HEATMAP_GAP }}>
-            <thead>
-              <tr>
-                <th style={{ width: HEATMAP_LABEL_COL, padding: 0 }} />
-                {corrLabels.map((g, ci) => (
-                  <th
-                    key={`${g}-${ci}`}
-                    style={{
-                      width: heatCellW,
-                      paddingBottom: 4,
-                      fontSize: 10,
-                      fontWeight: 600,
-                      color: MUTED,
-                      textAlign: "center",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {g}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {corrMatrix.map((row, ri) => (
-                <tr key={ri}>
-                  <td
-                    style={{
-                      width: HEATMAP_LABEL_COL,
-                      fontSize: 10,
-                      fontWeight: 600,
-                      color: MUTED,
-                      paddingRight: 8,
-                      textAlign: "right",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {corrLabels[ri]}
-                  </td>
-                  {row.map((v, ci) => (
-                    <td
-                      key={ci}
-                      style={{
-                        width: heatCellW,
-                        height: 40,
-                        background: heatBg(v),
-                        textAlign: "center",
-                        fontSize: 11,
-                        fontWeight: 700,
-                        color: heatTextColor(v),
-                        borderRadius: 3,
-                      }}
-                    >
-                      {v.toFixed(2)}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          {corrIsFallback && (
-            <div
-              style={{
-                marginTop: 6,
-                fontSize: 9,
-                color: MUTED,
-                fontStyle: "italic",
-              }}
-            >
-              ※ 분석 전 대표 참고값(국내 금융시장 학술 추정치)입니다. 분석 후
-              실제 포트폴리오 기반 값으로 업데이트됩니다.
-            </div>
-          )}
-
-          {/* 범례 — 그라디언트 바 */}
-          <div
-            style={{
-              marginTop: 12,
-              width: heatTableW,
-              paddingLeft: HEATMAP_LABEL_COL + 8,
-            }}
-          >
-            <div
-              style={{
-                height: 12,
-                borderRadius: 6,
-                background:
-                  "linear-gradient(to right, rgba(0,100,255,0.06), rgba(0,100,255,0.26), rgba(0,100,255,0.46), rgba(0,100,255,0.66), rgba(0,100,255,0.86))",
-                marginBottom: 4,
-              }}
-            />
-            {/* 눈금 라벨 */}
-            <div style={{ display: "flex", justifyContent: "space-between" }}>
-              {[
-                { v: 0.0, label: "0.0\n매우 낮음" },
-                { v: 0.25, label: "0.25\n낮음" },
-                { v: 0.5, label: "0.50\n중간" },
-                { v: 0.75, label: "0.75\n높음" },
-                { v: 1.0, label: "1.0\n매우 높음" },
-              ].map(({ v, label }) => (
-                <div key={v} style={{ textAlign: "center" }}>
-                  {label.split("\n").map((line, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        fontSize: 9,
-                        color: i === 0 ? TEXT : MUTED,
-                        fontWeight: i === 0 ? 700 : 500,
-                        lineHeight: 1.4,
-                      }}
-                    >
-                      {line}
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* 대체자산 4종 카드 */}
-        <div
-          style={{ display: "flex", alignItems: "center", marginBottom: 28 }}
-        >
-          <SectionBar />
-          <div style={{ fontSize: 14, fontWeight: 800, color: TEXT }}>
-            분산 효과가 있는 대체자산 4종
-          </div>
-        </div>
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: 12,
-            marginBottom: 24,
-          }}
-        >
-          {ASSET_CARDS.map((c) => (
-            <div
-              key={c.title}
-              style={{
-                border: `1px solid ${BORDER}`,
-                borderRadius: 10,
-                padding: "14px 16px",
-                background: "white",
-              }}
-            >
-              <div
-                style={{
-                  fontSize: 13,
-                  fontWeight: 800,
-                  color: TEXT,
-                  marginBottom: 4,
-                }}
-              >
-                {c.title}
-              </div>
-
-              <p
-                style={{
-                  fontSize: 11,
-                  color: TEXT,
-                  lineHeight: 1.6,
-                  margin: 0,
-                }}
-              >
-                {c.body}
-              </p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <PageFooter page={5} total={5} />
+      <PageFooter page={4} total={4} />
     </div>
   );
 }
@@ -2037,7 +1718,6 @@ export default function ClientPdfTemplate() {
       <MarketIpsPage />
       <PortfolioPage />
       <TaxPage />
-      <DiversificationPage />
     </>
   );
 }
