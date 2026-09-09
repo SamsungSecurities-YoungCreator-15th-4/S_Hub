@@ -6,7 +6,6 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AccountAllocation from "@/components/tax/AccountAllocation";
 import TaxWaterfall from "@/components/tax/TaxWaterfall";
-import AsOfNote from "@/components/common/AsOfNote";
 import HelpTooltip from "@/components/common/HelpTooltip";
 // 계좌별 활용도 막대(AccountAllocation)와 이름이 헷갈리지 않도록 "납입 배분"으로 둔다.
 import ContributionSplit from "@/components/tax/ContributionSplit";
@@ -236,8 +235,6 @@ export default function TaxSection() {
               연동 완료
             </div>
           ) : null}
-          {/* 절세 수치는 백엔드 계산값이라 인용할 외부 출처가 없어 기준일만 적는다. */}
-          <AsOfNote source="KRW" />
         </div>
         <TabsList className="h-auto rounded-lg bg-muted p-0.5">
           <TabsTrigger
@@ -265,6 +262,12 @@ export default function TaxSection() {
                   {baseLabel}
                 </span>
               </div>
+              {/*
+                절세 효과 금액이 없으면 아무것도 적지 않는다. "분석 후 계산됩니다"
+                라고 적어 두었는데, 같은 패널의 세후 수익률·세금 흐름·계좌 배치는
+                이미 값을 보여주고 있어 화면이 스스로 어긋났다. 분석해도 이 숫자만
+                채워지지 않는 상태라 안내가 지켜지지도 않았다.
+              */}
               {annualSavingManwon != null ? (
                 <p
                   className={`mt-1.5 flex items-baseline gap-1.5 text-[13px] font-bold ${annualSavingManwon > 0 ? "text-up" : "text-foreground"}`}
@@ -276,11 +279,7 @@ export default function TaxSection() {
                   </b>
                   <span className="text-[12px] font-extrabold">만원</span>
                 </p>
-              ) : (
-                <p className="mt-1.5 text-[13px] font-bold text-muted-foreground">
-                  분석 후 계산됩니다
-                </p>
-              )}
+              ) : null}
               {selectedTax?.summary && (
                 <p className="mt-1 text-[13px] font-semibold text-muted-foreground">
                   {selectedTax.summary}

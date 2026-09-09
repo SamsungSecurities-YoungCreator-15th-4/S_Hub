@@ -20,35 +20,11 @@ export const REPORT_META = {
   confidenceLevelPct: 99,
 } as const;
 
-// ── 현재 자산 배분 (11종) ────────────────────────────────────────
-// 리스크 연산은 6개 자산군 기준이지만, 배분 표기는 대시보드와 같은 11종으로 둔다.
-
+/** 라벨 + 비중(%) 한 줄. 배분 집계·기여도 표가 공유한다. */
 export interface AllocationRow {
   label: string;
   weightPct: number;
 }
-
-export const CURRENT_ALLOCATION: AllocationRow[] = [
-  { label: "국내주식", weightPct: 42 },
-  { label: "해외성장주", weightPct: 26 },
-  { label: "금", weightPct: 12 },
-  { label: "국내일반채권", weightPct: 12 },
-  { label: "해외배당주", weightPct: 8 },
-  { label: "신흥국주식", weightPct: 0 },
-  { label: "해외채권", weightPct: 0 },
-  { label: "저쿠폰·장기채", weightPct: 0 },
-  { label: "분리과세채권", weightPct: 0 },
-  { label: "리츠", weightPct: 0 },
-  { label: "인프라펀드", weightPct: 0 },
-];
-
-/** 배분 집계 — 11종을 대분류로 묶은 값. */
-export const ALLOCATION_SUMMARY: AllocationRow[] = [
-  { label: "주식", weightPct: 76 },
-  { label: "대체", weightPct: 12 },
-  { label: "채권", weightPct: 12 },
-  { label: "현금", weightPct: 0 },
-];
 
 // ── ② IPS 충돌 검사 ──────────────────────────────────────────────
 

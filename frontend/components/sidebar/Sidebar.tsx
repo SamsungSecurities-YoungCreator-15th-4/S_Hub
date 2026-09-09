@@ -138,7 +138,6 @@ export default function Sidebar() {
     resetRunStatus,
     setAnalyzeRejected,
     analyzeRejected,
-    setProposedWeightsDirty,
     proposedWeightsDirty,
     runStatusReason,
   } = useDashboardStore();
@@ -368,7 +367,8 @@ export default function Sidebar() {
   const handleGateApprove = () => {
     setGateOpen(false);
     setAnalyzeRejected(false);
-    setProposedWeightsDirty(false);
+    // 조정안은 지우지 않는다 — 조정한 안을 확정하려고 승인하는 것이라,
+    // 여기서 되돌리면 제안 조정을 할 이유가 없어진다.
     resetRunStatus();
     setRunStatus(RUN_STATUS.REVIEWED);
     void handleAnalyze();

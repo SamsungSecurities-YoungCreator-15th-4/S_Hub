@@ -30,11 +30,18 @@ const BENCHMARK_KEY: Record<Benchmark, string> = {
   "MSCI ACWI": "msciAcwi",
 };
 
-const LINES = [
-  { key: "current", name: "현재", color: "#8B95A1", width: 2 },
-  { key: "a", name: "A", color: "#0064FF", width: 2.6 },
-  { key: "b", name: "B", color: "#5B9BFF", width: 2 },
-] as const;
+/**
+ * 그릴 선 — 현재와 "지금 고른 제안" 둘이다.
+ *
+ * 제안 카드가 세그먼트 한 장으로 합쳐져 화면에 제안이 하나씩만 보이므로,
+ * 백테스트도 A·B 를 동시에 긋지 않는다. 선택한 안만 따라간다.
+ */
+function linesFor(proposalKey: "a" | "b") {
+  return [
+    { key: "current", name: "현재", color: "#8B95A1", width: 2 },
+    { key: proposalKey, name: "제안", color: "#0064FF", width: 2.6 },
+  ];
+}
 
 const BENCHMARK_COLOR = "#DC2626";
 
@@ -44,7 +51,7 @@ const pctFmt = (v: number) => {
   return `${ret >= 0 ? "+" : ""}${ret.toFixed(1)}%`;
 };
 
-/** 중앙 중단: 현재/A/B 백테스트 다중 선그래프 (최근 5년, 누적 수익률 표시) */
+/** 중앙 중단: 현재·제안 백테스트 선그래프 (최근 5년, 누적 수익률 표시) */
 export default function BacktestChart() {
   const [benchmark, setBenchmark] = useState<Benchmark>("KOSPI");
   const helpMode = useDashboardStore((s) => s.helpMode);
@@ -52,6 +59,11 @@ export default function BacktestChart() {
   const portfolioSource = useDashboardStore((s) => s.portfolioSource);
   const portfolioNote = useDashboardStore((s) => s.portfolioNote);
   const analyzing = useDashboardStore((s) => s.analyzing);
+  const selectedPortfolioId = useDashboardStore((s) => s.selectedPortfolioId);
+
+  // 제안 카드의 선택과 같은 값을 본다. "제안 조정" 은 백테스트 시계열이 없으므로
+  // 그때도 마지막으로 고른 제안(a·b)을 그대로 따라간다.
+  const lines = linesFor(selectedPortfolioId === "b" ? "b" : "a");
 
   const displayPortfolios = portfolios;
 
@@ -162,8 +174,8 @@ export default function BacktestChart() {
           ) : null}
         </div>
         <div className="flex items-center gap-3">
-          {/* 현재/A/B 범례 */}
-          {LINES.map((l) => (
+          {/* 현재·제안 범례 */}
+          {lines.map((l) => (
             <span
               key={l.key}
               className="flex items-center gap-1.5 text-[12px] font-bold text-muted-foreground"
@@ -224,7 +236,7 @@ export default function BacktestChart() {
                 const label =
                   name === benchKey
                     ? benchmark
-                    : (LINES.find((l) => l.key === name)?.name ?? String(name));
+                    : (lines.find((l) => l.key === name)?.name ?? String(name));
                 return [
                   value != null ? `${pctFmt(Number(value))} (${value})` : "-",
                   label,
@@ -252,7 +264,7 @@ export default function BacktestChart() {
               dot={false}
               isAnimationActive={false}
             />
-            {LINES.map((l) => (
+            {lines.map((l) => (
               <Line
                 key={l.key}
                 type="monotone"

@@ -295,6 +295,31 @@ function seedFromProposal(
   ) as CurrentWeightsInput;
 }
 
+/**
+ * 상담 이력이 있는 고객의 복원값. 상담 전(isNew)이면 null.
+ *
+ * 첫 로드와 고객 전환이 같은 식을 쓴다 — 예전에는 전환에만 복원이 걸려 있어,
+ * 사이트를 처음 열었을 때와 같은 고객을 다시 고른 뒤의 화면이 달랐다.
+ *
+ * 자산 배분만 이 고객의 비중으로 갈아 끼운다. 6지표·백테스트는 비중에서
+ * 산출할 경로가 프론트에 없어 픽스처 값을 그대로 쓴다
+ * (`lib/mockData.ts` withCurrentWeights 주석과 같은 이유).
+ */
+function restoredForCustomer(c: Customer | undefined) {
+  return !c?.isNew && c?.currentWeights
+    ? {
+        ips: { ...(c.ips ?? IPS_DEFAULT) },
+        currentWeightsInput: { ...c.currentWeights },
+        portfolios: withCurrentWeights(PORTFOLIOS, c.currentWeights),
+        portfolioSource: "fallback" as DataSource,
+        portfolioNote: "지난 상담 회차의 결과입니다.",
+      }
+    : null;
+}
+
+/** 첫 화면의 복원값 — 목록 첫 고객 기준. */
+const INITIAL_RESTORED = restoredForCustomer(CUSTOMERS[0]);
+
 export const useDashboardStore = create<DashboardState>((set) => ({
   customers: [...CUSTOMERS],
   selectedCustomerId: CUSTOMERS[0].id,
@@ -355,8 +380,25 @@ export const useDashboardStore = create<DashboardState>((set) => ({
       portfolioNote: note,
       isStressMode: false,
       weightsTab: "proposed",
-      proposedWeightsInput: seedFromProposal(portfolios, s.selectedPortfolioId),
-      proposedWeightsDirty: false,
+      /*
+        이미 손본 조정안은 그대로 둔다.
+
+        전에는 분석 결과가 올 때마다 선택한 제안의 값으로 다시 심고 dirty 를
+        내렸다. 그러면 조정 → 승인 → 조정값 소멸이 되어, 조정한 안을 확정하려고
+        승인했는데 그 안이 사라졌다. 조정을 할 이유가 없어지는 동작이었다.
+
+        손대지 않은 상태에서는 종전대로 선택한 제안을 심는다 — 그때의 조정안은
+        선택한 제안과 같은 안이라 심어 둬야 출발점이 생긴다.
+      */
+      ...(s.proposedWeightsDirty
+        ? {}
+        : {
+            proposedWeightsInput: seedFromProposal(
+              portfolios,
+              s.selectedPortfolioId,
+            ),
+            proposedWeightsDirty: false,
+          }),
     })),
   setStressPortfolios: (portfolios) => set({ portfolios, isStressMode: true }),
 
@@ -451,18 +493,7 @@ export const useDashboardStore = create<DashboardState>((set) => ({
         복원값의 출처는 고객 레코드 하나뿐이다(`lib/mockData.ts` CUSTOMERS).
         여기서 숫자를 만들지 않는다.
       */
-      const restored = !target?.isNew && target?.currentWeights
-        ? {
-            ips: { ...(target.ips ?? IPS_DEFAULT) },
-            currentWeightsInput: { ...target.currentWeights },
-            // 자산 배분만 이 고객의 비중으로 갈아 끼운다. 6지표·백테스트는
-            // 비중에서 산출할 경로가 프론트에 없어 픽스처 값을 그대로 쓴다
-            // (`lib/mockData.ts` withCurrentWeights 주석과 같은 이유).
-            portfolios: withCurrentWeights(PORTFOLIOS, target.currentWeights),
-            portfolioSource: "fallback" as DataSource,
-            portfolioNote: "지난 상담 회차의 결과입니다.",
-          }
-        : null;
+      const restored = restoredForCustomer(target);
 
       const next: Partial<DashboardState> = {
         selectedCustomerId: id,
@@ -571,6 +602,12 @@ export const useDashboardStore = create<DashboardState>((set) => ({
     set({ transcript, transcriptSource: source }),
   setConsultationId: (id) => set({ consultationId: id }),
   setSttStatus: (status, note) => set({ sttStatus: status, sttNote: note }),
+  /*
+    첫 화면도 고객 전환과 같은 복원을 태운다. 예전에는 전환에만 걸려 있어,
+    사이트를 처음 열었을 때와 그 고객을 다시 고른 뒤의 화면이 달랐다.
+    데이터 키만 덮으므로 위의 액션 함수들은 그대로다.
+  */
+  ...(INITIAL_RESTORED ?? {}),
 }));
 
 // ── 실행 상태 셀렉터 ──
