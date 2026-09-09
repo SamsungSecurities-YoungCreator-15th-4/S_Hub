@@ -175,17 +175,27 @@ export default function ReportDetailModal({ onClose }: { onClose: () => void }) 
 
 function Block({
   title,
+  sub,
   children,
   note,
 }: {
   title: string;
+  /** 제목 옆 부가정보(건수·조건). 백테스트 제목과 같은 방식이다. */
+  sub?: string;
   children: React.ReactNode;
   /** 블록 하단 한 줄. 이 블록을 어떻게 읽어야 하는지의 안내다. */
   note?: string;
 }) {
   return (
     <section className="rounded-xl border bg-card p-4">
-      <h3 className="mb-2.5 text-[13px] font-extrabold">{title}</h3>
+      <h3 className="mb-2.5 text-[13px] font-extrabold">
+        {title}
+        {sub && (
+          <span className="ml-1.5 text-[11px] font-semibold text-muted-foreground">
+            {sub}
+          </span>
+        )}
+      </h3>
       {children}
       {note && (
         <p className="mt-2.5 text-[11px] font-semibold leading-relaxed text-muted-foreground">
@@ -268,7 +278,8 @@ function AllocationBlock() {
 function ConflictBlock() {
   return (
     <Block
-      title={`IPS 충돌 검사 — ${IPS_CONFLICTS.length}건`}
+      title="IPS 충돌 검사"
+      sub={`${IPS_CONFLICTS.length}건`}
       note={IPS_CONFLICT_NOTE}
     >
       <div className="space-y-2">
@@ -306,7 +317,8 @@ function ConflictBlock() {
 function RiskMetricBlock() {
   return (
     <Block
-      title={`VaR / CVaR — 신뢰수준 ${REPORT_META.confidenceLevelPct}% · ${formatWon(REPORT_META.totalValuationKrw)} 기준`}
+      title="VaR / CVaR"
+      sub={`신뢰수준 ${REPORT_META.confidenceLevelPct}% · ${formatWon(REPORT_META.totalValuationKrw)} 기준`}
     >
       <div className="overflow-x-auto">
         <table className="w-full min-w-[520px] border-collapse">
@@ -347,7 +359,8 @@ function ContributionBlock() {
   const max = Math.max(...CVAR_CONTRIBUTIONS.map((r) => r.weightPct), 1);
   return (
     <Block
-      title={`CVaR 자산군 기여도 — 6자산군 · 합계 ${total.toFixed(1)}%`}
+      title="CVaR 자산군 기여도"
+      sub={`6자산군 · 합계 ${total.toFixed(1)}%`}
       note={CVAR_CONTRIBUTION_NOTE}
     >
       <div className="space-y-1.5">
@@ -378,7 +391,8 @@ function StressBlock() {
     STRESS_SCENARIOS[0];
   return (
     <Block
-      title={`스트레스 시나리오 — ${STRESS_SCENARIOS.length}종`}
+      title="스트레스 시나리오"
+      sub={`${STRESS_SCENARIOS.length}종`}
       note={STRESS_NOTE}
     >
       <div className="rounded-lg border border-down/30 bg-down/5 p-3">
@@ -427,7 +441,7 @@ function StressBlock() {
 
 function CitationBlock() {
   return (
-    <Block title={`인용·출처 — ${CITATIONS.length}건`}>
+    <Block title="인용·출처" sub={`${CITATIONS.length}건`}>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[520px] border-collapse">
           <thead>
@@ -460,7 +474,8 @@ function VerificationBlock() {
   const passed = VERIFICATIONS.filter((v) => v.passed).length;
   return (
     <Block
-      title={`검증 항목 — ${passed}/${VERIFICATIONS.length} 통과`}
+      title="검증 항목"
+      sub={`${passed}/${VERIFICATIONS.length} 통과`}
       note={VERIFICATION_NOTE}
     >
       <div className="grid gap-x-6 gap-y-1 sm:grid-cols-2">
@@ -488,7 +503,8 @@ function VerificationBlock() {
 function HashBlock() {
   return (
     <Block
-      title={`재현성 해시 — 엔진 ${REPORT_META.engineVersion}`}
+      title="재현성 해시"
+      sub={`엔진 ${REPORT_META.engineVersion}`}
       note={REPRODUCIBILITY_NOTE}
     >
       <div className="space-y-1">
