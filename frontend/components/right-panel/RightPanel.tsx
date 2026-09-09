@@ -16,6 +16,12 @@ import { useAutoCollapse } from "@/lib/useAutoCollapse";
 import { useDashboardStore, useRunStatus } from "@/lib/store";
 import { RUN_STATUS, canTransition } from "@/lib/runStatus";
 
+/**
+ * IPS 반영 거절 사유. 좌측 분석 게이트의 ANALYZE_REJECT_REASON 과 같은 문형이다 —
+ * 두 게이트는 같은 성격의 승인이라 화면 문구도 같은 모양으로 읽혀야 한다.
+ */
+const IPS_REFLECT_REJECT_REASON = "IPS 반영을 거절했습니다";
+
 /** 우측 패널: 시나리오 Test + AI 인사이트 — 여닫기 토글 포함 */
 export default function RightPanel() {
   const [isOpen, setIsOpen] = useAutoCollapse(1280);
@@ -29,6 +35,8 @@ export default function RightPanel() {
 
   const summary =
     insightResult?.source !== "empty" ? insightResult?.data?.summary : null;
+  /** 요약이 붙을 자리. 다이얼로그가 붙기 전 상태를 그대로 보여준다. */
+  const uniqueBefore = (ips.unique ?? "").trim();
 
   const handleIpsReflect = () => {
     if (!summary) return;
@@ -38,8 +46,9 @@ export default function RightPanel() {
 
   const handleConfirm = () => {
     if (!summary) return;
-    const prev = (ips.unique ?? "").trim();
-    setIps({ unique: prev ? `${prev}\n${summary}` : summary });
+    setIps({
+      unique: uniqueBefore ? `${uniqueBefore}\n${summary}` : summary,
+    });
     setConfirmOpen(false);
     setReflectRejected(false);
     // PB가 IPS 변경을 승인했으므로 reviewed 로 올린다.
@@ -79,6 +88,17 @@ export default function RightPanel() {
 
       <InsightSection />
 
+      {/*
+        좌측 분석하기와 같은 자리(버튼 바로 위)·같은 문형으로 적는다. 버튼 아래에
+        두면 패널 맨 끝이라 화면 밖으로 밀려 보이지 않는다 — 거절했는데 아무
+        반응이 없는 것처럼 읽힌다.
+      */}
+      {reflectRejected && (
+        <p className="-mb-1 px-0.5 text-[11px] font-semibold text-destructive">
+          {IPS_REFLECT_REJECT_REASON}
+        </p>
+      )}
+
       <HelpTooltip
         text="PB 승인 시, AI 분석 요약 답변이 좌측 패널 IPS Unique 항목에 추가되어 포트폴리오 분석에 활용됩니다."
         placement="top"
@@ -93,30 +113,45 @@ export default function RightPanel() {
         </Button>
       </HelpTooltip>
 
-      {/* 좌측 분석 게이트 거절 표기와 같은 문형으로 적는다. */}
-      {reflectRejected && (
-        <p className="-mt-1 text-[11px] font-semibold text-destructive">
-          IPS 반영을 거절했습니다
-        </p>
-      )}
-
       {/* IPS 승인 확인 — 닫기(X) 없이 승인/거절만 두던 기존 UI를 그대로 두고,
           ESC·백드롭 클릭·포커스 트랩만 Dialog 프리미티브에서 얻는다. */}
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <DialogContent
           showCloseButton={false}
           overlayClassName="bg-black/40 backdrop-blur-sm"
-          className="block w-80 rounded-2xl bg-card p-6 text-foreground shadow-xl sm:max-w-none"
+          className="block w-96 rounded-2xl bg-card p-6 text-foreground shadow-xl sm:max-w-none"
         >
           <DialogHeader className="block">
             <DialogTitle className="font-sans text-[15px] leading-normal font-extrabold">
               IPS에 반영하시겠습니까?
             </DialogTitle>
-            <DialogDescription className="mt-1.5 text-[13px] font-medium text-muted-foreground">
-              AI 인사이트 요약을 IPS의 <b>Unique</b> 항목에 추가합니다.
+            <DialogDescription className="mt-2 text-[13px] font-medium leading-relaxed text-muted-foreground">
+              아래 요약이 IPS의 <b>Unique</b> 항목 끝에 그대로 덧붙습니다.
             </DialogDescription>
           </DialogHeader>
-          <div className="mt-4 flex gap-2">
+
+          {/*
+            승인 대상이 보이지 않으면 승인이 형식이 된다 — 좌측 분석 게이트와 같은
+            이유로, 무엇이 어디에 붙는지를 실제 store 값으로 보여준다. Unique 는
+            이후 분석의 입력이라 붙기 전후를 함께 봐야 판단할 수 있다.
+            표시만 하고 아무 값도 바꾸지 않는다.
+          */}
+          <div className="mt-5 max-h-64 overflow-y-auto rounded-xl border p-4 text-[12px]">
+            <p className="mb-2 font-bold">추가할 내용</p>
+            <p className="whitespace-pre-wrap leading-relaxed">{summary}</p>
+
+            <p className="mt-4 mb-2 border-t pt-4 font-bold">
+              현재 IPS Unique{" "}
+              <span className="font-medium text-muted-foreground">
+                {uniqueBefore ? `(${uniqueBefore.length}자)` : "(비어 있음)"}
+              </span>
+            </p>
+            <p className="whitespace-pre-wrap leading-relaxed text-muted-foreground">
+              {uniqueBefore || "아직 입력된 특이사항이 없습니다."}
+            </p>
+          </div>
+
+          <div className="mt-5 flex gap-2">
             <Button className="flex-1" onClick={handleConfirm}>
               승인
             </Button>
