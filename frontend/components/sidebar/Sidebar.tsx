@@ -871,10 +871,13 @@ export default function Sidebar() {
         </Button>
 
         {/* 거절 직후 — 분석을 돌리지 않았다는 사실을 좌측에 남긴다.
-            중앙의 직전 결과는 그대로 두므로 화면이 비지 않는다. */}
+            중앙의 직전 결과는 그대로 두므로 화면이 비지 않는다.
+
+            "검토 대기" 라는 말은 쓰지 않는다 — runStatus 의 blocked 라벨이
+            "확정 차단 · 수동검토 대기" 이고 그쪽은 Judge 미통과라 다른 상태다. */}
         {analyzeRejected && (
-          <p className="rounded-xl border border-dashed border-muted-foreground/30 bg-muted/40 px-3 py-2 text-[12px] font-semibold text-muted-foreground">
-            검토 대기 · 분석 미실행
+          <p className="rounded-xl border border-destructive/40 bg-destructive/5 px-3 py-2 text-[12px] font-semibold leading-snug text-destructive">
+            분석하지 않았습니다 · 입력을 확인하고 다시 실행하세요
           </p>
         )}
       </aside>

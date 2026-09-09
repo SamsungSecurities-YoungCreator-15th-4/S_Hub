@@ -57,21 +57,21 @@ export default function AnalyzeGateDialog({
           <DialogTitle className="font-sans text-[15px] leading-normal font-extrabold">
             이 입력으로 분석하시겠습니까?
           </DialogTitle>
-          <DialogDescription className="mt-1.5 text-[13px] font-medium text-muted-foreground">
+          <DialogDescription className="mt-2 text-[13px] font-medium leading-relaxed text-muted-foreground">
             아래 IPS와 보유 비중이 그대로 계산에 들어갑니다.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="mt-4 max-h-64 overflow-y-auto rounded-xl border p-3 text-[12px]">
-          <p className="mb-1.5 font-bold">IPS</p>
-          <dl className="grid grid-cols-2 gap-x-3 gap-y-1">
+        <div className="mt-5 max-h-64 overflow-y-auto rounded-xl border p-4 text-[12px]">
+          <p className="mb-2 font-bold">IPS</p>
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
             <Row k="목표 수익률" v={`${ips.returnPct}%`} />
             <Row k="위험 성향" v={ips.risk || "미입력"} />
             <Row k="투자 기간" v={ips.timeYears ? `${ips.timeYears}년` : "미입력"} />
             <Row k="유동성" v={ips.liquidity || "미입력"} />
           </dl>
 
-          <p className="mt-3 mb-1.5 font-bold">
+          <p className="mt-4 mb-2 border-t pt-4 font-bold">
             현재 보유 비중{" "}
             <span className="font-medium text-muted-foreground">
               (합계 {weightTotal}%)
@@ -82,7 +82,7 @@ export default function AnalyzeGateDialog({
               미입력 — 현금 100%로 계산합니다.
             </p>
           ) : (
-            <dl className="grid grid-cols-2 gap-x-3 gap-y-1">
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
               {weights.map(([id, v]) => (
                 <Row key={id} k={weightLabel(id)} v={`${v}%`} />
               ))}
@@ -90,7 +90,7 @@ export default function AnalyzeGateDialog({
           )}
         </div>
 
-        <div className="mt-4 flex gap-2">
+        <div className="mt-5 flex gap-2">
           <Button className="flex-1" onClick={onApprove}>
             승인
           </Button>
@@ -105,7 +105,7 @@ export default function AnalyzeGateDialog({
 
 function Row({ k, v }: { k: string; v: string }) {
   return (
-    <div className="flex justify-between gap-2">
+    <div className="flex justify-between gap-3">
       <dt className="text-muted-foreground">{k}</dt>
       <dd className="font-semibold">{v}</dd>
     </div>
