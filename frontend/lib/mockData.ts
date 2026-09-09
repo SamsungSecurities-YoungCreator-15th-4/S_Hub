@@ -119,8 +119,14 @@ export const CUSTOMERS: Customer[] = [
     aumLabel: "운용자산 3억원",
     aumEokwon: 3,
     salaryManwon: 8000,
-    isaUsedManwon: 2000,
-    pensionUsedManwon: 900,
+    // 총급여 8,000만원 기준 연 2,400만원(월 200만원)을 절세계좌 납입여력으로 잡는다.
+    // 법정 수치가 아니라 이 고객의 설정값이다 — 실서비스에서는 PB 가 입력한다.
+    annualContributionManwon: 2400,
+    isaUsedManwon: 2000, // 누적 납입액
+    // 3년 전 개설. 이 값이 없으면 "올해 가입"으로 계산돼(조특법 누적 산식의
+    // 경과연수 0) 상담 이력이 있는 고객인데 올해 한도만 남은 것으로 잡힌다.
+    isaYearsSinceOpen: 3,
+    pensionUsedManwon: 900, // 연금 세액공제 한도 소진
     realizedLossManwon: 0,
     marginalRatePct: 26.4,
     age: 47,
@@ -140,7 +146,7 @@ export const CUSTOMERS: Customer[] = [
       tax: "배당소득 원천징수",
       liquidity: "낮음" as "낮음" | "중간" | "높음",
       legal: "특이사항 없음",
-      unique: "배당 중심 선호 · ISA 한도 소진",
+      unique: "배당 중심 선호 · 연금 세액공제 한도 소진",
     },
     currentWeights: {
       domesticEquity: 18,
@@ -162,14 +168,22 @@ export const CUSTOMERS: Customer[] = [
     aumLabel: "운용자산 5억원",
     aumEokwon: 5,
     salaryManwon: 6000,
-    isaUsedManwon: 2000,
+    // 총급여 6,000만원 기준 연 1,800만원(월 150만원). 이사조와 같은 기준이다.
+    annualContributionManwon: 1800,
+    isaUsedManwon: 2000, // 누적 납입액
+    // 개설 4년 이상 — 누적 산식의 경과연수 상한이라 총한도 1억이 그대로 쌓인다.
+    isaYearsSinceOpen: 4,
+    // 연금저축·IRP 당해 납입액. 세액공제 한도(900만)를 넘겨 납입한 상태라
+    // 추가 납입에 대한 공제 여력은 없다.
     pensionUsedManwon: 1800,
     realizedLossManwon: 0,
     marginalRatePct: 26.4,
     age: 58,
     horizonYears: 7,
-    nearTermNeedManwon: 0,
-    nearTermNeedYears: 0,
+    // IPS Unique 의 "3년 내 인출 계획" 을 금액·시점으로 옮긴 값. 운용자산 5억의
+    // 10%를 3년 내 인출한다고 본다. 0 으로 두면 Unique 와 어긋난다.
+    nearTermNeedManwon: 5000,
+    nearTermNeedYears: 3,
     isaOpened: true,
     lastConsultedAt: "2026-07-30",
     ips: {
