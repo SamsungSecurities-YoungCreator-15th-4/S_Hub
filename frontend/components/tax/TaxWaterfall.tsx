@@ -189,7 +189,19 @@ export default function TaxWaterfall({
     const gainFromTax = isaSaving + refund;
     totalSavingManwon = gainFromSwitch + gainFromTax;
     pretaxLabel = `${selected.name} 기준 · 자산 ${(aum / 10000).toFixed(1)}억`;
-    totalLabel = "제안 적용 시 손에 남는 돈";
+    /*
+     * "손에 남는 돈" 은 세후 수익 전체로 읽혀 총액처럼 보였다. 이 값은 현재
+     * 포트폴리오를 그대로 뒀을 때와 견준 1년치 차이다.
+     *
+     * 고객 앞에서 그대로 읽는 화면이라 다른 라벨과 같은 명사구·존대 어투로
+     * 맞춘다("연간 절세 효과", "3대 절세계좌 활용 시 예상 추가 절감").
+     * "따지면" 은 따져 묻는 말로 들리고 "남는 돈"·"순증" 은 총액으로 읽히거나
+     * 어려웠다. "반영한" 이 세후라는 이 카드의 핵심을 공손하게 말한다.
+     *
+     * "연간" 은 빼지 않는다 — 금융소득도 세액공제도 매년 되풀이되는 금액인데
+     * 기간이 없으면 한 번 받는 돈으로 읽힌다.
+     */
+    totalLabel = "세금까지 반영한 연간 효과";
     /*
      * 세 값을 막대에서 직접 뺀다. 전환 이익과 ISA 절감을 따로 더하면 세금 조각에
      * 걸린 하한(Math.max(selTax - isaSaving, 0))을 지나쳐 화면과 어긋날 수 있다.
