@@ -104,23 +104,13 @@ export default function CurrentPortfolioInput() {
 
   return (
     <div className="rounded-xl border p-3">
+      {/*
+        제목과 초기화를 한 줄에 두고 세그먼트는 아래에서 폭을 다 쓴다 —
+        같은 줄에 두면 세그먼트가 눌려 두 탭이 무엇을 고르는 것인지 잘 안 읽힌다.
+        제목은 사이드바의 다른 카드(고객 선택·상담 입력·IPS 조율기)와 같은 규격이다.
+      */}
       <div className="mb-2 flex items-center justify-between">
-        <div className="flex rounded-lg bg-muted p-0.5">
-          <TabButton
-            active={active === "current"}
-            onClick={() => setTab("current")}
-          >
-            현재 보유
-          </TabButton>
-          <TabButton
-            active={active === "proposed"}
-            onClick={() => setTab("proposed")}
-            disabled={!proposedEnabled}
-            reason="분석 후 활성"
-          >
-            제안 조정
-          </TabButton>
-        </div>
+        <p className="text-[14px] font-bold">자산 비중 조절기</p>
         {hasAnyInput && (
           <button
             type="button"
@@ -130,6 +120,23 @@ export default function CurrentPortfolioInput() {
             초기화
           </button>
         )}
+      </div>
+
+      <div className="mb-2 flex rounded-lg bg-muted p-0.5">
+        <TabButton
+          active={active === "current"}
+          onClick={() => setTab("current")}
+        >
+          현재 보유
+        </TabButton>
+        <TabButton
+          active={active === "proposed"}
+          onClick={() => setTab("proposed")}
+          disabled={!proposedEnabled}
+          reason="분석 후 활성"
+        >
+          제안 조정
+        </TabButton>
       </div>
 
       {!proposedEnabled && (
@@ -223,7 +230,7 @@ function TabButton({
       title={disabled ? reason : undefined}
       // 중앙 제안 카드의 세그먼트와 같은 규격이다 — 좌·우가 같은 상태를 보므로
       // 생김새도 같아야 두 곳이 한 컨트롤임이 드러난다.
-      className={`rounded-md px-3 py-1 text-[11px] font-bold transition-colors ${
+      className={`flex-1 rounded-md px-3 py-1 text-[11px] font-bold transition-colors ${
         active
           ? "bg-white text-brand-dark shadow-sm"
           : "text-muted-foreground hover:text-foreground"
