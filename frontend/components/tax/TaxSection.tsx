@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { ExternalLink, Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -9,18 +8,15 @@ import TaxWaterfall from "@/components/tax/TaxWaterfall";
 import HelpTooltip from "@/components/common/HelpTooltip";
 // 계좌별 활용도 막대(AccountAllocation)와 이름이 헷갈리지 않도록 "납입 배분"으로 둔다.
 import ContributionSplit from "@/components/tax/ContributionSplit";
-import { fmtSaving } from "@/lib/formatKrw";
 import { TAX_ADVICE } from "@/lib/mockData";
 import { PRODUCT_LINKS } from "@/lib/productLinks";
 import { useDashboardStore } from "@/lib/store";
 // LLM 자리의 시연 대역. 엔드포인트가 생기면 이 import 만 fetch 로 바뀐다.
 import { demoContributionRationale } from "@/lib/demo/fixtures/api";
-import {
-  allocationPlan,
-  maxPensionKeepingNeed as calcMaxPensionKeepingNeed,
-  pensionAccount,
-  type AllocationPlan,
-} from "@/lib/taxAccounts";
+import { useState } from "react";
+import { useTaxFlow, useTaxPlan } from "@/lib/taxPlan";
+import { deriveAdviceCards } from "@/lib/taxAdviceCards";
+import type { AllocationPlan } from "@/lib/taxAccounts";
 import type { StressTaxStrategyCard } from "@/lib/api";
 
 // portfolio id → backend kind key
@@ -29,8 +25,6 @@ const ID_TO_KIND: Record<string, string> = {
   a: "A",
   b: "B",
 };
-
-const MASS_TAX_SOURCE_KEYS = ["isa", "pension_credit"] as const;
 
 /** 중앙 하단: 절세 최적화 시뮬레이터 */
 // 백엔드 값이 문자열로 와도 산술 더하기가 문자열 연결로 변질되지 않도록 숫자로 강제
@@ -93,7 +87,10 @@ export default function TaxSection() {
 
   // 세후수익률 비교 — 현재 vs 선택 포트폴리오
   const currentAfterTax = currentPortfolio?.metrics.afterTaxReturnPct ?? null;
-  const selectedAfterTax = selectedPortfolio?.metrics.afterTaxReturnPct ?? null;
+  // 지표 카드도 흐름 막대와 같은 안을 봐야 한다(아래 baseLabel 주석 참고).
+  // waterfallFlow 는 이 줄 아래에서 만들어지므로 실제 대입은 그쪽에서 한다.
+  const selectedAfterTaxBase =
+    selectedPortfolio?.metrics.afterTaxReturnPct ?? null;
 
   // 절세 효과 헤드라인: 스트레스 모드면 taxSource(stressed) headline, 아니면 calculate saved_vs_current
   const annualSavingManwon = isStressMode
@@ -104,7 +101,7 @@ export default function TaxSection() {
       ? Math.round(selectedTax.saved_vs_current / 10000)
       : null;
 
-  // 실효세 절감: taxSource.headline의 세전→세후 실효세 (만원)
+  // taxSource.headline 의 전→후 금융소득세 (만원)
   const effectiveTaxBeforeMan =
     taxSource?.headline.tax_amount_before != null
       ? Math.round(taxSource.headline.tax_amount_before / 10000)
@@ -149,84 +146,27 @@ export default function TaxSection() {
   // 절세 제안 카드: 소스가 있으면 strategy_cards, 없으면 프론트 계산
   const liveStrategyCards = taxSource?.strategy_cards ?? null;
 
-  /**
-   * 절세계좌 배분 — 백엔드 없이 프론트에서 계산한다(`lib/taxAccounts.ts`).
-   * 한도·세액공제율·의무보유기간은 전부 법정 상수라 조회할 외부 소스가 없다.
-   * 기본값은 연금 한도를 꽉 채운 상태다. "한도부터 채운다"는 통념이 이 고객에게는
-   * 왜 틀리는지가 슬라이더를 건드리기 전에 바로 보여야 하기 때문이다.
+  /*
+   * 절세계좌 배분과 세금 흐름은 lib/taxPlan.ts 가 계산한다. 화면 안에서 계산하면
+   * store 만 읽는 PDF 가 같은 값을 볼 수 없어 리포트가 다른 배분을 인쇄한다.
    */
-  const accountInput = customer
-    ? {
-        salaryManwon: customer.salaryManwon,
-        isaUsedManwon: customer.isaUsedManwon,
-        isaYearsSinceOpen: customer.isaYearsSinceOpen,
-        pensionUsedManwon: customer.pensionUsedManwon,
-        age: customer.age,
-        horizonYears: customer.horizonYears,
-        isaOpened: customer.isaOpened,
-        isaYearsUntilLiquid: customer.isaYearsUntilLiquid,
-      }
-    : null;
+  const {
+    plan,
+    pensionRequestManwon: pensionRequest,
+    setPensionRequestManwon: setPensionRequest,
+    pensionCeilingForNeed,
+  } = useTaxPlan();
+  const waterfallFlow = useTaxFlow();
 
-  const defaultPension = accountInput ? pensionAccount(accountInput).headroomManwon : 0;
-  const [pensionRequest, setPensionRequest] = useState(defaultPension);
-  // 고객을 바꾸면 한도가 달라지므로 슬라이더도 그 고객의 기본값으로 되돌린다.
-  const [pensionOwner, setPensionOwner] = useState(selectedCustomerId);
-  if (pensionOwner !== selectedCustomerId) {
-    setPensionOwner(selectedCustomerId);
-    setPensionRequest(defaultPension);
-  }
-
-  const plan: AllocationPlan | null =
-    accountInput && customer
-      ? allocationPlan(
-          accountInput,
-          customer.annualContributionManwon ?? 0,
-          pensionRequest,
-          customer.nearTermNeedYears ?? 0,
-        )
-      : null;
-
-  // 유동액과 같은 규칙으로 구해야 해서 계산 모듈에 맡긴다. 화면에서 따로 유도하면
-  // ISA 의무보유가 목표 시점 뒤에 풀리는 고객에서 두 값이 갈린다.
-  const pensionCeilingForNeed =
-    accountInput && customer
-      ? calcMaxPensionKeepingNeed(
-          accountInput,
-          customer.annualContributionManwon ?? 0,
-          customer.nearTermNeedManwon,
-          customer.nearTermNeedYears ?? 0,
-        )
-      : null;
-
-  /**
-   * 백엔드가 없을 때 세금 흐름을 프론트에서 잇는다. 위에서 고른 포트폴리오의
-   * 지표와 아래 절세 제안의 계산을 그대로 쓰므로 한 화면 안에서 숫자가 어긋나지
-   * 않는다. 예전에는 mock 이 자산 18억 기준(세전 2.59억)을 그려, 1억원 고객
-   * 화면에도 그대로 나왔다.
-   *
-   * 절감액을 두 갈래로 나눠 넘긴다. ISA 는 금융소득세를 직접 깎지만 연금
-   * 세액공제는 근로소득세에서 돌려받는 돈이라 같은 막대에 못 쌓는다.
+  /*
+   * 머리 박스의 배지는 아래 흐름 막대가 어느 안을 기준으로 그려졌는지를 말한다.
+   * 막대가 확정 대상 안을 따르므로 배지도 같은 이름이어야 한다 — 안 그러면
+   * PB 가 비중을 조정했을 때 배지는 "안정 추구", 막대는 "제안 조정" 이 된다.
    */
-  const waterfallFlow =
-    customer && plan && selectedPortfolio && currentPortfolio
-      ? {
-          aumManwon: customer.aumEokwon * 10000,
-          current: {
-            expectedReturnPct: currentPortfolio.metrics.expectedReturnPct,
-            afterTaxReturnPct: currentPortfolio.metrics.afterTaxReturnPct,
-          },
-          selected: {
-            name: selectedPortfolio.name,
-            expectedReturnPct: selectedPortfolio.metrics.expectedReturnPct,
-            afterTaxReturnPct: selectedPortfolio.metrics.afterTaxReturnPct,
-          },
-          financialTaxSavingManwon: plan.isaSavingManwon,
-          creditRefundManwon: plan.pensionSavingManwon,
-        }
-      : null;
-
-  const baseLabel = selectedPortfolio?.name ?? "포트폴리오";
+  const baseLabel =
+    waterfallFlow?.selected.name ?? selectedPortfolio?.name ?? "포트폴리오";
+  const selectedAfterTax =
+    waterfallFlow?.selected.afterTaxReturnPct ?? selectedAfterTaxBase;
 
   if (
     portfolioSource === "fallback" &&
@@ -339,7 +279,9 @@ export default function TaxSection() {
                 {effectiveTaxBeforeMan != null &&
                 effectiveTaxAfterMan != null ? (
                   <SummaryStat
-                    k="실효세 절감"
+                    // 값이 전→후 세액이라 늘어날 수도 있다. "절감" 이라 쓰면
+                    // 세금이 는 화면에서도 아꼈다는 말이 된다.
+                    k="금융소득세"
                     v={`${effectiveTaxBeforeMan.toLocaleString()} → ${effectiveTaxAfterMan.toLocaleString()}만`}
                     d={
                       effectiveTaxDeltaPct != null
@@ -444,154 +386,7 @@ interface AdviceCardsProps {
 function AdviceCards({ liveCards, plan }: AdviceCardsProps) {
   const [tabs, setTabs] = useState<Record<string, AdviceTab>>({});
 
-  const liveByKey = new Map(liveCards?.map((card) => [card.key, card]) ?? []);
-
-  /*
-   * 카드마다 따로 폴백하면 백엔드가 일부만 내려줄 때 한 줄에 백엔드 숫자와 프론트
-   * 계산이 나란히 뜨는데 화면에는 구분이 없다. 어느 하나라도 오면 전부 백엔드 경로로
-   * 간다 — 출처가 섞이느니 비어 있는 편이 추적 가능하다.
-   */
-  const useLive = (liveCards?.length ?? 0) > 0;
-
-  /**
-   * 백엔드 응답이 없을 때(데모·연결 실패) 프론트 계산을 같은 모양으로 돌려준다.
-   * 예전에는 이 자리가 비어 카드 세 장이 금액 없이 설명문만 남았다.
-   */
-  const fromPlan = (card: (typeof TAX_ADVICE.cards)[number]) => {
-    if (!plan) return null;
-    const isIsa = card.sourceKey === "isa";
-    const account = isIsa ? plan.isa : plan.pension;
-    // 연금계좌는 한 덩어리로 계산하지만 배분은 카드별로 다르다 — 연금저축은 단독
-    // 한도 600만원까지, 넘는 금액은 IRP 로 간다. 카드마다 제 몫을 말해야 PB 가
-    // "연금저축에 900만원"처럼 안내하지 않는다.
-    const allocated = isIsa
-      ? plan.isaManwon
-      : card.key === "irp"
-        ? plan.irpManwon
-        : plan.pensionSavingsManwon;
-    /*
-     * 카드마다 걸리는 한도가 다르다. 연금저축에는 단독 한도 600만원이 따로 있고,
-     * IRP 는 연금저축과 900만원 통을 나눠 쓴다. 그래서 IRP 의 소진 여부는 자기
-     * 배분액이 아니라 **연금 배분 합계**로 판단해야 한다 — irpManwon 으로 재면
-     * "900 중 300" 이 되어 600만원이 남은 것처럼 읽히는데, 그 600만원은 옆 카드
-     * (연금저축)가 이미 쓴 돈이다.
-     */
-    const cap = isIsa
-      ? { limit: plan.isa.headroomManwon, used: plan.isaManwon, full: "한도 소진", left: "잔여" }
-      : card.key === "irp"
-        ? {
-            limit: plan.pension.headroomManwon,
-            used: plan.pensionManwon,
-            full: `합산 ${plan.pension.headroomManwon.toLocaleString()}만원 소진`,
-            left: "합산 한도 잔여",
-          }
-        : {
-            limit: plan.pensionSavingsRoomManwon,
-            used: plan.pensionSavingsManwon,
-            full: "단독 한도 소진",
-            left: "단독 한도 잔여",
-          };
-    const remaining = Math.max(cap.limit - cap.used, 0);
-    const capText =
-      remaining > 0 ? `${cap.left} ${remaining.toLocaleString()}만원` : cap.full;
-
-    return {
-      applicable: account.eligible,
-      reason: account.reason,
-      allocatedManwon: allocated,
-      capText,
-      headroomManwon: account.headroomManwon,
-      savingManwon: isIsa ? plan.isaSavingManwon : plan.pensionSavingManwon,
-      note: isIsa
-        ? `이 고객은 ${plan.isaType.type === "seogmin" ? "서민형" : "일반형"} — 비과세 ${plan.isaType.taxFreeManwon}만원 (${plan.isaType.reason})`
-        : card.key === "irp"
-          ? "연금저축 단독 한도 600만원 초과분이 여기로 배분"
-          : "연금저축 단독 한도는 600만원",
-    };
-  };
-
-  // 화면은 Mass 고객의 3대 절세계좌만 보여 준다. 연금저축·IRP는 pension_credit
-  // 합산 계산을 공유하므로 연금저축 카드에만 금액을 표시한다.
-  const cards = TAX_ADVICE.cards.map((copy) => {
-    const live = liveByKey.get(copy.sourceKey);
-    const calc = useLive ? null : fromPlan(copy);
-
-    const applicable = live?.applicable ?? calc?.applicable ?? true;
-    const reason = live?.reason ?? live?.ineligibleReason ?? calc?.reason ?? null;
-    const transferManwon = live?.transferableManwon ?? calc?.headroomManwon ?? null;
-
-    /*
-     * 카드에는 이 고객의 숫자와 결론만 두고, 제도 설명은 가이드 툴팁으로 보낸다.
-     * 세 장이 나란히 서는 자리라 제도 문장까지 본문에 두면 읽히지 않는다.
-     * 가이드가 OFF 여도 숫자는 남아야 하므로 둘을 섞지 않는다.
-     *
-     *   summary — 잔여 한도·배분액 (항상 카드에 보인다)
-     *   explain — 제도 설명·판정 근거 (가이드 ON 일 때 hover 로 뜬다)
-     */
-    let summary: string;
-    let explain: string[] = copy.helpLines;
-
-    if (!applicable && reason) {
-      summary = "적용 불가";
-      explain = [reason];
-    } else if (calc) {
-      // 배분액이 답이라 앞에, 한도는 맥락이라 뒤에 둔다.
-      summary =
-        calc.allocatedManwon > 0
-          ? `${calc.allocatedManwon.toLocaleString()}만원 배분 · ${calc.capText}`
-          : `배분 없음 · ${calc.capText}`;
-      // 판정 근거(일반형/서민형, 연금저축 단독 한도)도 설명 쪽이다.
-      explain = [...copy.helpLines, calc.note];
-    } else if (transferManwon != null) {
-      summary =
-        copy.sourceKey === "isa"
-          ? `이전 가능액 ${transferManwon.toLocaleString()}만원`
-          : `합산 잔여 활용 가능액 ${transferManwon.toLocaleString()}만원`;
-    } else {
-      summary = "";
-    }
-
-    /*
-     * ⚠️ 두 값의 의미가 다르다.
-     *     live.combined_contribution_manwon — 백엔드가 계산한 **납입액**
-     *     calc.savingManwon                 — 프론트가 계산한 **절감액**
-     * 그런데 같은 "+N만원" 절세액 슬롯에 들어간다. 백엔드가 붙으면 900만원 납입이
-     * "+900만원 절세"로 보인다. live 쪽 표기는 이 PR 이전부터의 동작이라 여기서
-     * 바꾸지 않지만, 백엔드를 연동할 때 반드시 손봐야 하는 자리다.
-     * (아래 총액도 같은 문제를 갖는다.)
-     */
-    const liveContributionManwon = live?.applicable
-      ? live.combined_contribution_manwon
-      : 0;
-    const calcSavingManwon = calc?.applicable ? calc.savingManwon : 0;
-    const shownManwon = live ? liveContributionManwon : calcSavingManwon;
-
-    const saving =
-      copy.savingRole === "included"
-        ? shownManwon > 0
-          ? copy.saving
-          : ""
-        : shownManwon > 0
-          ? `약 +${fmtSaving(shownManwon)}만원`
-          : "";
-
-    return { ...copy, summary, explain, saving, applicable };
-  });
-
-  // 기존 6종 combined_total에는 화면에서 제외한 전략도 들어 있다. 표시 총액은
-  // ISA와 pension_credit을 각각 한 번만 합산해 3개 카드와 계산 범위를 맞춘다.
-  // ⚠️ 위와 같은 의미 불일치 — live 쪽은 납입액 합, 프론트 쪽은 절감액 합이다.
-  const massTotalManwon = useLive
-    ? MASS_TAX_SOURCE_KEYS.reduce(
-        (sum, key) =>
-          sum + (liveByKey.get(key)?.combined_contribution_manwon ?? 0),
-        0,
-      )
-    : (plan?.totalSavingManwon ?? null);
-  const totalSaving =
-    massTotalManwon != null
-      ? `약 +${fmtSaving(massTotalManwon)}만원`
-      : TAX_ADVICE.totalSaving;
+  const { cards, totalSaving } = deriveAdviceCards(plan, liveCards);
 
   return (
     /*

@@ -4,7 +4,7 @@
  *
  * 목적: PDF 템플릿(PbPdf·ClientPdf)의 절세 JSX를 그대로 두고 데이터 소스만 교체하기 위함.
  *   - TAX_EFFECT  → buildPdfTaxEffect(taxOptimizer)
- *   - TAX_ADVICE  → buildPdfTaxAdvice(taxOptimizer)
+ *   - 절세 제안 카드는 여기서 만들지 않는다 — 화면과 같은 lib/taxAdviceCards.ts 를 쓴다.
  * live 데이터가 없으면(미분석·데모 폴백) 각 필드를 mock 값으로 폴백한다.
  *
  * 주의(추적성): live로 연결되는 값은 모두 calculate 응답(tax_optimizer)의 실제 수치다.
@@ -12,10 +12,12 @@
  *   - strategy_cards → Mass 고객용 절세계좌 3카드(중개형 ISA·연금저축·IRP).
  *     연금저축과 IRP는 pension_credit 합산 계산값을 공유하므로 중복 합산하지 않는다.
  *   - account_cards → 계좌 활용도(used/limit). 캡션 문구는 mock 유지.
- *   - flow(세금 흐름 3행 표)는 calculate에 3분할 소스가 없어 mock 유지 — 백엔드 분할 노출 후 연결 예정(TODO).
+ *   - flow(세금 흐름 3행 표)는 calculate에 3분할 소스가 없다. 백엔드가 없으면
+ *     화면과 같은 프론트 계산으로 채운다(pdfTaxFlowFromDerived·pdfTaxEffectFromDerived).
  */
-import { TAX_ADVICE, TAX_EFFECT } from "@/lib/mockData";
+import { TAX_EFFECT } from "@/lib/mockData";
 import type { PortfolioTaxResponse, StressTaxData } from "@/lib/api/types";
+import type { TaxFlowInput, TaxFlowRows } from "@/lib/taxPlan";
 
 // selectedPortfolioId("current"|"a"|"b") → tax_optimizer 맵 키
 const PDF_TAX_OPT_KEY: Record<string, string> = {
@@ -47,8 +49,10 @@ type PdfTaxAccount = {
   limit: number | null;
   caption: string;
 };
-type PdfTaxEffect = Omit<typeof TAX_EFFECT, "accounts"> & {
+export type PdfTaxEffect = Omit<typeof TAX_EFFECT, "accounts"> & {
   accounts: PdfTaxAccount[];
+  /** 머리 배너 제목. 프론트 계산으로 채울 때는 화면 머리말과 같은 문구를 쓴다. */
+  headlineLabel?: string;
 };
 
 /** 계좌 활용도 — live used/limit(만원)만 override, 캡션·태그·이름은 mock 유지. */
@@ -114,7 +118,13 @@ export function buildPdfTaxEffect(
 
 // ── 세금 효과 비교 흐름 행 (flow rows) ────────────────────────────────────────
 
-export type PdfFlowRow = { label: string; afterTaxManwon: number; taxManwon: number };
+export type PdfFlowRow = {
+  label: string;
+  afterTaxManwon: number;
+  taxManwon: number;
+  /** 비고 칸 문구. 세액공제가 붙는 행이면 그 금액을 적는다. */
+  note: string;
+};
 
 export type PdfTaxFlow = {
   pretaxLabel: string;
@@ -158,8 +168,8 @@ export function buildPdfTaxFlow(
       totalLabel: "연간 절세 효과",
       totalSavingManwon: savingManwon,
       rows: [
-        { label: "전략 전",        afterTaxManwon: baselineAfter,  taxManwon: baselineTax     },
-        { label: "절세 전략 적용",  afterTaxManwon,                  taxManwon: actualTaxManwon },
+        { label: "전략 전",        afterTaxManwon: baselineAfter,  taxManwon: baselineTax,     note: "기준" },
+        { label: "절세 전략 적용",  afterTaxManwon,                  taxManwon: actualTaxManwon, note: "절세 적용" },
       ],
     };
   }
@@ -177,47 +187,80 @@ export function buildPdfTaxFlow(
       totalLabel: "연간 절세 효과",
       totalSavingManwon: totalSaving,
       rows: [
-        { label: "현재 포트폴리오", afterTaxManwon: beforeAfter, taxManwon: beforeTax },
-        { label: "절세 제안 적용",  afterTaxManwon: afterAfter,  taxManwon: afterTax  },
+        { label: "현재 포트폴리오", afterTaxManwon: beforeAfter, taxManwon: beforeTax, note: "기준" },
+        { label: "절세 제안 적용",  afterTaxManwon: afterAfter,  taxManwon: afterTax,  note: "절세 적용" },
       ],
     };
   }
   return null;
 }
 
-/** TAX_ADVICE(절세 제안) shape으로 변환. 카드별 계산값은 기존 ISA·연금 전략에서 가져온다. */
-export function buildPdfTaxAdvice(
-  taxOptimizer: StressTaxData | null,
-): typeof TAX_ADVICE {
-  const live = taxOptimizer?.strategy_cards;
-  if (!live?.cards?.length) return TAX_ADVICE;
 
-  const liveByKey = new Map(live.cards.map((card) => [card.key, card]));
-  const cards = TAX_ADVICE.cards.map((base) => {
-      const lc = liveByKey.get(base.sourceKey);
-      const saving =
-        base.savingRole === "included"
-          ? lc?.applicable && lc.combined_contribution_manwon > 0
-            ? base.saving
-            : ""
-          : lc?.applicable && lc.combined_contribution_manwon > 0
-          ? `+${lc.combined_contribution_manwon.toLocaleString()}만원`
-          : "";
-      return {
-        ...base,
-        saving,
-      };
-    });
+/**
+ * 백엔드 흐름 데이터가 없을 때 화면과 같은 프론트 계산을 같은 shape 으로 돌려준다.
+ *
+ * 예전에는 여기서 null 을 돌려 리포트의 세금 효과 비교 표가 통째로 "분석 후
+ * 확인할 수 있습니다" 로 비었다. 데모 픽스처에는 portfolioTax·taxOptimizer 가
+ * 없으므로 시연에서는 늘 그 상태였다.
+ */
+export function pdfTaxFlowFromDerived(derived: TaxFlowRows | null): PdfTaxFlow {
+  if (!derived) return null;
+  return {
+    pretaxLabel: derived.pretaxLabel,
+    totalLabel: derived.totalLabel,
+    totalSavingManwon: derived.totalSavingManwon,
+    rows: derived.rows.map((r, i) => ({
+      label: r.name,
+      afterTaxManwon: r.afterTax,
+      taxManwon: r.tax,
+      note:
+        r.refund > 0
+          ? `세액공제 +${r.refund.toLocaleString()}만`
+          : i === 0
+            ? "기준"
+            : "전환",
+    })),
+  };
+}
 
-  const combinedTotalManwon = ["isa", "pension_credit"].reduce(
-    (sum, key) =>
-      sum + (liveByKey.get(key)?.combined_contribution_manwon ?? 0),
-    0,
-  );
+/**
+ * 헤드라인·세후수익률·실효세를 프론트 계산으로 덮어쓴다.
+ *
+ * 백엔드가 없을 때 이 값들이 mock 상수로 남아 있었다. 같은 페이지의 비교표는
+ * 현재 240만 → 절세 제안 252만 을 말하는데 그 아래 요약은 "실효세 절감
+ * 1,620 → 540만(-66.7%)" 을, 머리 배너는 "+1,080만원" 을 인쇄했다. 셋 다 다른
+ * 고객·다른 자산 기준의 숫자다.
+ */
+export function pdfTaxEffectFromDerived(
+  base: PdfTaxEffect,
+  derived: TaxFlowRows | null,
+  flow: TaxFlowInput | null,
+): PdfTaxEffect {
+  if (!derived || !flow) return base;
+
+  const beforeTax = derived.rows[0].tax;
+  const afterTax = derived.rows[derived.rows.length - 1].tax;
+  const taxDeltaPct =
+    beforeTax > 0 ? ((afterTax - beforeTax) / beforeTax) * 100 : 0;
+
+  const fromPct = flow.current.afterTaxReturnPct;
+  const toPct = flow.selected.afterTaxReturnPct;
+  const b = derived.breakdown;
 
   return {
-    ...TAX_ADVICE,
-    cards,
-    totalSaving: `+${combinedTotalManwon.toLocaleString()}만원`,
+    ...base,
+    annualSavingManwon: derived.totalSavingManwon,
+    headlineLabel: derived.totalLabel,
+    subNote: `현재 포트폴리오 대비 · 금융소득 +${b.financialManwon.toLocaleString()}만 · 근로소득세 환급 +${b.refundManwon.toLocaleString()}만`,
+    afterTaxReturn: {
+      from: `${fromPct.toFixed(1)}%`,
+      to: `${toPct.toFixed(1)}%`,
+      delta: `${toPct - fromPct >= 0 ? "+" : ""}${(toPct - fromPct).toFixed(1)}%p`,
+    },
+    effectiveTax: {
+      from: beforeTax.toLocaleString(),
+      to: `${afterTax.toLocaleString()}만`,
+      delta: `${taxDeltaPct >= 0 ? "+" : ""}${taxDeltaPct.toFixed(1)}%`,
+    },
   };
 }
