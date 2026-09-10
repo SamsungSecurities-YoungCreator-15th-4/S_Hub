@@ -1102,7 +1102,7 @@ function TaxPage() {
    * mockData 를 읽어, 화면이 "약 +97만원" 을 말할 때 여기에는 자리표시 문구인
    * "분석 후 계산" 이 인쇄됐다.
    */
-  const { plan } = useTaxPlan();
+  const { plan, customer: taxCustomer } = useTaxPlan();
   const taxAdvice = deriveAdviceCards(
     plan,
     taxOptimizerEntry?.strategy_cards?.cards ?? null,
@@ -1123,14 +1123,28 @@ function TaxPage() {
   const taxFlow =
     buildPdfTaxFlow(taxOptimizerEntry, aumEokwon, portfolioTaxEntry) ??
     pdfTaxFlowFromDerived(derivedFlow);
+  /*
+   * 사용액이 없을 때 한도의 45% 를 채워 그리고 있었다. 어느 고객이든 막대가 절반쯤
+   * 차 보이는데 그 숫자는 아무 데서도 나오지 않은 값이다. 고객 레코드의 기납입액을
+   * 쓴다 — 화면의 계좌 배치 막대가 읽는 값과 같다.
+   *
+   * 캡션의 공제율·환급액도 배분 계산에서 가져온다. 문구에 박아 두면 총급여 5,500만원을
+   * 넘는 고객(13.2%)에게도 16.5% 라고 인쇄된다.
+   */
   const accountRows = ACCOUNT_PDF.filter((acct) => acct.key !== "general").map(
     (acct) => {
       const accData = taxEffect.accounts.find((a) => a.name === acct.name);
-      const used =
-        accData?.used != null
-          ? accData.used
-          : Math.round(acct.refManwon * 0.45);
-      return { ...acct, used };
+      const isIsa = acct.key === "isa";
+      const fallbackUsed = isIsa
+        ? (taxCustomer?.isaUsedManwon ?? 0)
+        : (taxCustomer?.pensionUsedManwon ?? 0);
+      const used = accData?.used ?? fallbackUsed;
+      const caption = !plan
+        ? acct.caption
+        : isIsa
+          ? `비과세 ${plan.isaType.taxFreeManwon}만원(${plan.isaType.type === "seogmin" ? "서민형" : "일반형"}) · 초과분 9.9% 분리과세`
+          : `세액공제 ${(plan.pensionRate * 100).toFixed(1)}% → 환급 ${plan.pensionSavingManwon.toLocaleString()}만`;
+      return { ...acct, used, caption };
     },
   );
 
