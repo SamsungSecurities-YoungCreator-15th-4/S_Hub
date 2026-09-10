@@ -33,7 +33,7 @@ export interface TaxFlowInput {
     afterTaxReturnPct: number;
   };
   /**
-   * 금융소득세를 직접 줄이는 절감액(만원) — ISA.
+   * 이자·배당세를 직접 줄이는 절감액(만원) — ISA.
    *
    * ⚠️ 전제: 위 afterTaxReturnPct 가 **일반계좌 원천징수 기준**이라고 본다. 그래야
    *    ISA 절감을 그 위에 얹는 것이 맞다. 만약 그 세후수익률이 이미 ISA 활용을
@@ -151,14 +151,14 @@ export function useTaxFlow(): TaxFlowInput | null {
       expectedReturnPct: viewed.metrics.expectedReturnPct,
       afterTaxReturnPct: viewed.metrics.afterTaxReturnPct,
     },
-    // ISA 는 금융소득세를 직접 깎지만 연금 세액공제는 근로소득세에서 돌려받는
+    // ISA 는 이자·배당세를 직접 깎지만 연금 세액공제는 근로소득세에서 돌려받는
     // 돈이라 같은 막대에 못 쌓는다. 두 갈래로 나눠 넘긴다.
     financialTaxSavingManwon: plan.isaSavingManwon,
     creditRefundManwon: plan.pensionSavingManwon,
   };
 }
 
-/** 흐름 막대 한 줄 — 세후 수익 / 금융소득세 / 세액공제 환급(만원). */
+/** 흐름 막대 한 줄 — 세후 수익 / 투자 세금 / 세액공제 환급(만원). */
 export interface TaxFlowRow {
   name: string;
   afterTax: number;
@@ -170,9 +170,9 @@ export interface TaxFlowRow {
 export interface TaxFlowBreakdown {
   financialManwon: number;
   pretaxGainManwon: number;
-  /** 전환으로 늘어난 금융소득세 — 금융소득에서 빠지는 몫이라 부호가 뒤집힌다. */
+  /** 전환으로 늘어난 투자 세금 — 투자수익에서 빠지는 몫이라 부호가 뒤집힌다. */
   switchTaxManwon: number;
-  /** ISA 가 도로 깎은 금융소득세. switchTax − isaCut 이 실제 세금 증가분이다. */
+  /** ISA 가 도로 깎은 이자·배당세. switchTax − isaCut 이 실제 세금 증가분이다. */
   isaCutManwon: number;
   refundManwon: number;
 }
@@ -180,7 +180,7 @@ export interface TaxFlowBreakdown {
 export interface TaxFlowRows {
   rows: TaxFlowRow[];
   breakdown: TaxFlowBreakdown;
-  /** 현재 대비 1년치 차이(만원) = 금융소득 + 근로소득세 환급. */
+  /** 현재 대비 1년치 차이(만원) = 투자수익 + 근로소득세 환급. */
   totalSavingManwon: number;
   pretaxLabel: string;
   totalLabel: string;
@@ -208,7 +208,7 @@ export function deriveTaxFlowRows(flow: TaxFlowInput): TaxFlowRows {
     { name: "현재", afterTax: curAfter, tax: curTax, refund: 0 },
     { name: selected.name, afterTax: selAfter, tax: selTax, refund: 0 },
     {
-      // ISA 절감은 금융소득세를 직접 깎으므로 세후 수익으로 넘어간다.
+      // ISA 절감은 이자·배당세를 직접 깎으므로 세후 수익으로 넘어간다.
       name: "+ 절세 제안",
       afterTax: selAfter + isaSaving,
       tax: Math.max(selTax - isaSaving, 0),

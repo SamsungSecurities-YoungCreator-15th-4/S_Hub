@@ -1316,7 +1316,7 @@ function TaxPage() {
                     이 칸에 들어가는 값은 그 해에 내는 세금이지 절감액이 아니다.
                     "절세액 240만" 은 240만원을 아꼈다는 말로 읽힌다.
                   */}
-                  {["구분", "세후 수익", "금융소득세", "비고"].map((h) => (
+                  {["구분", "세후 수익", "세금", "비고"].map((h) => (
                     <th
                       key={h}
                       style={{
@@ -1413,7 +1413,7 @@ function TaxPage() {
               <div style={{ fontSize: 10, color: MUTED, lineHeight: 1.7 }}>
                 ✓ 세후 수익률 {taxEffect.afterTaxReturn.from} →{" "}
                 {taxEffect.afterTaxReturn.to} ({taxEffect.afterTaxReturn.delta})
-                <br />✓ 금융소득세 {taxEffect.effectiveTax.from} →{" "}
+                <br />✓ 세금 {taxEffect.effectiveTax.from} →{" "}
                 {taxEffect.effectiveTax.to} ({taxEffect.effectiveTax.delta})
                 {/*
                   화면 머리말과 같은 분해다. 총액만 적으면 절반이 다른 세목(근로
@@ -1424,7 +1424,7 @@ function TaxPage() {
                   <>
                     <br />✓ {taxFlow?.totalLabel} +
                     {derivedFlow.totalSavingManwon.toLocaleString()}만원:
-                    금융소득 +
+                    투자수익 +
                     {derivedFlow.breakdown.financialManwon.toLocaleString()}만
                     (세전 +
                     {derivedFlow.breakdown.pretaxGainManwon.toLocaleString()} ·{" "}
