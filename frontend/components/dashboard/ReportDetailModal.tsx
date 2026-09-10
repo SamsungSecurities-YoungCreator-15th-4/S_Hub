@@ -436,7 +436,7 @@ function StressBlock() {
   const note =
     needKrw > 0 && needYears > 0
       ? overNeed.length > 0
-        ? `${needYears}년 내 필요자금 ${formatWon(needKrw)}을 넘는 손실이 ${overNeed.length}개 시나리오에서 납니다 — 그중 가장 작은 것이 ${mildestOverNeed.label} ${formatWon(-mildestOverNeed.loss.lossKrw)}입니다.`
+        ? `${needYears}년 내 필요자금 ${formatWon(needKrw)}을 넘는 손실이 ${overNeed.length}개 시나리오에서 납니다: 그중 가장 작은 것이 ${mildestOverNeed.label} ${formatWon(-mildestOverNeed.loss.lossKrw)}입니다.`
         : `${rows.length}개 시나리오 모두 손실이 ${needYears}년 내 필요자금 ${formatWon(needKrw)}보다 작습니다.`
       : undefined;
 

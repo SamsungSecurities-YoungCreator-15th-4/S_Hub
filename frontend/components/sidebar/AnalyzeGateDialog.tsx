@@ -79,7 +79,7 @@ export default function AnalyzeGateDialog({
           </p>
           {weights.length === 0 ? (
             <p className="text-muted-foreground">
-              미입력 — 현금 100%로 계산합니다.
+              미입력: 현금 100%로 계산합니다.
             </p>
           ) : (
             <dl className="grid grid-cols-2 gap-x-4 gap-y-2">

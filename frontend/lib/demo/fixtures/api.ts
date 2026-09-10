@@ -122,28 +122,28 @@ export function demoContributionRationale(
       return (
         `${years}년 뒤 전세 재계약은 날짜가 정해진 지출이라 ${amount}은 미루거나 줄일 수 ` +
         `있는 돈이 아닙니다. 은퇴자산은 시점을 넓게 두고 쌓을 수 있지만 이 돈은 그렇지 ` +
-        `않습니다 — ${locked}`
+        `않습니다: ${locked}`
       );
     case "homePurchase":
       return (
         `주택 계약금은 계약일과 대출 실행일에 함께 묶여, ${years}년 뒤 ${amount}이 ` +
-        `현금으로 있어야 합니다. 하루 늦으면 계약 자체가 흔들립니다 — ${locked}`
+        `현금으로 있어야 합니다. 하루 늦으면 계약 자체가 흔들립니다: ${locked}`
       );
     case "startup":
       return (
         `창업 자금은 시점을 다소 조절할 수 있어 전세나 계약금만큼 경직되지는 않습니다. ` +
-        `다만 ${years}년을 크게 넘기면 준비해 온 기회를 놓치는 비용이 생깁니다 — ${locked}`
+        `다만 ${years}년을 크게 넘기면 준비해 온 기회를 놓치는 비용이 생깁니다: ${locked}`
       );
     case "education":
       return (
         `학자금은 학기 일정에 묶여 ${years}년 뒤 ${amount}이 필요한 시점을 미룰 수 ` +
-        `없습니다. 한 학기를 건너뛰는 선택지가 사실상 없기 때문입니다 — ${locked}`
+        `없습니다. 한 학기를 건너뛰는 선택지가 사실상 없기 때문입니다: ${locked}`
       );
     default:
       // 목적을 모르면 "못 미루는 돈"이라고 단정하지 않는다. 금액과 시점만 말한다.
       return (
         `${years}년 뒤 ${label ? `${label} ` : ""}${amount}이 필요합니다. 시점을 미룰 수 ` +
-        `있는 지출인지 상담에서 확인해야 합니다 — ${locked}`
+        `있는 지출인지 상담에서 확인해야 합니다: ${locked}`
       );
   }
 }
@@ -184,7 +184,7 @@ export function demoStressTestPortfolios(): Portfolio[] {
  */
 export function demoCreatedClient(name: string, aumEokwon: number): CreateClientResult {
   const data: CreatedClient = { clientId: "", name, aumEokwon };
-  return { status: "fallback", data, note: "시연 고정 데이터 — DB에 저장되지 않습니다." };
+  return { status: "fallback", data, note: "시연 고정 데이터: DB에 저장되지 않습니다." };
 }
 
 /**

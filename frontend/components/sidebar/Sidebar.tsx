@@ -606,7 +606,7 @@ export default function Sidebar() {
                 {customer.persisted === false && (
                   <DataSourceBadge
                     source="fallback"
-                    note="DB 저장 실패 — 예시로만 추가된 고객입니다."
+                    note="DB 저장 실패: 예시로만 추가된 고객입니다."
                   />
                 )}
               </div>
@@ -737,7 +737,7 @@ export default function Sidebar() {
           )}
           {sttStatus === "done" && (
             <p className="mt-1.5 text-[10px] font-semibold text-emerald-600">
-              전사 완료 — 상담 내역·IPS 조율기에 반영했습니다.
+              전사 완료: 상담 내역·IPS 조율기에 반영했습니다.
             </p>
           )}
           {/* 재생 경로는 상담 내역만 채운다 — 업로드 경로와 달리 setIps 를 부르지 않으므로
@@ -965,7 +965,7 @@ export default function Sidebar() {
                     {c.persisted === false && (
                       <DataSourceBadge
                         source="fallback"
-                        note="DB 저장 실패 — 예시로만 추가된 고객입니다."
+                        note="DB 저장 실패: 예시로만 추가된 고객입니다."
                       />
                     )}
                   </div>
