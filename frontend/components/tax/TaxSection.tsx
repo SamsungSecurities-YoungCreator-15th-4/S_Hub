@@ -303,7 +303,7 @@ export default function TaxSection() {
             각각 테두리로 묶어 어디까지가 한 그림인지 경계를 준다.
           */}
           <div className="flex min-h-0 w-full flex-1 flex-col gap-2.5">
-            <div className="flex min-h-0 w-full flex-1 flex-col rounded-xl border p-3">
+            <div className="flex min-h-0 w-full flex-auto flex-col rounded-xl border p-3">
               <TaxWaterfall
                 waterfallData={isStressMode ? null : waterfallData}
                 liveHeadline={isStressMode ? (taxSource?.headline ?? null) : null}
@@ -312,10 +312,11 @@ export default function TaxSection() {
               />
             </div>
             {/*
-              계좌 배치는 내용만큼만 차지한다. 막대 두 줄과 범례라 높이를 더 줘도
-              늘어날 것이 없고, 그 공간은 세로가 길수록 읽기 좋은 흐름 막대가 받는다.
+              중앙 열이 늘어나 남는 높이는 두 박스가 반씩 나눠 갖는다. 흐름 박스만
+              받으면 차트 상한(max-h-56)을 넘는 몫이 범례 아래 빈칸으로 남고, 계좌
+              배치는 막대가 붙어 비좁아 보였다. 계좌 배치는 받은 몫을 줄 간격으로 쓴다.
             */}
-            <div className="flex w-full shrink-0 flex-col rounded-xl border p-3">
+            <div className="flex w-full shrink-0 grow flex-col rounded-xl border p-3">
               <AccountAllocation
                 accounts={[
                   {
