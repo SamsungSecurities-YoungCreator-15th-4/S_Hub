@@ -95,7 +95,11 @@ export default function ContributionSplit({
   const sliderMax = Math.min(plan.pension.headroomManwon, budgetManwon);
 
   return (
-    <div className="rounded-xl border p-3.5">
+    /*
+      grow·justify-between — 절세 제안 탭이 절세 효과 탭 높이에 맞춰 늘어나면, 늘어난 몫의
+      절반을 이 상자가 받아 머리줄·슬라이더·AI 코멘트·가정 줄 사이에 고르게 나눈다.
+    */
+    <div className="flex grow flex-col justify-between rounded-xl border p-4">
       <div className="flex items-baseline justify-between">
         <p className="text-[13px] font-extrabold">
           연 납입여력 {fmt(budgetManwon)}만원
@@ -105,7 +109,7 @@ export default function ContributionSplit({
         </span>
       </div>
 
-      <div className="mt-3 flex flex-col gap-3 lg:flex-row lg:items-center">
+      <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-center">
         {/* 배분 */}
         <div className="flex-1">
           <div className="flex items-end justify-between text-[12px] font-bold">
@@ -182,7 +186,7 @@ export default function ContributionSplit({
         말한다 — 색은 "여기는 AI 가 쓴 자리" 만 말하면 된다.
       */}
       {narrative && (
-        <div className="mt-3 rounded-lg border border-[#F5A623]/25 bg-muted/50 px-3 py-2.5">
+        <div className="mt-4 rounded-lg border border-[#F5A623]/25 bg-muted/50 px-3.5 py-3">
           <div className="flex gap-1.5">
             {/*
               아이콘만 색을 준다. 상자 자체는 회색이라 판정의 좋고 나쁨을 말하지
@@ -216,7 +220,7 @@ export default function ContributionSplit({
         적고, 나머지는 hover 로 편다. 화면에서 근거가 사라지지는 않는다.
       */}
       <HelpTooltip text={ASSUMPTION_LINES(plan, needYears, targetReturnPct, horizonYears)} wide>
-        <p className="mt-2 flex items-center gap-1 text-[10px] font-semibold text-muted-foreground">
+        <p className="mt-3 flex items-center gap-1 text-[10px] font-semibold text-muted-foreground">
           <CircleHelp className="size-3 shrink-0" />
           납입 원금만 계산 · 운용수익·산출세액 한도 미반영 · ISA 절감액은 가정 포함
         </p>
