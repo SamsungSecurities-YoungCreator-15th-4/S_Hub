@@ -577,7 +577,11 @@ export default function Sidebar() {
         onResume={resumeRealtime}
         onStop={stopRealtime}
       />
-      <aside className="flex w-[300px] shrink-0 self-start flex-col gap-2.5 rounded-2xl bg-card p-2.5 ring-1 ring-foreground/10">
+      {/*
+        self-start 를 두지 않는다 — 좌·중·우 세 열이 긴 쪽 높이에 맞춰 같은 선에서 끝난다.
+        사이드바가 짧으면 늘어난 자리는 분석하기 위의 여백이 된다(아래 mt-auto).
+      */}
+      <aside className="flex w-[300px] shrink-0 flex-col gap-2.5 rounded-2xl bg-card p-2.5 ring-1 ring-foreground/10">
         {/* 패널 헤더 */}
         <div className="flex items-center justify-end px-0.5 pb-0.5">
           <button
@@ -911,28 +915,30 @@ export default function Sidebar() {
           IPS 반영 거절은 여기 넣지 않는다 — 그건 분석을 막지 않는다.
           우측 IPS 반영하기 버튼 위에 둔다.
         */}
-        {gateNotice && (
-          <p className="-mb-1 px-0.5 text-[11px] font-semibold text-destructive">
-            {gateNotice}
-          </p>
-        )}
-
-        <Button
-          size="lg"
-          disabled={analyzing || !isCurrentWeightsInputValid(currentWeightsInput)}
-          onClick={() => setGateOpen(true)}
-          className="w-full rounded-xl py-6 text-sm font-extrabold shadow-[0_4px_14px_rgba(0,100,255,0.28)]"
-        >
-          {analyzing ? (
-            <>
-              <Loader2 className="size-4 animate-spin" />
-              분석 중…
-            </>
-          ) : (
-            "분석하기"
+        {/* 안내와 분석하기를 함께 바닥에 붙인다 — 우측 IPS 반영하기와 같은 높이. */}
+        <div className="mt-auto flex flex-col gap-2.5">
+          {gateNotice && (
+            <p className="-mb-1 px-0.5 text-[11px] font-semibold text-destructive">
+              {gateNotice}
+            </p>
           )}
-        </Button>
 
+          <Button
+            size="lg"
+            disabled={analyzing || !isCurrentWeightsInputValid(currentWeightsInput)}
+            onClick={() => setGateOpen(true)}
+            className="w-full rounded-xl py-6 text-sm font-extrabold shadow-[0_4px_14px_rgba(0,100,255,0.28)]"
+          >
+            {analyzing ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                분석 중…
+              </>
+            ) : (
+              "분석하기"
+            )}
+          </Button>
+        </div>
       </aside>
 
       <AnalyzeGateDialog
