@@ -1,59 +1,42 @@
 "use client";
 
-import {
-  Bar,
-  BarChart,
-  Cell,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import { TAX_EFFECT, PORTFOLIOS } from "@/lib/mockData";
 import { toCalcUnitAllocation } from "@/lib/assetMapping";
 import { useDashboardStore } from "@/lib/store";
 import { useViewedPortfolio } from "@/lib/viewedPortfolio";
+import { useTaxPlan } from "@/lib/taxPlan";
 import type { AccountSlot } from "@/lib/types";
 
-// 출처: 조세특례제한법 §91의18(ISA), 소득세법 §59의3(연금·IRP)
-const REFERENCE_MAN: Record<string, number> = {
-  isa: 2000,
-  pension: 900,
-};
+/*
+  두 계좌의 한도는 성격이 다르다.
 
-const CHART_MAX = 2000;
+    ISA   조특법 §91의18 ③5 — 2,000만원 × (1 + 가입 후 경과연수) − 누적 납입금액.
+          해마다 2,000 씩 쌓이고 리셋되지 않는다. "올해 한도" 라는 것이 없어서,
+          2년 묵힌 사람은 올해 6,000만원을 한 번에 넣을 수 있다.
+    연금  소득세법 §59의3 — 세액공제 한도 연 900만원. 1월 1일에 리셋된다.
+
+  한 축(0~2,000만원)에 나란히 그리고 있었다. 그래서 이월분이 쌓인 고객은 막대가
+  축 끝에서 잘려 "한도 소진" 으로 보였다 — 같은 화면의 납입안 카드는 "잔여
+  4,200만원" 이라고 적는데. 각자 자기 한도 대비 비율로 그린다. 금액은 옆에 적어
+  잃지 않는다.
+*/
+const PENSION_ANNUAL_LIMIT_MAN = 900;
 
 const ACCOUNT_META: Record<string, { name: string }> = {
   isa: { name: "ISA" },
   pension: { name: "연금저축 + IRP" },
 };
 
-function buildData(accounts: typeof TAX_EFFECT.accounts) {
-  return accounts
-    .filter((a) => a.name !== "일반계좌")
-    .map((a) => {
-      const key = a.name === "ISA" ? "isa" : "pension";
-      const ref = REFERENCE_MAN[key];
-      const used = a.used !== null ? a.used : Math.round(ref * 0.45);
-      return { name: ACCOUNT_META[key].name, used, reference: ref };
-    });
+interface AccountBar {
+  key: string;
+  name: string;
+  usedManwon: number;
+  limitManwon: number;
+  /** 한도의 성격 — 누적인지 그 해 기준인지. 둘을 섞으면 숫자가 거짓이 된다. */
+  basis: string;
+  color: string;
 }
 
-function buildFromSlots(slots: AccountSlot[]) {
-  return slots
-    .filter((s) => s.key !== "general")
-    .map((s) => {
-      const key = s.key;
-      const meta = ACCOUNT_META[key] ?? { name: key };
-      const ref = REFERENCE_MAN[key] ?? s.limitManwon ?? 1000;
-      const used =
-        s.usedManwon !== null ? s.usedManwon : Math.round(ref * 0.45);
-      return { name: meta.name, used, reference: ref };
-    });
-}
-
-const xFmt = (v: number) =>
-  v === 0 ? "0" : v >= 1000 ? `${v / 1000}천만` : `${v}만`;
 
 /** ② 절세 계좌 배치 활용도 — 포트폴리오 구성 세그먼트 바 + ISA / 연금저축+IRP 바 차트 */
 export default function AccountAllocation({
@@ -84,13 +67,63 @@ export default function AccountAllocation({
     ({ weight }) => weight > 0,
   );
 
-  const data =
-    accounts && accounts.length > 0
-      ? buildFromSlots(accounts)
-      : buildData(TAX_EFFECT.accounts);
+  /*
+   * ISA 한도는 배분 계산이 들고 있는 누적 산식을 그대로 쓴다 — 납입안 카드가
+   * 적는 잔여 한도와 늘 같은 값이어야 한다. 화면에서 따로 유도하면 두 탭이
+   * 다른 한도를 말한다.
+   */
+  const { plan, customer } = useTaxPlan();
+
+  const slot = (key: string) =>
+    accounts?.find((a) => a.key === key) ??
+    (() => {
+      const fallback = TAX_EFFECT.accounts.find(
+        (a) => a.name === ACCOUNT_META[key].name,
+      );
+      return fallback
+        ? { key, usedManwon: fallback.used, limitManwon: fallback.limit }
+        : null;
+    })();
+
+  const isaSlot = slot("isa");
+  const pensionSlot = slot("pension");
+
+  const isaUsed = isaSlot?.usedManwon ?? customer?.isaUsedManwon ?? 0;
+  // 누적 한도 = 이미 넣은 돈 + 아직 넣을 수 있는 돈. 산식은 lib/taxAccounts.ts.
+  // ⚠️ 백엔드 account_cards 가 붙으면 그쪽 한도가 이겨야 한다. 지금은 그 응답에
+  //    누적 산식이 반영돼 있는지 확인할 수 없어 프론트 계산을 우선한다.
+  const isaLimit = plan
+    ? isaUsed + plan.isa.headroomManwon
+    : (isaSlot?.limitManwon ?? 2000);
+  const isaYears = customer?.isaYearsSinceOpen;
+
+  const pensionUsed = pensionSlot?.usedManwon ?? customer?.pensionUsedManwon ?? 0;
+  const pensionLimit = pensionSlot?.limitManwon ?? PENSION_ANNUAL_LIMIT_MAN;
+
+  const bars: AccountBar[] = [
+    {
+      key: "isa",
+      name: ACCOUNT_META.isa.name,
+      usedManwon: isaUsed,
+      limitManwon: isaLimit,
+      basis:
+        isaYears != null && isaYears > 0
+          ? `가입 ${isaYears + 1}년차 누적`
+          : "누적",
+      color: "#0064FF",
+    },
+    {
+      key: "pension",
+      name: ACCOUNT_META.pension.name,
+      usedManwon: pensionUsed,
+      limitManwon: pensionLimit,
+      basis: "올해",
+      color: "#3D8BFF",
+    },
+  ];
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="flex flex-col">
       <p className="mb-2 flex items-center gap-1.5 text-[13px] font-extrabold">
         계좌 배치 활용도
       </p>
@@ -100,7 +133,7 @@ export default function AccountAllocation({
         <span className="w-[72px] shrink-0 text-right text-[12px] font-extrabold text-[#4E5968]">
           전체 계좌
         </span>
-        <div className="ml-[2px] mr-[16px] flex h-[10px] flex-1 overflow-hidden rounded-md">
+        <div className="ml-[2px] mr-[16px] flex h-[12px] flex-1 overflow-hidden rounded-md">
           {allocation.map(({ label, weight, color }) => (
             <div
               key={label}
@@ -116,7 +149,7 @@ export default function AccountAllocation({
         사이에서 줄어 그만큼을 흡수하므로 카드 높이는 그대로다. 간격을 좁혀 두
         줄 안에 들어오게 한다.
       */}
-      <div className="mb-3 ml-[74px] mr-[16px] flex flex-wrap gap-x-1.5 gap-y-0 leading-tight">
+      <div className="mb-2 ml-[74px] mr-[16px] flex flex-wrap gap-x-1.5 gap-y-0 leading-tight">
         {allocation.map(({ label, weight, color }) => (
           <span
             key={label}
@@ -131,107 +164,51 @@ export default function AccountAllocation({
         ))}
       </div>
 
-      {/* ISA / 연금저축+IRP 바 차트 */}
+      {/* ISA / 연금저축+IRP — 각자 자기 한도 대비 비율 */}
       {/* 흐름 차트와 같은 규칙 — 상한은 종전 높이, 모자라면 하한까지 줄어든다. */}
-      <div className="min-h-20 max-h-28 flex-1">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart
-            data={data}
-            layout="vertical"
-            margin={{ top: 4, right: 16, bottom: 4, left: 2 }}
-            barCategoryGap={28}
-            barGap={3}
-          >
-            <XAxis
-              type="number"
-              domain={[0, CHART_MAX]}
-              tickLine={false}
-              axisLine={false}
-              tick={{ fontSize: 11, fill: "#B0B8C1", fontWeight: 600 }}
-              tickFormatter={xFmt}
-              ticks={[0, 500, 1000, 1500, 2000]}
-            />
-            <YAxis
-              type="category"
-              dataKey="name"
-              width={72}
-              tickLine={false}
-              axisLine={false}
-              tick={{ dx: 0, fontSize: 12, fontWeight: 800, fill: "#4E5968" }}
-            />
-            <Tooltip
-              cursor={{ fill: "#EAF1FF" }}
-              content={({ active, payload, label }) => {
-                if (!active || !payload?.length) return null;
-                return (
-                  <div
-                    style={{
-                      background: "#fff",
-                      border: "1px solid #e5e7eb",
-                      borderRadius: 8,
-                      padding: "8px 12px",
-                      fontSize: 13,
-                    }}
-                  >
-                    <p style={{ fontWeight: 700, marginBottom: 4 }}>{label}</p>
-                    {payload.map((entry) => (
-                      <p
-                        key={String(entry.dataKey)}
-                        style={{
-                          color:
-                            entry.dataKey === "reference"
-                              ? "#4E5968"
-                              : String(entry.color),
-                        }}
-                      >
-                        {entry.dataKey === "reference" ? "기준값" : "사용액"} :{" "}
-                        {Number(entry.value ?? 0).toLocaleString()}만원
-                      </p>
-                    ))}
-                  </div>
-                );
-              }}
-            />
-            <Bar
-              dataKey="reference"
-              name="기준값"
-              fill="#D1D5DB"
-              radius={4}
-              barSize={14}
-              isAnimationActive={false}
-            />
-            <Bar
-              dataKey="used"
-              name="사용액"
-              radius={4}
-              barSize={14}
-              isAnimationActive={false}
-            >
-              {data.map((_, i) => (
-                <Cell key={i} fill={i === 0 ? "#0064FF" : "#3D8BFF"} />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
+      {/* 막대가 납작해 보이지 않게 두께와 간격을 함께 준다. */}
+      <div className="flex flex-col gap-3.5 py-1">
+        {bars.map((bar) => {
+          const pct =
+            bar.limitManwon > 0 ? (bar.usedManwon / bar.limitManwon) * 100 : 0;
+          return (
+            <div key={bar.key} className="flex items-center">
+              <span className="w-[72px] shrink-0 text-right text-[12px] font-extrabold leading-tight text-[#4E5968]">
+                {bar.name}
+              </span>
+              <div className="ml-[10px] mr-[10px] h-[18px] flex-1 overflow-hidden rounded-md bg-[#E9EDF3]">
+                <div
+                  className="h-full rounded-md"
+                  style={{
+                    // 한도를 넘는 데이터가 와도 막대는 칸을 넘지 않는다. 숫자는 옆에 그대로 적힌다.
+                    width: `${Math.min(Math.max(pct, 0), 100)}%`,
+                    backgroundColor: bar.color,
+                  }}
+                />
+              </div>
+              <span className="shrink-0 whitespace-nowrap text-[12px] font-semibold tabular-nums text-muted-foreground">
+                <b className="font-extrabold text-foreground">
+                  {bar.usedManwon.toLocaleString()}
+                </b>
+                {" / "}
+                {bar.limitManwon.toLocaleString()}만원
+                <span className="ml-1 font-extrabold" style={{ color: bar.color }}>
+                  {pct.toFixed(0)}%
+                </span>
+              </span>
+            </div>
+          );
+        })}
       </div>
 
-      <div className="mt-1.5 flex gap-3">
-        <LegendDot color="#0064FF" label="ISA 사용액" />
-        <LegendDot color="#3D8BFF" label="연금 사용액" />
-        <LegendDot color="#D1D5DB" label="기준값" />
-      </div>
+      {/*
+        두 막대의 한도가 서로 다른 것을 재고 있다는 사실을 여기서 말한다. 한 줄로
+        붙여 두지 않으면 8,000 과 900 이 같은 성격의 숫자로 읽힌다.
+      */}
+      <p className="mt-2 text-[11px] font-semibold leading-tight text-muted-foreground">
+        ISA 는 {bars[0].basis} 한도 — 미사용분이 해마다 쌓인다 · 연금은 올해
+        세액공제 한도
+      </p>
     </div>
-  );
-}
-
-function LegendDot({ color, label }: { color: string; label: string }) {
-  return (
-    <span className="flex items-center gap-1.5 text-[12px] font-bold text-muted-foreground">
-      <span
-        className="size-2 rounded-[3px]"
-        style={{ backgroundColor: color }}
-      />
-      {label}
-    </span>
   );
 }

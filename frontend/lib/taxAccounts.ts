@@ -341,12 +341,30 @@ export function allocationPlan(
   const toPensionSavings = Math.min(toPension, savingsRoom);
   const toIrp = toPension - toPensionSavings;
 
-  // ISA 안 vs 밖 — 같은 이자·배당에 붙는 세금 차이. 비과세 한도는 유형이 정한다.
+  /*
+   * ISA 안 vs 밖 — 같은 이자·배당에 붙는 세금 차이.
+   *
+   * ⚠️ 비과세 한도는 해마다 주어지지 않는다. ISA 는 계좌 안 손익을 계약기간 내내
+   *    쌓아 두었다가 만기·해지 시점에 통산해 한 번 과세하고, 200만원(서민형
+   *    400만원)도 그 통산 순소득에 딱 한 번 적용된다. 예전에는 해마다 200만원을
+   *    새로 빼 줘서 절감액이 부풀려졌다 — 데모 고객들은 연간 소득이 200만원을
+   *    넘지 않아 ISA 안 세금이 늘 0 으로 나왔다.
+   *
+   *    화면은 연 단위로 말하므로 한도를 계약주기로 나눠 안분한다. 나누는 값은
+   *    의무보유기간 3년이다 — ISA 계약은 3년 이상으로 맺고 만기 뒤 재가입하면
+   *    한도가 새로 생기므로, 3년이 한도가 가장 자주 갱신되는(=고객에게 가장
+   *    유리한) 주기다.
+   *
+   *    통산의 다른 이점 두 가지는 여전히 안 넣었다 — 계좌 안 손익 통산과, 만기까지
+   *    세금을 떼지 않는 과세이연. 둘 다 절감액을 키우는 쪽이라 이 계산은 보수적이다.
+   */
   const isaType = isaTypeOf(input);
   const isaBalance = Math.max(input.isaUsedManwon, 0) + toIsa;
   const income = isaBalance * a.isaAssumedIncomeYield;
   const taxOutside = income * a.withholdingRate;
-  const taxInside = Math.max(income - isaType.taxFreeManwon, 0) * a.isaExcessRate;
+  const taxFreePerYear =
+    isaType.taxFreeManwon / Math.max(a.isaMandatoryHoldingYears, 1);
+  const taxInside = Math.max(income - taxFreePerYear, 0) * a.isaExcessRate;
   const isaSaving = Math.max(taxOutside - taxInside, 0);
 
   const years = Math.max(targetYears, 0);

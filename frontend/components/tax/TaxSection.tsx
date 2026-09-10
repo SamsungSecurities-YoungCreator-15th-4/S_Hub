@@ -316,7 +316,11 @@ export default function TaxSection() {
                 flow={waterfallFlow}
               />
             </div>
-            <div className="flex min-h-0 flex-1 flex-col rounded-xl border p-3">
+            {/*
+              계좌 배치는 내용만큼만 차지한다. 막대 두 줄과 범례라 높이를 더 줘도
+              늘어날 것이 없고, 그 공간은 세로가 길수록 읽기 좋은 흐름 막대가 받는다.
+            */}
+            <div className="flex shrink-0 flex-col rounded-xl border p-3">
               <AccountAllocation
                 accounts={[
                   {

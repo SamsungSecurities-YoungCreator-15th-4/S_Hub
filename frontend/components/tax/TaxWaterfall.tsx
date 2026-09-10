@@ -226,6 +226,7 @@ export default function TaxWaterfall({
           */
           `그 ISA 몫은 잔액이 연 ${(ASSUMPTIONS.isaAssumedIncomeYield * 100).toFixed(1)}% 이자·배당을 낸다는 가정 (법정 수치 아님)`,
           "같은 시점 시장값 — 국고채 3년 3.91%(2026-09-09) · 코스피 배당수익률 0.92%(2026-05)",
+          `비과세 ${ASSUMPTIONS.isaGeneralTaxFreeManwon}만원은 계약기간 통산에 한 번이라 ${ASSUMPTIONS.isaMandatoryHoldingYears}년으로 나눠 반영 (손익 통산·과세이연 미반영)`,
         ]
       : []),
   ];
@@ -311,13 +312,19 @@ export default function TaxWaterfall({
         사이드바가 행 높이를 정하므로 이쪽이 따라 줄어야 카드가 그 아래로
         비어져 나오지 않는다. 상한은 종전 높이라 더 커지지는 않는다.
       */}
-      <div className={flow ? "min-h-24 max-h-40 flex-1" : "h-32"}>
+      <div className={flow ? "min-h-32 max-h-56 flex-1" : "h-32"}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={data}
             layout="vertical"
-            margin={{ top: 0, right: flow ? 108 : 52, bottom: 0, left: 0 }}
-            barSize={flow ? 40 : 28}
+            margin={{ top: 4, right: flow ? 108 : 52, bottom: 4, left: 0 }}
+            /*
+              막대를 두껍게 하는 대신 사이를 띄운다. 칸 높이는 차트 높이를 행 수로
+              나눈 값이고 막대는 그 가운데에 놓이므로, barSize 를 줄인 만큼이 그대로
+              행간이 된다. 46 은 세 행이 서로 붙어 한 덩어리로 보였다.
+            */
+            barSize={flow ? 30 : 28}
+            barCategoryGap="30%"
           >
             <XAxis type="number" hide domain={[0, domainMax]} />
             <YAxis

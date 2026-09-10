@@ -34,9 +34,8 @@ function useSelectedCustomer() {
   return customers.find((c) => c.id === selectedCustomerId) ?? customers[0];
 }
 
-// 절세 계좌 배치 — 기준값(한도) 및 차트 최대값
+// 절세 계좌 배치 — 한도 폴백값(백엔드·프론트 계산이 없을 때만 쓴다)
 // 출처: 조세특례제한법 §91의18(ISA), 소득세법 §59의3(연금·IRP)
-const ACCOUNT_CHART_MAX = 2000;
 const ACCOUNT_PDF = [
   {
     key: "isa",
@@ -1151,30 +1150,43 @@ function TaxPage() {
    * 캡션의 공제율·환급액도 배분 계산에서 가져온다. 문구에 박아 두면 총급여 5,500만원을
    * 넘는 고객(13.2%)에게도 16.5% 라고 인쇄된다.
    */
+  /*
+   * 계좌 배치 막대. 화면(AccountAllocation)과 같은 모델을 쓴다.
+   *
+   * 두 계좌의 한도는 성격이 다르다 — ISA 는 조특법 §91의18 ③5 의 누적 한도라
+   * 미사용분이 해마다 쌓이고, 연금은 소득세법 §59의3 의 그 해 세액공제 한도다.
+   * 예전에는 둘을 0~2,000만원 한 축에 그려, 이월분이 쌓인 고객이 "한도 소진"
+   * 으로 보였다.
+   *
+   * mock 의 accounts 에도 used 가 들어 있어(ISA 2,000 · 연금 900) 그대로 두면
+   * 어느 고객이든 꽉 채워 쓴 것으로 그려진다. 백엔드 응답이 있을 때만 그 값을
+   * 쓰고, 없으면 고객 레코드의 기납입액을 쓴다.
+   */
   const accountRows = ACCOUNT_PDF.filter((acct) => acct.key !== "general").map(
     (acct) => {
       const accData = taxEffect.accounts.find((a) => a.name === acct.name);
       const isIsa = acct.key === "isa";
-      /*
-       * mock 의 accounts 에도 used 가 들어 있어(ISA 2,000 · 연금 900) 그대로 두면
-       * 어느 고객이든 두 계좌를 꽉 채워 쓴 것으로 그려진다. 백엔드 응답이 있을
-       * 때만 그 값을 쓰고, 없으면 고객 레코드의 기납입액을 쓴다 — 화면의 계좌
-       * 배치 막대가 읽는 값과 같다.
-       */
+      const fallbackUsed = isIsa
+        ? (taxCustomer?.isaUsedManwon ?? 0)
+        : (taxCustomer?.pensionUsedManwon ?? 0);
       const used = taxOptimizerEntry
-        ? (accData?.used ??
-          (isIsa
-            ? (taxCustomer?.isaUsedManwon ?? 0)
-            : (taxCustomer?.pensionUsedManwon ?? 0)))
-        : isIsa
-          ? (taxCustomer?.isaUsedManwon ?? 0)
-          : (taxCustomer?.pensionUsedManwon ?? 0);
+        ? (accData?.used ?? fallbackUsed)
+        : fallbackUsed;
+      // 누적 한도 = 이미 넣은 돈 + 아직 넣을 수 있는 돈. 산식은 lib/taxAccounts.ts.
+      const limitManwon =
+        isIsa && plan ? used + plan.isa.headroomManwon : acct.refManwon;
+      const isaYears = taxCustomer?.isaYearsSinceOpen;
+      const basis = isIsa
+        ? isaYears != null && isaYears > 0
+          ? `ISA 는 가입 ${isaYears + 1}년차 누적 한도`
+          : "ISA 는 누적 한도"
+        : "올해";
       const caption = !plan
         ? acct.caption
         : isIsa
           ? `비과세 ${plan.isaType.taxFreeManwon}만원(${plan.isaType.type === "seogmin" ? "서민형" : "일반형"}) · 초과분 9.9% 분리과세`
           : `세액공제 ${(plan.pensionRate * 100).toFixed(1)}% → 환급 ${plan.pensionSavingManwon.toLocaleString()}만`;
-      return { ...acct, used, caption };
+      return { ...acct, used, limitManwon, basis, caption };
     },
   );
 
@@ -1532,170 +1544,96 @@ function TaxPage() {
                   </span>
                 ))}
               </div>
-              {/* Y축 + 바 영역 */}
-              <div style={{ display: "flex", gap: 0 }}>
-                <div style={{ width: 68, flexShrink: 0 }}>
-                  {accountRows.map((acct, idx) => (
+              {/*
+                화면(계좌 배치 활용도)과 같은 모델이다. 두 계좌의 한도는 성격이
+                달라(ISA 는 누적, 연금은 그 해 기준) 한 축에 놓을 수 없다. 각자
+                자기 한도 대비 비율로 그리고 금액은 옆에 적는다.
+              */}
+              <div>
+                {accountRows.map((acct, idx) => {
+                  const pct =
+                    acct.limitManwon > 0
+                      ? (acct.used / acct.limitManwon) * 100
+                      : 0;
+                  const color = idx === 0 ? "#0064FF" : "#3D8BFF";
+                  return (
                     <div
                       key={acct.name}
                       style={{
-                        height: 30,
                         display: "flex",
                         alignItems: "center",
-                        justifyContent: "flex-end",
-                        paddingRight: 8,
-                        marginBottom: idx < accountRows.length - 1 ? 14 : 0,
-                        fontSize: 10,
-                        fontWeight: 800,
-                        color: "#4E5968",
-                        textAlign: "right" as const,
-                        lineHeight: 1.2,
+                        marginBottom: idx < accountRows.length - 1 ? 12 : 0,
                       }}
                     >
-                      {acct.name}
-                    </div>
-                  ))}
-                </div>
-                <div style={{ flex: 1 }}>
-                  {accountRows.map((acct, idx) => {
-                    const refPct = (acct.refManwon / ACCOUNT_CHART_MAX) * 100;
-                    const usedPct = (acct.used / ACCOUNT_CHART_MAX) * 100;
-                    const usedColor = idx === 0 ? "#0064FF" : "#3D8BFF";
-                    return (
-                      <div
-                        key={acct.name}
-                        style={{
-                          marginBottom: idx < accountRows.length - 1 ? 14 : 0,
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 5,
-                            marginBottom: 4,
-                          }}
-                        >
-                          <div
-                            style={{
-                              flex: 1,
-                              height: 13,
-                              background: "#F3F4F6",
-                              borderRadius: 4,
-                              overflow: "hidden",
-                            }}
-                          >
-                            <div
-                              style={{
-                                width: `${refPct}%`,
-                                height: "100%",
-                                background: "#D1D5DB",
-                                borderRadius: 4,
-                              }}
-                            />
-                          </div>
-                          <span
-                            style={{
-                              width: 42,
-                              fontSize: 9,
-                              fontWeight: 600,
-                              color: MUTED,
-                              textAlign: "right" as const,
-                              flexShrink: 0,
-                            }}
-                          >
-                            {acct.refManwon.toLocaleString()}만
-                          </span>
-                        </div>
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 5,
-                          }}
-                        >
-                          <div
-                            style={{
-                              flex: 1,
-                              height: 13,
-                              background: "#F3F4F6",
-                              borderRadius: 4,
-                              overflow: "hidden",
-                            }}
-                          >
-                            <div
-                              style={{
-                                width: `${usedPct}%`,
-                                height: "100%",
-                                background: usedColor,
-                                borderRadius: 4,
-                              }}
-                            />
-                          </div>
-                          <span
-                            style={{
-                              width: 42,
-                              fontSize: 9,
-                              fontWeight: 800,
-                              color: usedColor,
-                              textAlign: "right" as const,
-                              flexShrink: 0,
-                            }}
-                          >
-                            {acct.used.toLocaleString()}만
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      marginTop: 6,
-                    }}
-                  >
-                    {["0", "500만", "1천만", "1500만", "2천만"].map((t) => (
                       <span
-                        key={t}
                         style={{
-                          fontSize: 8.5,
-                          color: "#B0B8C1",
-                          fontWeight: 600,
+                          width: 68,
+                          flexShrink: 0,
+                          fontSize: 10,
+                          fontWeight: 800,
+                          color: "#4E5968",
+                          textAlign: "right" as const,
+                          lineHeight: 1.2,
                         }}
                       >
-                        {t}
+                        {acct.name}
                       </span>
-                    ))}
-                  </div>
-                </div>
+                      <div
+                        style={{
+                          flex: 1,
+                          height: 14,
+                          margin: "0 8px",
+                          background: "#E9EDF3",
+                          borderRadius: 4,
+                          overflow: "hidden",
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: `${Math.min(Math.max(pct, 0), 100)}%`,
+                            height: "100%",
+                            background: color,
+                            borderRadius: 4,
+                          }}
+                        />
+                      </div>
+                      <span
+                        style={{
+                          flexShrink: 0,
+                          fontSize: 9.5,
+                          fontWeight: 600,
+                          color: MUTED,
+                          whiteSpace: "nowrap" as const,
+                        }}
+                      >
+                        <b style={{ color: TEXT, fontWeight: 800 }}>
+                          {acct.used.toLocaleString()}
+                        </b>
+                        {" / "}
+                        {acct.limitManwon.toLocaleString()}만원
+                        <b style={{ color, fontWeight: 800, marginLeft: 4 }}>
+                          {pct.toFixed(0)}%
+                        </b>
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
-              <div style={{ display: "flex", gap: 14, marginTop: 10 }}>
-                {[
-                  { color: "#0064FF", label: "ISA 사용액" },
-                  { color: "#3D8BFF", label: "연금 사용액" },
-                  { color: "#D1D5DB", label: "기준값" },
-                ].map((l) => (
-                  <div
-                    key={l.label}
-                    style={{ display: "flex", alignItems: "center", gap: 5 }}
-                  >
-                    <div
-                      style={{
-                        width: 10,
-                        height: 10,
-                        background: l.color,
-                        borderRadius: 2,
-                      }}
-                    />
-                    <span
-                      style={{ fontSize: 9.5, color: MUTED, fontWeight: 700 }}
-                    >
-                      {l.label}
-                    </span>
-                  </div>
-                ))}
-              </div>
+              {/*
+                8,000 과 900 이 같은 성격의 숫자로 읽히지 않게 한 줄로 밝힌다.
+              */}
+              <p
+                style={{
+                  margin: "10px 0 0 0",
+                  fontSize: 9,
+                  fontWeight: 600,
+                  color: MUTED,
+                  lineHeight: 1.5,
+                }}
+              >
+                {accountRows[0]?.basis} — 미사용분이 해마다 쌓인다 · 연금은 올해
+                세액공제 한도
+              </p>
             </div>
           </div>
         </div>
