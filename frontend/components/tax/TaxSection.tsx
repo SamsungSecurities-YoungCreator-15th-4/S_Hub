@@ -361,7 +361,6 @@ export default function TaxSection() {
                   kind: customer.nearTermNeedKind,
                   label: customer.nearTermNeedLabel,
                 },
-                plan.pension.lockupYears,
               )}
             />
           )}
