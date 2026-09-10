@@ -348,7 +348,6 @@ export default function TaxSection() {
               budgetManwon={customer.annualContributionManwon ?? 0}
               pensionRequestManwon={pensionRequest}
               onPensionRequestChange={setPensionRequest}
-              needManwon={customer.nearTermNeedManwon}
               needYears={customer.nearTermNeedYears ?? 0}
               targetReturnPct={ips.returnPct}
               horizonYears={customer.horizonYears}

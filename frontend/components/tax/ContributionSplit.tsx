@@ -58,8 +58,6 @@ interface Props {
   /** 슬라이더가 요청한 연금 납입액(만원) */
   pensionRequestManwon: number;
   onPensionRequestChange: (manwon: number) => void;
-  /** 단기 필요자금(만원)과 시점(년) — IPS Unique */
-  needManwon: number;
   needYears: number;
   /** IPS 목표수익률(%) — 화면 문구가 IPS 조율기 값을 따라가야 한다. */
   targetReturnPct: number;
@@ -89,14 +87,12 @@ export default function ContributionSplit({
   budgetManwon,
   pensionRequestManwon,
   onPensionRequestChange,
-  needManwon,
   needYears,
   targetReturnPct,
   horizonYears,
   narrative,
 }: Props) {
   const sliderMax = Math.min(plan.pension.headroomManwon, budgetManwon);
-  const shortfall = Math.max(needManwon - plan.liquidAtTargetManwon, 0);
 
   return (
     <div className="rounded-xl border p-3.5">
@@ -153,9 +149,13 @@ export default function ContributionSplit({
           </div>
         </div>
 
-        {/* 두 결과가 반대로 움직인다 */}
-        <div className="flex gap-2 lg:w-[380px]">
-          <div className="flex-1 rounded-lg border border-brand/20 bg-brand/5 px-3 py-2">
+        {/*
+          "3년 뒤 쓸 수 있는 돈" 카드를 뺐다. 고객이 알고 싶은 것은 목표 시점에
+          되느냐 안 되느냐이지 얼마가 쌓이느냐가 아니고, 그 결론은 아래 AI 상자가
+          한 줄로 말한다. 카드가 빠진 만큼 슬라이더가 넓어져 눈금이 잘 읽힌다.
+        */}
+        <div className="lg:w-[220px]">
+          <div className="rounded-lg border border-brand/20 bg-brand/5 px-3 py-2">
             <p className="text-[11px] font-bold text-muted-foreground">
               연 절세액
             </p>
@@ -168,28 +168,6 @@ export default function ContributionSplit({
               세액공제 {(plan.pensionRate * 100).toFixed(1)}% 적용
             </p>
           </div>
-          <div
-            className={`flex-1 rounded-lg border px-3 py-2 ${
-              shortfall > 0
-                ? "border-up/30 bg-[#FEECEE]"
-                : "border-brand/20 bg-brand/5"
-            }`}
-          >
-            <p className="text-[11px] font-bold text-muted-foreground">
-              {needYears}년 뒤 쓸 수 있는 돈
-            </p>
-            <p
-              className={`mt-0.5 text-[17px] font-extrabold tabular-nums ${
-                shortfall > 0 ? "text-up" : "text-brand-dark"
-              }`}
-            >
-              {fmt(plan.liquidAtTargetManwon)}
-              <span className="text-[12px]">만원</span>
-            </p>
-            <p className="mt-0.5 text-[10px] font-semibold text-muted-foreground">
-              필요 {fmt(needManwon)}만원
-            </p>
-          </div>
         </div>
       </div>
 
@@ -198,27 +176,17 @@ export default function ContributionSplit({
         따로 떨어져 있으면 어느 것이 사람이 정한 문구이고 어느 것이 AI 가 쓴 것인지
         화면에서 알 수 없다.
 
-        상자 색만 계산이 정한다(부족하면 붉은색) — 문장이 아니라 판정 결과를 색으로
-        말하는 자리이므로 LLM 이 흔들 수 없어야 한다.
+        색은 하나로 둔다. 슬라이더를 미는 동안 파랑↔빨강이 오가면 값이 바뀌는 것보다
+        색이 먼저 눈에 들어와 읽기가 어렵고, 파랑은 이 화면에서 이미 "좋다" 는 뜻을
+        갖고 있어(절세액·배지) 판정이 아닌 것에 쓰면 뜻이 겹친다. 결론은 문장이
+        말한다 — 색은 "여기는 AI 가 쓴 자리" 만 말하면 된다.
       */}
       {narrative && (
-        <div
-          className={`mt-3 rounded-lg px-3 py-2.5 ${
-            shortfall > 0 ? "bg-[#FEECEE]" : "bg-brand/5"
-          }`}
-        >
+        <div className="mt-3 rounded-lg bg-muted/60 px-3 py-2.5">
           <div className="flex gap-1.5">
-            <Sparkles
-              className={`mt-[3px] size-3 shrink-0 ${
-                shortfall > 0 ? "text-up" : "text-brand"
-              }`}
-            />
+            <Sparkles className="mt-[3px] size-3 shrink-0 text-muted-foreground" />
             <div className="min-w-0">
-              <p
-                className={`text-[13px] font-extrabold ${
-                  shortfall > 0 ? "text-up" : "text-brand-dark"
-                }`}
-              >
+              <p className="text-[13px] font-extrabold text-foreground">
                 {narrative.verdict}
               </p>
               <p className="mt-0.5 text-[12px] font-semibold leading-relaxed text-muted-foreground">
