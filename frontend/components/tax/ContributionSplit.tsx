@@ -182,9 +182,13 @@ export default function ContributionSplit({
         말한다 — 색은 "여기는 AI 가 쓴 자리" 만 말하면 된다.
       */}
       {narrative && (
-        <div className="mt-3 rounded-lg bg-muted/60 px-3 py-2.5">
+        <div className="mt-3 rounded-lg border border-[#F5A623]/25 bg-muted/50 px-3 py-2.5">
           <div className="flex gap-1.5">
-            <Sparkles className="mt-[3px] size-3 shrink-0 text-muted-foreground" />
+            {/*
+              아이콘만 색을 준다. 상자 자체는 회색이라 판정의 좋고 나쁨을 말하지
+              않고, 노란 별과 옅은 테두리가 "AI 가 쓴 자리" 라는 것만 표시한다.
+            */}
+            <Sparkles className="mt-[3px] size-3 shrink-0 text-[#F5A623]" />
             <div className="min-w-0">
               {/*
                 굵은 첫 줄은 "AI 코멘트" 로 고정한다. 판정 문장을 제목 자리에 두면
