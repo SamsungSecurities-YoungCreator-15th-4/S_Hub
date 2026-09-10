@@ -169,7 +169,7 @@ export default function AccountAllocation({
         <span className="w-[72px] shrink-0 text-right text-[12px] font-extrabold text-[#4E5968]">
           전체 계좌
         </span>
-        <div className="ml-[10px] mr-[16px] flex h-[12px] flex-1 overflow-hidden rounded-md">
+        <div className="ml-[10px] flex h-[12px] flex-1 overflow-hidden rounded-md">
           {allocation.map(({ label, weight, color }) => (
             <div
               key={label}
