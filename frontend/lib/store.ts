@@ -178,6 +178,16 @@ export interface DashboardState {
   /** calculate 응답의 tax_optimizer — 스트레스 미진입 시 절세 제안·종합과세 게이지 소스 */
   taxOptimizer: Record<string, StressTaxData> | null;
   setTaxOptimizer: (tax: Record<string, StressTaxData> | null) => void;
+  /**
+   * 연 납입여력 중 연금계좌에 넣기로 한 금액(만원). 절세 제안 탭의 슬라이더가 쓴다.
+   *
+   * null 이면 "아직 손대지 않음" — 고객별 연금 잔여한도를 기본값으로 삼는다.
+   * 화면 안에 두면(useState) 같은 값을 PDF 가 볼 수 없어 리포트가 화면과 다른
+   * 배분을 인쇄한다. 확정 대상 안을 store 에 둔 것(proposedWeightsInput)과 같은
+   * 이유다. 읽는 쪽은 lib/taxPlan.ts 의 useTaxPlan() 하나로 모은다.
+   */
+  pensionRequestManwon: number | null;
+  setPensionRequestManwon: (v: number | null) => void;
 
   // ── 분석하기 버튼 상태 ──
   analyzing: boolean;
@@ -405,6 +415,8 @@ export const useDashboardStore = create<DashboardState>((set) => ({
   setStressTax: (tax) => set({ stressTax: tax }),
   taxOptimizer: null,
   setTaxOptimizer: (tax) => set({ taxOptimizer: tax }),
+  pensionRequestManwon: null,
+  setPensionRequestManwon: (v) => set({ pensionRequestManwon: v }),
 
   analyzing: false,
   setAnalyzing: (v) => set({ analyzing: v }),
@@ -496,6 +508,8 @@ export const useDashboardStore = create<DashboardState>((set) => ({
         portfolioTax: null,
         stressTax: null,
         taxOptimizer: null,
+        // 연금 한도는 고객마다 다르다 — 슬라이더도 새 고객의 기본값으로 되돌린다.
+        pensionRequestManwon: null,
         insightResult: null,
         analyzeRejected: false,
         weightsTab: "current",

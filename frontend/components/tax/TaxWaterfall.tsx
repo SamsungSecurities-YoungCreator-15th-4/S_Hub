@@ -10,6 +10,7 @@ import {
   YAxis,
 } from "recharts";
 import HelpTooltip from "@/components/common/HelpTooltip";
+import type { TaxFlowInput } from "@/lib/taxPlan";
 import { TAX_EFFECT } from "@/lib/mockData";
 import type { StressTaxHeadline, TaxWaterfallResponse } from "@/lib/api";
 
@@ -44,27 +45,11 @@ const money = (manwon: number) =>
  * 세금(150만)보다 절감(155만)이 커져 음수가 난다. 별도 조각으로 오른쪽에 붙인다 —
  * 세목은 안 섞이면서 "손에 들어오는 돈"이라는 한 줄기로 읽힌다.
  */
-export interface PortfolioFlowInput {
-  /** 운용자산(만원) */
-  aumManwon: number;
-  current: { expectedReturnPct: number; afterTaxReturnPct: number };
-  selected: { name: string; expectedReturnPct: number; afterTaxReturnPct: number };
-  /**
-   * 금융소득세를 직접 줄이는 절감액(만원) — ISA.
-   *
-   * ⚠️ 전제: 위 afterTaxReturnPct 가 **일반계좌 원천징수 기준**이라고 본다. 그래야
-   *    ISA 절감을 그 위에 얹는 것이 맞다. 만약 그 세후수익률이 이미 ISA 활용을
-   *    가정한 값이라면 같은 절감을 두 번 세게 된다.
-   *
-   *    지금 mockData 의 포트폴리오 지표에는 그 값이 무슨 기준인지 적혀 있지 않고,
-   *    원래 백엔드가 계산하던 값이라 확인할 방법이 없다. 금액이 작아(이 고객 18만원)
-   *    결론을 흔들지는 않지만, 포트폴리오 지표를 실계산으로 붙일 때 세후수익률의
-   *    정의를 먼저 못박아야 한다.
-   */
-  financialTaxSavingManwon: number;
-  /** 근로소득세에서 돌려받는 환급액(만원) — 연금 세액공제 */
-  creditRefundManwon: number;
-}
+/*
+  입력 타입은 lib/taxPlan.ts 가 갖는다 — 리포트도 같은 값을 그리므로 한 곳에만
+  두어야 두 그림이 갈리지 않는다. 종전 이름은 쓰던 곳이 있어 별칭으로 남긴다.
+*/
+export type PortfolioFlowInput = TaxFlowInput;
 
 interface Props {
   /**

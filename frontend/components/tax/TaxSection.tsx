@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { ExternalLink, Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -15,12 +14,9 @@ import { PRODUCT_LINKS } from "@/lib/productLinks";
 import { useDashboardStore } from "@/lib/store";
 // LLM 자리의 시연 대역. 엔드포인트가 생기면 이 import 만 fetch 로 바뀐다.
 import { demoContributionRationale } from "@/lib/demo/fixtures/api";
-import {
-  allocationPlan,
-  maxPensionKeepingNeed as calcMaxPensionKeepingNeed,
-  pensionAccount,
-  type AllocationPlan,
-} from "@/lib/taxAccounts";
+import { useState } from "react";
+import { useTaxFlow, useTaxPlan } from "@/lib/taxPlan";
+import type { AllocationPlan } from "@/lib/taxAccounts";
 import type { StressTaxStrategyCard } from "@/lib/api";
 
 // portfolio id → backend kind key
@@ -149,82 +145,17 @@ export default function TaxSection() {
   // 절세 제안 카드: 소스가 있으면 strategy_cards, 없으면 프론트 계산
   const liveStrategyCards = taxSource?.strategy_cards ?? null;
 
-  /**
-   * 절세계좌 배분 — 백엔드 없이 프론트에서 계산한다(`lib/taxAccounts.ts`).
-   * 한도·세액공제율·의무보유기간은 전부 법정 상수라 조회할 외부 소스가 없다.
-   * 기본값은 연금 한도를 꽉 채운 상태다. "한도부터 채운다"는 통념이 이 고객에게는
-   * 왜 틀리는지가 슬라이더를 건드리기 전에 바로 보여야 하기 때문이다.
+  /*
+   * 절세계좌 배분과 세금 흐름은 lib/taxPlan.ts 가 계산한다. 화면 안에서 계산하면
+   * store 만 읽는 PDF 가 같은 값을 볼 수 없어 리포트가 다른 배분을 인쇄한다.
    */
-  const accountInput = customer
-    ? {
-        salaryManwon: customer.salaryManwon,
-        isaUsedManwon: customer.isaUsedManwon,
-        isaYearsSinceOpen: customer.isaYearsSinceOpen,
-        pensionUsedManwon: customer.pensionUsedManwon,
-        age: customer.age,
-        horizonYears: customer.horizonYears,
-        isaOpened: customer.isaOpened,
-        isaYearsUntilLiquid: customer.isaYearsUntilLiquid,
-      }
-    : null;
-
-  const defaultPension = accountInput ? pensionAccount(accountInput).headroomManwon : 0;
-  const [pensionRequest, setPensionRequest] = useState(defaultPension);
-  // 고객을 바꾸면 한도가 달라지므로 슬라이더도 그 고객의 기본값으로 되돌린다.
-  const [pensionOwner, setPensionOwner] = useState(selectedCustomerId);
-  if (pensionOwner !== selectedCustomerId) {
-    setPensionOwner(selectedCustomerId);
-    setPensionRequest(defaultPension);
-  }
-
-  const plan: AllocationPlan | null =
-    accountInput && customer
-      ? allocationPlan(
-          accountInput,
-          customer.annualContributionManwon ?? 0,
-          pensionRequest,
-          customer.nearTermNeedYears ?? 0,
-        )
-      : null;
-
-  // 유동액과 같은 규칙으로 구해야 해서 계산 모듈에 맡긴다. 화면에서 따로 유도하면
-  // ISA 의무보유가 목표 시점 뒤에 풀리는 고객에서 두 값이 갈린다.
-  const pensionCeilingForNeed =
-    accountInput && customer
-      ? calcMaxPensionKeepingNeed(
-          accountInput,
-          customer.annualContributionManwon ?? 0,
-          customer.nearTermNeedManwon,
-          customer.nearTermNeedYears ?? 0,
-        )
-      : null;
-
-  /**
-   * 백엔드가 없을 때 세금 흐름을 프론트에서 잇는다. 위에서 고른 포트폴리오의
-   * 지표와 아래 절세 제안의 계산을 그대로 쓰므로 한 화면 안에서 숫자가 어긋나지
-   * 않는다. 예전에는 mock 이 자산 18억 기준(세전 2.59억)을 그려, 1억원 고객
-   * 화면에도 그대로 나왔다.
-   *
-   * 절감액을 두 갈래로 나눠 넘긴다. ISA 는 금융소득세를 직접 깎지만 연금
-   * 세액공제는 근로소득세에서 돌려받는 돈이라 같은 막대에 못 쌓는다.
-   */
-  const waterfallFlow =
-    customer && plan && selectedPortfolio && currentPortfolio
-      ? {
-          aumManwon: customer.aumEokwon * 10000,
-          current: {
-            expectedReturnPct: currentPortfolio.metrics.expectedReturnPct,
-            afterTaxReturnPct: currentPortfolio.metrics.afterTaxReturnPct,
-          },
-          selected: {
-            name: selectedPortfolio.name,
-            expectedReturnPct: selectedPortfolio.metrics.expectedReturnPct,
-            afterTaxReturnPct: selectedPortfolio.metrics.afterTaxReturnPct,
-          },
-          financialTaxSavingManwon: plan.isaSavingManwon,
-          creditRefundManwon: plan.pensionSavingManwon,
-        }
-      : null;
+  const {
+    plan,
+    pensionRequestManwon: pensionRequest,
+    setPensionRequestManwon: setPensionRequest,
+    pensionCeilingForNeed,
+  } = useTaxPlan();
+  const waterfallFlow = useTaxFlow();
 
   const baseLabel = selectedPortfolio?.name ?? "포트폴리오";
 
