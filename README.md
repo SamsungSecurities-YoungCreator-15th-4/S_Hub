@@ -14,6 +14,10 @@ PB가 VVIP 고객 상담에 쓰는 **대시보드**와, 그 화면이 보여 줄
 두 시스템은 **IPS 7필드(RRTTLLU — Return · Risk · Time · Tax · Liquidity · Legal · Unique)** 라는
 같은 데이터 계약을 공유한다. 이것이 연결의 접합면이다.
 
+다만 지금은 **개념 계약만 같고 런타임 데이터 경로는 아직 없다** — `backend/`는 `engine/`을
+호출하지 않고, 두 쪽이 VaR·스트레스·자산군을 각자 정의해 각자 계산한다. 무엇을 먼저
+맞춰야 붙일 수 있는지는 [docs/integration_map.md](docs/integration_map.md)에 정리돼 있다.
+
 ## 레포 구조
 
 ```
@@ -33,6 +37,7 @@ S_Hub/
 ├── requirements.txt # [S.ymphony] 엔진 런타임
 │
 ├── docs/
+│   ├── integration_map.md  # 엔진 × 대시보드 통합 지도 (현재 연결 상태·선결 조건)
 │   ├── dashboard/   # S.upervisor 상세 문서
 │   └── engine/      # S.ymphony 계약·계획 문서
 └── .github/         # CI 2종 (대시보드·엔진) · 커뮤니티 문서 · Dependabot
@@ -45,18 +50,23 @@ S_Hub/
 ## 빠른 시작
 
 ```bash
-# 엔진 — 정상 확정 경로
+# 엔진 — 정상 확정 경로 (--offline 은 외부 API 없이 돌아 키가 필요 없다)
 pip install -r requirements.txt
 python scripts/run_graph.py --auto-approve --offline
 pytest tests
 
 # 대시보드 백엔드
+cp backend/.env.example backend/.env      # Azure·Supabase 키 입력
 pip install -r backend/requirements.txt
 cd backend && uvicorn app.main:app --reload
 
 # 대시보드 프론트 (pnpm 통일, npm/yarn 혼용 금지)
+cp frontend/.env.example frontend/.env.local
 cd frontend && pnpm install && pnpm dev
 ```
+
+키 템플릿은 세 곳에 나뉘어 있다 — `.env.example`(엔진 · Azure/LangSmith),
+`backend/.env.example`, `frontend/.env.example`. 실제 값이 든 `.env`는 커밋하지 않는다.
 
 **두 `requirements.txt` 를 합치지 않는다.** pandas·numpy·openai 핀이 서로 다르고,
 합치면 해소 불가능한 의존성 충돌이 난다.
