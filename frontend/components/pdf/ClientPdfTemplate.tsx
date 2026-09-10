@@ -16,10 +16,7 @@ import { deriveTaxFlowRows, useTaxFlow, useTaxPlan } from "@/lib/taxPlan";
 import { deriveAdviceCards } from "@/lib/taxAdviceCards";
 import { useViewedPortfolio } from "@/lib/viewedPortfolio";
 import { formatSharpe } from "@/lib/sharpe";
-import {
-  buildPdfAllocation,
-  buildPdfMacroCell,
-} from "@/lib/pdfPortfolioData";
+import { buildPdfAllocation, buildPdfMacroCell } from "@/lib/pdfPortfolioData";
 import {
   buildPdfTaxEffect,
   pdfTaxEffectFromDerived,
@@ -58,7 +55,6 @@ const ACCOUNT_PDF = [
     caption: "국내·해외 ETF 중심으로 금융소득종합과세 구간 회피",
   },
 ];
-
 
 const BRAND = "#0050D6";
 const BRAND_DARK = "#1A4BAF";
@@ -707,7 +703,8 @@ const METRIC_CARDS = [
     title: "최대낙폭 (MDD)",
     en: "Maximum Drawdown",
     body: "투자 기간 중 고점 대비 가장 많이 떨어진 최대 손실 폭입니다. 낮을수록 안전합니다.",
-    example: "-11.2%라면 보유 자산의 11.2%까지 평가손실이 났던 구간이 있었다는 뜻",
+    example:
+      "-11.2%라면 보유 자산의 11.2%까지 평가손실이 났던 구간이 있었다는 뜻",
   },
   {
     num: "⑥",
@@ -1252,8 +1249,7 @@ function TaxPage() {
               }}
             >
               {taxEffect.headlineLabel ?? "연간 절세 효과"} (
-              {selectedPf?.name ?? "안정 추구"} 기준 ·{" "}
-              {C.aumLabel})
+              {selectedPf?.name ?? "안정 추구"} 기준 · {C.aumLabel})
             </div>
             <div
               style={{
@@ -1427,9 +1423,11 @@ function TaxPage() {
                 {derivedFlow && (
                   <>
                     <br />✓ {taxFlow?.totalLabel} +
-                    {derivedFlow.totalSavingManwon.toLocaleString()}만원: 금융소득
-                    +{derivedFlow.breakdown.financialManwon.toLocaleString()}만 (세전
-                    +{derivedFlow.breakdown.pretaxGainManwon.toLocaleString()} ·{" "}
+                    {derivedFlow.totalSavingManwon.toLocaleString()}만원:
+                    금융소득 +
+                    {derivedFlow.breakdown.financialManwon.toLocaleString()}만
+                    (세전 +
+                    {derivedFlow.breakdown.pretaxGainManwon.toLocaleString()} ·{" "}
                     {derivedFlow.breakdown.switchTaxManwon >= 0
                       ? "전환 세금 −"
                       : "전환 세금 절감 +"}
@@ -1437,8 +1435,9 @@ function TaxPage() {
                       derivedFlow.breakdown.switchTaxManwon,
                     ).toLocaleString()}{" "}
                     · ISA 절감 +
-                    {derivedFlow.breakdown.isaCutManwon.toLocaleString()}) · 근로소득세
-                    환급 +{derivedFlow.breakdown.refundManwon.toLocaleString()}만
+                    {derivedFlow.breakdown.isaCutManwon.toLocaleString()}) ·
+                    근로소득세 환급 +
+                    {derivedFlow.breakdown.refundManwon.toLocaleString()}만
                   </>
                 )}
               </div>
@@ -1828,26 +1827,40 @@ function RiskCheckPage() {
               marginTop: 2,
             }}
           >
-            시장이 흔들릴 때의 손실 추정 · 보완할 점
+            시장이 흔들릴 때의 손실 추정
+            {conflicts.length > 0 ? " · 보완할 점" : ""}
           </div>
         </div>
       </div>
 
       <div style={{ padding: "22px 40px 80px", wordBreak: "keep-all" }}>
-        <div style={{ display: "flex", alignItems: "center", marginBottom: 10 }}>
+        <div
+          style={{ display: "flex", alignItems: "center", marginBottom: 10 }}
+        >
           <SectionBar />
           <div style={{ fontSize: 15, fontWeight: 800, color: TEXT }}>
             시장이 크게 흔들릴 때
           </div>
         </div>
-        <p style={{ margin: "0 0 12px", fontSize: 11, color: MUTED, lineHeight: 1.7 }}>
+        <p
+          style={{
+            margin: "0 0 12px",
+            fontSize: 11,
+            color: MUTED,
+            lineHeight: 1.7,
+          }}
+        >
           과거에 있었던 시장 충격을 참조해, {selectedPf.name} 구성이 같은 상황을
-          만났을 때 줄어들 수 있는 금액입니다. 정밀한 재현이 아니라 방향과 크기를
-          맞춘 대표 시나리오입니다.
+          만났을 때 줄어들 수 있는 금액입니다. 정밀한 재현이 아니라 방향과
+          크기를 맞춘 대표 시나리오입니다.
         </p>
 
         <table
-          style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}
+          style={{
+            width: "100%",
+            borderCollapse: "collapse",
+            tableLayout: "fixed",
+          }}
         >
           <colgroup>
             <col style={{ width: 120 }} />
@@ -1941,6 +1954,71 @@ function RiskCheckPage() {
           </tbody>
         </table>
 
+        {/*
+          보완할 항목이 없으면 칸 자체를 만들지 않는다 — 제목과 안내문만 남고
+          아래가 비면 문서에 빠진 자리처럼 보인다.
+        */}
+        {conflicts.length > 0 && (
+          <>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                margin: "26px 0 10px",
+              }}
+            >
+              <SectionBar />
+              <div style={{ fontSize: 15, fontWeight: 800, color: TEXT }}>
+                보완할 점
+              </div>
+            </div>
+
+            {/*
+            안내문을 항목보다 먼저 둔다 — 미달 문장을 먼저 읽고 나면 "막히는 건가"
+            하는 인상이 남고, 그 뒤에 오는 해명은 늦다. 성격을 먼저 말하고 항목을 보인다.
+          */}
+            <p
+              style={{
+                margin: "0 0 10px",
+                fontSize: 10.5,
+                color: MUTED,
+                lineHeight: 1.7,
+              }}
+            >
+              아래 항목은 투자를 막는 사유가 아니라, 담당 PB 와 함께 확인하고
+              조정할 지점입니다.
+            </p>
+
+            {conflicts.map((c) => (
+              <div
+                key={c.rule}
+                style={{
+                  border: `1px solid ${BORDER}`,
+                  borderRadius: 8,
+                  padding: "11px 13px",
+                  marginBottom: 8,
+                  background: BG_ALT,
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 800,
+                    color: TEXT,
+                    marginBottom: 3,
+                  }}
+                >
+                  {c.message}
+                </div>
+                <div style={{ fontSize: 11, color: TEXT }}>
+                  {c.observed} · 기준 {c.threshold}
+                  {c.previousObserved ? ` (상담 전 ${c.previousObserved})` : ""}
+                </div>
+              </div>
+            ))}
+          </>
+        )}
+
         <div
           style={{
             display: "flex",
@@ -1950,53 +2028,18 @@ function RiskCheckPage() {
         >
           <SectionBar />
           <div style={{ fontSize: 15, fontWeight: 800, color: TEXT }}>
-            보완할 점
+            유의사항
           </div>
-        </div>
-
-        {/*
-          안내문을 항목보다 먼저 둔다 — 미달 문장을 먼저 읽고 나면 "막히는 건가"
-          하는 인상이 남고, 그 뒤에 오는 해명은 늦다. 성격을 먼저 말하고 항목을 보인다.
-        */}
-        <p style={{ margin: "0 0 10px", fontSize: 10.5, color: MUTED, lineHeight: 1.7 }}>
-          아래 항목은 투자를 막는 사유가 아니라, 담당 PB 와 함께 확인하고 조정할 지점입니다.
-        </p>
-
-        {conflicts.map((c) => (
-          <div
-            key={c.rule}
-            style={{
-              border: `1px solid ${BORDER}`,
-              borderRadius: 8,
-              padding: "11px 13px",
-              marginBottom: 8,
-              background: BG_ALT,
-            }}
-          >
-            <div style={{ fontSize: 12, fontWeight: 800, color: TEXT, marginBottom: 3 }}>
-              {c.message}
-            </div>
-            <div style={{ fontSize: 11, color: TEXT }}>
-              {c.observed} · 기준 {c.threshold}
-              {c.previousObserved ? ` (상담 전 ${c.previousObserved})` : ""}
-            </div>
-          </div>
-        ))}
-
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            margin: "26px 0 10px",
-          }}
-        >
-          <SectionBar />
-          <div style={{ fontSize: 15, fontWeight: 800, color: TEXT }}>유의사항</div>
         </div>
         {DISCLAIMERS.map((d) => (
           <p
             key={d.code}
-            style={{ margin: "0 0 6px", fontSize: 10.5, color: MUTED, lineHeight: 1.7 }}
+            style={{
+              margin: "0 0 6px",
+              fontSize: 10.5,
+              color: MUTED,
+              lineHeight: 1.7,
+            }}
           >
             · {d.text}
           </p>

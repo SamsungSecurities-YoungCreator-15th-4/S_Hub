@@ -131,7 +131,11 @@ function covarianceWithPortfolio(
   let acc = 0;
   for (const other of CALC_UNITS) {
     const w = (weights[other.id] ?? 0) / 100;
-    acc += w * ANNUAL_VOL_PCT[unit] * ANNUAL_VOL_PCT[other.id] * correlation(unit, other.id);
+    acc +=
+      w *
+      ANNUAL_VOL_PCT[unit] *
+      ANNUAL_VOL_PCT[other.id] *
+      correlation(unit, other.id);
   }
   return acc;
 }
@@ -215,7 +219,8 @@ export function cvarContributions(
   let variance = 0;
   for (const unit of CALC_UNITS) {
     variance +=
-      ((weights[unit.id] ?? 0) / 100) * covarianceWithPortfolio(unit.id, weights);
+      ((weights[unit.id] ?? 0) / 100) *
+      covarianceWithPortfolio(unit.id, weights);
   }
   if (variance <= 0) return [];
 
@@ -242,12 +247,25 @@ export function cvarContributions(
   ];
 }
 
+/**
+ * 손실 기여도 한 줄 요약. 자산군 이름의 받침에 따라 조사를 고른다 —
+ * "국내주식이(가)" 같은 표기는 사람이 쓴 문장이 아니다.
+ */
+export function contributionNote(top: ContributionRow): string {
+  const last = top.label.charCodeAt(top.label.length - 1);
+  // 한글 음절 영역에서 (코드 − 0xAC00) % 28 이 0 이면 받침이 없다.
+  const hasFinal =
+    last >= 0xac00 && last <= 0xd7a3 ? (last - 0xac00) % 28 !== 0 : false;
+  return `${top.label}${hasFinal ? "이" : "가"} 손실의 ${top.weightPct.toFixed(1)}%를 차지합니다.`;
+}
+
 /** 연 변동성(%) — 비중만으로 구한다. 지표가 없는 조정안 등에서 쓴다. */
 export function portfolioVolatilityPct(weights: CalcUnitWeights): number {
   let variance = 0;
   for (const unit of CALC_UNITS) {
     variance +=
-      ((weights[unit.id] ?? 0) / 100) * covarianceWithPortfolio(unit.id, weights);
+      ((weights[unit.id] ?? 0) / 100) *
+      covarianceWithPortfolio(unit.id, weights);
   }
   return Math.sqrt(Math.max(variance, 0));
 }

@@ -18,6 +18,7 @@ import {
 import { conflictSummary, evaluateIpsConflicts } from "@/lib/ipsConflicts";
 import {
   CONFIDENCE_LEVEL_PCT,
+  contributionNote,
   cvarContributions,
   riskMetricRows,
 } from "@/lib/riskModel";
@@ -26,7 +27,11 @@ import { useDashboardStore } from "@/lib/store";
 import { useViewedPortfolio } from "@/lib/viewedPortfolio";
 import { deriveTaxFlowRows, useTaxFlow, useTaxPlan } from "@/lib/taxPlan";
 import { deriveAdviceCards } from "@/lib/taxAdviceCards";
-import { buildPdfAllocation, buildPdfMacroCell, buildPdfPerfRows } from "@/lib/pdfPortfolioData";
+import {
+  buildPdfAllocation,
+  buildPdfMacroCell,
+  buildPdfPerfRows,
+} from "@/lib/pdfPortfolioData";
 import {
   buildPdfTaxEffect,
   pdfTaxEffectFromDerived,
@@ -121,9 +126,7 @@ function PageFooter({ page, total }: { page: number; total: number }) {
           alignItems: "center",
         }}
       >
-        <span style={{ fontSize: 10, color: MUTED }}>
-          내부 기밀 자료
-        </span>
+        <span style={{ fontSize: 10, color: MUTED }}>내부 기밀 자료</span>
         <span
           style={{
             position: "absolute",
@@ -277,7 +280,12 @@ function CoverPage() {
    */
   const coverFlow = useTaxFlow();
   const taxEffect = pdfTaxEffectFromDerived(
-    buildPdfTaxEffect(extractTaxOptimizerEntry(useDashboardStore((s) => s.taxOptimizer), selectedPortfolioId)),
+    buildPdfTaxEffect(
+      extractTaxOptimizerEntry(
+        useDashboardStore((s) => s.taxOptimizer),
+        selectedPortfolioId,
+      ),
+    ),
     coverFlow ? deriveTaxFlowRows(coverFlow) : null,
     coverFlow,
   );
@@ -338,7 +346,12 @@ function CoverPage() {
             <img
               src="/logo.png"
               alt=""
-              style={{ width: 36, height: 36, borderRadius: 9, objectFit: "cover" }}
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 9,
+                objectFit: "cover",
+              }}
             />
             <div>
               <div
@@ -653,7 +666,8 @@ function MarketIpsPage() {
                     color: cell.color,
                   }}
                 >
-                  {cell.arrow ? `${cell.arrow} ` : ""}{cell.changeText}
+                  {cell.arrow ? `${cell.arrow} ` : ""}
+                  {cell.changeText}
                 </div>
               </div>
             );
@@ -749,7 +763,8 @@ function PortfolioPage() {
   const selectedCustomerId = useDashboardStore((s) => s.selectedCustomerId);
   const selectedPortfolioId = useDashboardStore((s) => s.selectedPortfolioId);
   const aumEokwon =
-    (customers.find((c) => c.id === selectedCustomerId) ?? customers[0])?.aumEokwon ?? 50;
+    (customers.find((c) => c.id === selectedCustomerId) ?? customers[0])
+      ?.aumEokwon ?? 50;
 
   // 훅은 early return 앞에서 호출(react-hooks/rules-of-hooks).
   /*
@@ -771,11 +786,49 @@ function PortfolioPage() {
     보여주게 된다. 손댔을 때만 넷째 열을 세운다.
   */
   const cols = [
-    { key: "current", p: current, alloc: buildPdfAllocation(current), label: "현재 포트폴리오", badge: "", badgeColor: "#6B7280", headerColor: "#6B7280", selected: false },
-    { key: "a", p: portA, alloc: buildPdfAllocation(portA), label: "안정 추구", badge: "", badgeColor: BRAND, headerColor: BRAND, selected: !isAdjusted && selId === "a" },
-    { key: "b", p: portB, alloc: buildPdfAllocation(portB), label: "수익 추구", badge: "", badgeColor: "#2C7BFF", headerColor: "#2C7BFF", selected: !isAdjusted && selId === "b" },
+    {
+      key: "current",
+      p: current,
+      alloc: buildPdfAllocation(current),
+      label: "현재 포트폴리오",
+      badge: "",
+      badgeColor: "#6B7280",
+      headerColor: "#6B7280",
+      selected: false,
+    },
+    {
+      key: "a",
+      p: portA,
+      alloc: buildPdfAllocation(portA),
+      label: "안정 추구",
+      badge: "",
+      badgeColor: BRAND,
+      headerColor: BRAND,
+      selected: !isAdjusted && selId === "a",
+    },
+    {
+      key: "b",
+      p: portB,
+      alloc: buildPdfAllocation(portB),
+      label: "수익 추구",
+      badge: "",
+      badgeColor: "#2C7BFF",
+      headerColor: "#2C7BFF",
+      selected: !isAdjusted && selId === "b",
+    },
     ...(adjusted
-      ? [{ key: "adjusted", p: adjusted, alloc: buildPdfAllocation(adjusted), label: "제안 조정", badge: "", badgeColor: BRAND_DARK, headerColor: BRAND_DARK, selected: true }]
+      ? [
+          {
+            key: "adjusted",
+            p: adjusted,
+            alloc: buildPdfAllocation(adjusted),
+            label: "제안 조정",
+            badge: "",
+            badgeColor: BRAND_DARK,
+            headerColor: BRAND_DARK,
+            selected: true,
+          },
+        ]
       : []),
   ];
 
@@ -801,7 +854,6 @@ function PortfolioPage() {
         vals: [...row.vals, adjustedPerfRows[i].vals[1]],
       }))
     : basePerfRows;
-
 
   // ── Stress Test ─────────────────────────────────────────────────
   // 화면 카드(StressTestSection)와 같은 runStress 를 쓴다 — 리포트 숫자가
@@ -891,7 +943,13 @@ function PortfolioPage() {
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: isAdjusted ? 8 : 12, marginBottom: 22 }}>
+        <div
+          style={{
+            display: "flex",
+            gap: isAdjusted ? 8 : 12,
+            marginBottom: 22,
+          }}
+        >
           {cols.map(({ key, alloc, label, badge, badgeColor, selected }) => (
             <div
               key={key}
@@ -1033,7 +1091,11 @@ function PortfolioPage() {
         {stressRows.length > 0 && (
           <>
             <div
-              style={{ display: "flex", alignItems: "center", marginBottom: 28 }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                marginBottom: 28,
+              }}
             >
               <SectionBar />
               <div style={{ fontSize: 14, fontWeight: 800, color: TEXT }}>
@@ -1041,7 +1103,12 @@ function PortfolioPage() {
                 {/* 어느 안의 손실인지 밝힌다 — 리스크 리포트의 같은 이름 표는
                     현재 포트폴리오를 보므로 값이 다른 것이 정상이다. */}
                 <span
-                  style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: MUTED }}
+                  style={{
+                    marginLeft: 8,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: MUTED,
+                  }}
                 >
                   {selectedPf.name} 기준
                 </span>
@@ -1107,7 +1174,9 @@ function PortfolioPage() {
                     >
                       {row.name}
                     </td>
-                    <td style={{ padding: "8px 10px", fontSize: 11, color: TEXT }}>
+                    <td
+                      style={{ padding: "8px 10px", fontSize: 11, color: TEXT }}
+                    >
                       {row.shock}
                     </td>
                     <td
@@ -1153,7 +1222,10 @@ function TaxPage() {
   // 절세 계좌 배치 바는 절세 화면(AccountAllocation)과 같이 확정 대상 안을 따른다.
   const { viewed: selectedPf } = useViewedPortfolio();
   const selectedAllocSlices = selectedPf ? buildPdfAllocation(selectedPf) : [];
-  const taxOptimizerEntry = extractTaxOptimizerEntry(taxOptimizerMap, selectedPortfolioId);
+  const taxOptimizerEntry = extractTaxOptimizerEntry(
+    taxOptimizerMap,
+    selectedPortfolioId,
+  );
   const taxEffectBase = buildPdfTaxEffect(taxOptimizerEntry);
   /*
    * 카드와 총액은 화면(절세 제안 탭)과 같은 함수를 부른다. 예전에는 리포트만
@@ -1167,7 +1239,10 @@ function TaxPage() {
   );
   const portfolioTaxMap = useDashboardStore((s) => s.portfolioTax);
   const aumEokwon = customer.aumEokwon ?? 0;
-  const portfolioTaxEntry = extractPortfolioTaxEntry(portfolioTaxMap, selectedPortfolioId);
+  const portfolioTaxEntry = extractPortfolioTaxEntry(
+    portfolioTaxMap,
+    selectedPortfolioId,
+  );
   /*
    * 백엔드 흐름이 없으면 화면과 같은 프론트 계산으로 채운다. 예전에는 여기서
    * null 이 되어 표가 통째로 "분석 후 확인할 수 있습니다" 로 비었는데, 데모
@@ -1278,8 +1353,7 @@ function TaxPage() {
               }}
             >
               {taxEffect.headlineLabel ?? "연간 절세 효과"} (
-              {selectedPf?.name ?? "안정 추구"} 기준 ·{" "}
-              {customer.aumLabel})
+              {selectedPf?.name ?? "안정 추구"} 기준 · {customer.aumLabel})
             </div>
             <div
               style={{
@@ -1442,10 +1516,9 @@ function TaxPage() {
             >
               <div style={{ fontSize: 10, color: MUTED, lineHeight: 1.7 }}>
                 ✓ 세후 수익률 {taxEffect.afterTaxReturn.from} →{" "}
-                {taxEffect.afterTaxReturn.to} (
-                {taxEffect.afterTaxReturn.delta})<br />✓ 금융소득세{" "}
-                {taxEffect.effectiveTax.from} → {taxEffect.effectiveTax.to} (
-                {taxEffect.effectiveTax.delta})
+                {taxEffect.afterTaxReturn.to} ({taxEffect.afterTaxReturn.delta})
+                <br />✓ 금융소득세 {taxEffect.effectiveTax.from} →{" "}
+                {taxEffect.effectiveTax.to} ({taxEffect.effectiveTax.delta})
                 {/*
                   화면 머리말과 같은 분해다. 총액만 적으면 절반이 다른 세목(근로
                   소득세 환급)이라는 사실이 묻히고, 전환으로 세금이 늘었다는 것도
@@ -1454,9 +1527,11 @@ function TaxPage() {
                 {derivedFlow && (
                   <>
                     <br />✓ {taxFlow?.totalLabel} +
-                    {derivedFlow.totalSavingManwon.toLocaleString()}만원: 금융소득
-                    +{derivedFlow.breakdown.financialManwon.toLocaleString()}만 (세전
-                    +{derivedFlow.breakdown.pretaxGainManwon.toLocaleString()} ·{" "}
+                    {derivedFlow.totalSavingManwon.toLocaleString()}만원:
+                    금융소득 +
+                    {derivedFlow.breakdown.financialManwon.toLocaleString()}만
+                    (세전 +
+                    {derivedFlow.breakdown.pretaxGainManwon.toLocaleString()} ·{" "}
                     {derivedFlow.breakdown.switchTaxManwon >= 0
                       ? "전환 세금 −"
                       : "전환 세금 절감 +"}
@@ -1464,8 +1539,9 @@ function TaxPage() {
                       derivedFlow.breakdown.switchTaxManwon,
                     ).toLocaleString()}{" "}
                     · ISA 절감 +
-                    {derivedFlow.breakdown.isaCutManwon.toLocaleString()}) · 근로소득세
-                    환급 +{derivedFlow.breakdown.refundManwon.toLocaleString()}만
+                    {derivedFlow.breakdown.isaCutManwon.toLocaleString()}) ·
+                    근로소득세 환급 +
+                    {derivedFlow.breakdown.refundManwon.toLocaleString()}만
                   </>
                 )}
               </div>
@@ -1919,7 +1995,11 @@ function AiPage() {
         {citationSources.length > 0 && (
           <>
             <div
-              style={{ display: "flex", alignItems: "center", marginBottom: 16 }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                marginBottom: 16,
+              }}
             >
               <SectionBar />
               <div style={{ fontSize: 14, fontWeight: 800, color: TEXT }}>
@@ -1927,7 +2007,9 @@ function AiPage() {
               </div>
             </div>
 
-            <table style={{ width: "100%", borderCollapse: "collapse" as const }}>
+            <table
+              style={{ width: "100%", borderCollapse: "collapse" as const }}
+            >
               <thead>
                 <tr style={{ background: BG_ALT }}>
                   <th
@@ -1976,7 +2058,13 @@ function AiPage() {
                     >
                       {src.title}
                     </td>
-                    <td style={{ padding: "8px 12px", fontSize: 11, color: MUTED }}>
+                    <td
+                      style={{
+                        padding: "8px 12px",
+                        fontSize: 11,
+                        color: MUTED,
+                      }}
+                    >
                       {src.date}
                     </td>
                   </tr>
@@ -2029,11 +2117,20 @@ function ReportSection({
     <div style={{ marginBottom: 18 }}>
       <div style={{ display: "flex", alignItems: "center", marginBottom: 9 }}>
         <SectionBar />
-        <div style={{ fontSize: 14, fontWeight: 800, color: TEXT }}>{title}</div>
+        <div style={{ fontSize: 14, fontWeight: 800, color: TEXT }}>
+          {title}
+        </div>
       </div>
       {children}
       {note && (
-        <p style={{ margin: "7px 0 0", fontSize: 10, color: MUTED, lineHeight: 1.6 }}>
+        <p
+          style={{
+            margin: "7px 0 0",
+            fontSize: 10,
+            color: MUTED,
+            lineHeight: 1.6,
+          }}
+        >
           {note}
         </p>
       )}
@@ -2140,7 +2237,11 @@ function RiskReportPage() {
           title={`VaR / CVaR 신뢰수준 ${CONFIDENCE_LEVEL_PCT}% · ${formatWon(totalKrw)} 기준`}
         >
           <table
-            style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}
+            style={{
+              width: "100%",
+              borderCollapse: "collapse",
+              tableLayout: "fixed",
+            }}
           >
             <colgroup>
               <col style={{ width: 130 }} />
@@ -2177,14 +2278,14 @@ function RiskReportPage() {
 
         <ReportSection
           title={`CVaR 자산군 기여도 합계 ${contributionTotal.toFixed(1)}%`}
-          note={
-            topContribution
-              ? `${topContribution.label}이(가) 손실의 ${topContribution.weightPct.toFixed(1)}% 를 차지합니다.`
-              : undefined
-          }
+          note={topContribution ? contributionNote(topContribution) : undefined}
         >
           <table
-            style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}
+            style={{
+              width: "100%",
+              borderCollapse: "collapse",
+              tableLayout: "fixed",
+            }}
           >
             <tbody>
               {contributions.map((r) => (
@@ -2228,7 +2329,11 @@ function EvidencePage() {
       <div style={{ padding: "22px 40px 80px", wordBreak: "keep-all" }}>
         <ReportSection title={`인용·출처 ${CITATIONS.length}건`}>
           <table
-            style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}
+            style={{
+              width: "100%",
+              borderCollapse: "collapse",
+              tableLayout: "fixed",
+            }}
           >
             <colgroup>
               <col style={{ width: 26 }} />
@@ -2259,7 +2364,11 @@ function EvidencePage() {
           note={VERIFICATION_NOTE}
         >
           <table
-            style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}
+            style={{
+              width: "100%",
+              borderCollapse: "collapse",
+              tableLayout: "fixed",
+            }}
           >
             <colgroup>
               <col style={{ width: 62 }} />
@@ -2286,7 +2395,11 @@ function EvidencePage() {
 
         <ReportSection title="재현성 해시" note={REPRODUCIBILITY_NOTE}>
           <table
-            style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}
+            style={{
+              width: "100%",
+              borderCollapse: "collapse",
+              tableLayout: "fixed",
+            }}
           >
             <colgroup>
               <col style={{ width: 140 }} />
@@ -2317,7 +2430,12 @@ function EvidencePage() {
           {DISCLAIMERS.map((d) => (
             <p
               key={d.code}
-              style={{ margin: "0 0 5px", fontSize: 10, color: MUTED, lineHeight: 1.7 }}
+              style={{
+                margin: "0 0 5px",
+                fontSize: 10,
+                color: MUTED,
+                lineHeight: 1.7,
+              }}
             >
               · {d.text}
             </p>

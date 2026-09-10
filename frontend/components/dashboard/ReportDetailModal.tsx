@@ -11,10 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { RUN_STATUS, canTransition } from "@/lib/runStatus";
 import { CALC_UNITS } from "@/lib/assetMapping";
-import {
-  useDashboardStore,
-  useRunStatus,
-} from "@/lib/store";
+import { useDashboardStore, useRunStatus } from "@/lib/store";
 import {
   CITATIONS,
   DISCLAIMERS,
@@ -30,6 +27,7 @@ import { STRESS_SCENARIOS, runStress } from "@/lib/stressScenarios";
 import { conflictSummary, evaluateIpsConflicts } from "@/lib/ipsConflicts";
 import {
   CONFIDENCE_LEVEL_PCT,
+  contributionNote,
   cvarContributions,
   riskMetricRows,
 } from "@/lib/riskModel";
@@ -48,7 +46,11 @@ const BOTTOM_THRESHOLD_PX = 24;
  * 표시하는 값은 전부 lib/mock/symphonyReport.ts 의 상수다. 이 화면은 지표를 다시
  * 계산하지 않는다 — 6지표 산출의 SSOT 는 엔진의 calculate_metrics 하나뿐이다.
  */
-export default function ReportDetailModal({ onClose }: { onClose: () => void }) {
+export default function ReportDetailModal({
+  onClose,
+}: {
+  onClose: () => void;
+}) {
   const runStatus = useRunStatus();
   const { totalKrw, label } = useSymphonySubject();
   const lockReport = useDashboardStore((s) => s.lockReport);
@@ -92,9 +94,7 @@ export default function ReportDetailModal({ onClose }: { onClose: () => void }) 
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent
-        className="flex h-[92vh] w-full max-w-[980px] flex-col gap-0 overflow-hidden p-0 sm:max-w-[980px]"
-      >
+      <DialogContent className="flex h-[92vh] w-full max-w-[980px] flex-col gap-0 overflow-hidden p-0 sm:max-w-[980px]">
         {/* 상태 헤더 — 스크롤과 무관하게 상단 고정 */}
         <div className="shrink-0 border-b px-5 py-3.5">
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 pr-9">
@@ -400,8 +400,7 @@ function ContributionBlock() {
   const total = rows.reduce((a, r) => a + r.weightPct, 0);
   const max = Math.max(...rows.map((r) => r.weightPct), 1);
   // 비중보다 기여도가 큰 자산군이 이 안의 손실을 끌고 간다 — 그 한 줄만 남긴다.
-  const top = rows[0];
-  const note = `${top.label}이(가) 손실의 ${top.weightPct.toFixed(1)}% 를 차지합니다.`;
+  const note = contributionNote(rows[0]);
 
   return (
     <Block
@@ -450,7 +449,9 @@ function StressBlock() {
     label: sc.label,
     loss: runStress(portfolio.weights, totalKrw, sc),
   }));
-  const worst = rows.reduce((w, r) => (r.loss.lossKrw > w.loss.lossKrw ? r : w));
+  const worst = rows.reduce((w, r) =>
+    r.loss.lossKrw > w.loss.lossKrw ? r : w,
+  );
 
   /*
     근시일에 써야 할 돈과 견준다. 금액을 문구에 박아 두면 고객이 바뀌었을 때
@@ -504,7 +505,9 @@ function StressBlock() {
           <tbody>
             {rows.map((r) => (
               <tr key={r.key} className="border-b last:border-0">
-                <td className={`${TD} ${r.key === worst.key ? "font-bold" : ""}`}>
+                <td
+                  className={`${TD} ${r.key === worst.key ? "font-bold" : ""}`}
+                >
                   {r.label}
                 </td>
                 <td className={`${TD} text-right tabular-nums text-down`}>
