@@ -3,6 +3,7 @@
 import { TAX_EFFECT, PORTFOLIOS } from "@/lib/mockData";
 import { toCalcUnitAllocation } from "@/lib/assetMapping";
 import { useDashboardStore } from "@/lib/store";
+import HelpTooltip from "@/components/common/HelpTooltip";
 import { useViewedPortfolio } from "@/lib/viewedPortfolio";
 import { useTaxPlan } from "@/lib/taxPlan";
 import type { AccountSlot } from "@/lib/types";
@@ -21,6 +22,22 @@ import type { AccountSlot } from "@/lib/types";
   잃지 않는다.
 */
 const PENSION_ANNUAL_LIMIT_MAN = 900;
+
+/*
+  이 막대의 8,000만원이 어디서 나왔는지는 조문에만 있다. 화면 아래 한 줄은 "누적
+  한도" 라고만 말하고 산식은 보여주지 않으므로, 근거는 가이드에 둔다.
+*/
+const ACCOUNT_HELP = (isaLimitManwon: number) => [
+  `ISA 납입한도 = 2,000만원 × (1 + 가입 후 경과연수) − 누적 납입금액 (조특법 §91의18)`,
+  "미사용분은 해마다 쌓인다 — 리셋되지 않는다",
+  `총 납입한도 1억원 — 5년차에 닿고 그 뒤로는 늘지 않는다${
+    isaLimitManwon >= 10000 ? " (이 고객이 그 자리다)" : ""
+  }`,
+  "인출해도 한도는 복원되지 않는다 — 넣었다 뺀 금액도 누적에 남는다",
+  "연금계좌는 연 900만원 세액공제 한도 — 1월 1일에 리셋된다 (소득세법 §59의3)",
+  "막대는 이미 납입한 금액 — 올해 배분안은 납입안 탭이 적는다",
+  "전체 계좌 띠는 확정 대상 안의 자산 구성 — 제안을 조정하면 함께 바뀐다",
+];
 
 const ACCOUNT_META: Record<string, { name: string }> = {
   isa: { name: "ISA" },
@@ -50,6 +67,7 @@ export default function AccountAllocation({
    * 않았다. 같은 화면의 도넛·스트레스는 store 를 읽는데 여기만 상수였다.
    */
   const portfolios = useDashboardStore((s) => s.portfolios);
+  const helpMode = useDashboardStore((s) => s.helpMode);
   /*
    * 확정 대상 안을 따른다 — PB 가 제안 조정으로 비중을 손보면 이 막대도 같이
    * 움직여야 한다. PDF(PB·고객) 의 같은 막대도 같은 훅을 읽는다.
@@ -124,9 +142,23 @@ export default function AccountAllocation({
 
   return (
     <div className="flex flex-col">
-      <p className="mb-2 flex items-center gap-1.5 text-[13px] font-extrabold">
-        계좌 배치 활용도
-      </p>
+      {/*
+        여는 자리는 제목 글자뿐이다 — 세금 흐름 비교·절세 제안 카드와 같은 규격이라,
+        가이드를 켜면 설명이 붙은 자리가 화면 전체에서 같은 모양으로 보인다.
+      */}
+      <HelpTooltip text={ACCOUNT_HELP(isaLimit)} placement="bottom" className="w-fit" wide>
+        <p className="mb-2 cursor-default text-[13px] font-extrabold">
+          <span
+            className={
+              helpMode
+                ? "rounded border border-brand/40 bg-brand/[0.06] px-1"
+                : ""
+            }
+          >
+            계좌 배치 활용도
+          </span>
+        </p>
+      </HelpTooltip>
 
       {/* 전체 계좌 세그먼트 바 — YAxis width(72px) 기준 정렬, 2px 여백 */}
       <div className="mb-1 flex items-center">
