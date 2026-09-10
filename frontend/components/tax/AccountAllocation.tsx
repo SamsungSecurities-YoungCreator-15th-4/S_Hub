@@ -141,7 +141,7 @@ export default function AccountAllocation({
   ];
 
   return (
-    <div className="flex flex-col">
+    <div className="flex w-full flex-col">
       {/*
         여는 자리는 제목 글자뿐이다 — 세금 흐름 비교·절세 제안 카드와 같은 규격이라,
         가이드를 켜면 설명이 붙은 자리가 화면 전체에서 같은 모양으로 보인다.
@@ -164,12 +164,12 @@ export default function AccountAllocation({
         </p>
       </HelpTooltip>
 
-      {/* 전체 계좌 세그먼트 바 — YAxis width(72px) 기준 정렬, 2px 여백 */}
+      {/* 전체 계좌 세그먼트 바 — 아래 계좌 막대와 같은 72px 라벨 + 10px 간격 */}
       <div className="mb-1 flex items-center">
         <span className="w-[72px] shrink-0 text-right text-[12px] font-extrabold text-[#4E5968]">
           전체 계좌
         </span>
-        <div className="ml-[2px] mr-[16px] flex h-[12px] flex-1 overflow-hidden rounded-md">
+        <div className="ml-[10px] flex h-[12px] flex-1 overflow-hidden rounded-md">
           {allocation.map(({ label, weight, color }) => (
             <div
               key={label}
@@ -180,12 +180,7 @@ export default function AccountAllocation({
       </div>
 
       {/* 세그먼트 범례 */}
-      {/*
-        6분류일 때는 한 줄이었지만 11종이면 두 줄이 된다. 아래 차트가 상한·하한
-        사이에서 줄어 그만큼을 흡수하므로 카드 높이는 그대로다. 간격을 좁혀 두
-        줄 안에 들어오게 한다.
-      */}
-      <div className="mb-2 ml-[74px] mr-[16px] flex flex-wrap gap-x-1.5 gap-y-0 leading-tight">
+      <div className="mb-2 ml-[82px] mr-[16px] flex flex-wrap gap-x-1.5 gap-y-0 leading-tight">
         {allocation.map(({ label, weight, color }) => (
           <span
             key={label}
@@ -201,8 +196,6 @@ export default function AccountAllocation({
       </div>
 
       {/* ISA / 연금저축+IRP — 각자 자기 한도 대비 비율 */}
-      {/* 흐름 차트와 같은 규칙 — 상한은 종전 높이, 모자라면 하한까지 줄어든다. */}
-      {/* 막대가 납작해 보이지 않게 두께와 간격을 함께 준다. */}
       <div className="flex flex-col gap-3.5 py-1">
         {bars.map((bar) => {
           const pct =

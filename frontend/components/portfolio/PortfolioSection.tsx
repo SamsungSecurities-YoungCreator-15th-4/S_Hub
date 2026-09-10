@@ -130,7 +130,7 @@ export default function PortfolioSection() {
   const adjustedPortfolio: CardPortfolio | undefined = isProposedEdit && editBase
     ? {
         ...editBase,
-        // 백엔드 원본 allocation 을 지운다 — 도넛이 사람이 조정한 weights 를 쓰게 한다.
+        // 백엔드 원본 allocation 을 지운다 — 차트가 사람이 조정한 weights 를 쓰게 한다.
         allocation: undefined,
         id: ADJUSTED_KEY,
         name: ADJUSTED_LABEL,
@@ -199,7 +199,7 @@ export default function PortfolioSection() {
           {/*
             제안 A·B 를 한 카드로 합치고 세그먼트로 전환한다. 두 안은 같은 축
             (안정 ↔ 수익)의 양끝이라 나란히 두는 것보다 하나를 바꿔 보는 편이
-            비교가 된다. 현재 카드와 같은 폭으로 둬 두 도넛·지표가 같은 크기로
+            비교가 된다. 현재 카드와 같은 폭으로 둬 두 원형 차트·지표가 같은 크기로
             맞붙게 한다 — 비교가 이 화면의 목적이다.
           */}
           {(adjustedPortfolio ?? selectedProposal) && (
@@ -315,10 +315,8 @@ function PortfolioCard({
         {header}
       </div>
 
-      <div className="flex min-h-72 items-stretch gap-2.5">
-        <div className="flex flex-1 flex-col items-center">
-          <AssetDonut allocation={allocation} />
-        </div>
+      <div className="min-h-64">
+        <AssetDonut allocation={allocation} />
       </div>
 
       {/*

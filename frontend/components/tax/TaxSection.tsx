@@ -188,12 +188,7 @@ export default function TaxSection() {
   }
 
   return (
-    /*
-      제목 줄과 카드 위치는 그대로 두고 카드 상자만 아래로 늘려 중앙 열 바닥을
-      메운다. 안쪽 내용은 자연 높이 그대로라 남는 높이는 카드 안쪽 여백이 된다 —
-      차트에 flex-1 을 흘려보내면 막대 세 개가 흩어져 오히려 성겨 보였다.
-      min-h-0 이 없으면 flex 자식이 내용 높이 아래로 줄지 않아 세로 스크롤이 생긴다.
-    */
+    /* 각 탭은 콘텐츠에 필요한 높이를 사용한다. */
     <Tabs defaultValue="effect" className="flex min-h-0 flex-1 flex-col">
       <div className="mb-2 flex items-center justify-between px-0.5">
         <div className="flex items-center gap-2.5">
@@ -228,19 +223,19 @@ export default function TaxSection() {
 
       <Card className="min-h-0 flex-1 gap-0 p-3">
         {/* 탭 1: 절세 효과 */}
-        <TabsContent value="effect" className="flex min-h-0 flex-1 flex-col gap-2">
+        <TabsContent value="effect" className="flex min-h-0 flex-1 flex-col gap-2.5">
           {/*
             절세 효과 금액이 없는 상태에서는 왼쪽이 배지 한 줄뿐이라 박스가 비어
             보인다. 세로 여백과 지표 카드를 줄여 내용만큼만 차지하게 한다.
           */}
-          <div className="flex items-center gap-3 rounded-xl border border-brand/20 bg-brand/5 px-3.5 py-2">
+          <div className="flex items-center gap-3 rounded-xl border border-brand/20 bg-brand/5 px-3 py-2">
             <div className="flex-1">
               <div className="flex items-center gap-2">
                 {/*
                   이 배지가 왼쪽 칸에 홀로 남는다(절세 효과 금액이 없을 때).
                   오른쪽 지표 카드와 무게를 맞추려면 이 정도는 되어야 한다.
                 */}
-                <span className="rounded-full border border-brand/20 bg-white px-3 py-1 text-[15px] font-extrabold text-brand-dark">
+                <span className="text-[15px] font-extrabold text-brand-dark">
                   {baseLabel}
                 </span>
               </div>
@@ -307,8 +302,8 @@ export default function TaxSection() {
             세로로 쌓으면 남는 높이가 두 그림의 폭으로 바뀐다.
             각각 테두리로 묶어 어디까지가 한 그림인지 경계를 준다.
           */}
-          <div className="flex min-h-0 flex-1 flex-col gap-2.5">
-            <div className="flex min-h-0 flex-1 flex-col rounded-xl border p-3">
+          <div className="flex min-h-0 w-full flex-1 flex-col gap-2.5">
+            <div className="flex min-h-0 w-full flex-1 flex-col rounded-xl border p-3">
               <TaxWaterfall
                 waterfallData={isStressMode ? null : waterfallData}
                 liveHeadline={isStressMode ? (taxSource?.headline ?? null) : null}
@@ -320,7 +315,7 @@ export default function TaxSection() {
               계좌 배치는 내용만큼만 차지한다. 막대 두 줄과 범례라 높이를 더 줘도
               늘어날 것이 없고, 그 공간은 세로가 길수록 읽기 좋은 흐름 막대가 받는다.
             */}
-            <div className="flex shrink-0 flex-col rounded-xl border p-3">
+            <div className="flex w-full shrink-0 flex-col rounded-xl border p-3">
               <AccountAllocation
                 accounts={[
                   {
@@ -394,11 +389,7 @@ function AdviceCards({ liveCards, plan }: AdviceCardsProps) {
   const { cards, totalSaving } = deriveAdviceCards(plan, liveCards);
 
   return (
-    /*
-      총합 바만 카드 바닥에 붙인다. 납입안 카드는 내용만큼만 차지한다 — 함께
-      늘리면 본문이 h-[104px] 로 고정이라 절감액 줄 아래가 하얗게 빈다.
-      남는 높이는 카드 목록과 총합 바 사이의 여백이 된다.
-    */
+    /* 카드 본문은 내용에 필요한 높이만 사용한다. */
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="mb-2 max-h-[520px] overflow-y-auto">
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
@@ -555,7 +546,7 @@ function SummaryStat({
         : "text-foreground";
   // 값과 증감을 한 줄에 둔다. 세 줄로 쌓으면 카드 높이가 박스 전체를 밀어 올린다.
   return (
-    <div className="min-w-29.5 rounded-xl border bg-white px-3 py-1.5">
+    <div className="min-w-29.5 px-1 py-0.5">
       <p className="text-[12px] font-bold text-muted-foreground">{k}</p>
       <p className="mt-0.5 flex items-baseline gap-1.5 whitespace-nowrap">
         <span className="text-[14px] font-extrabold tabular-nums">{v}</span>

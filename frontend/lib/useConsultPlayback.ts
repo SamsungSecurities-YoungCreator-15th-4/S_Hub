@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { CONSULT_LOG, type ConsultMessage } from "@/lib/mockData";
+import { CONSULT_LOG, IPS_DEFAULT, type ConsultMessage } from "@/lib/mockData";
 import { useDashboardStore } from "@/lib/store";
 import type { SttRealtimeStatus } from "@/lib/useSttRealtime";
 
@@ -60,6 +60,7 @@ export function useConsultPlayback() {
   const analyserRef = useRef<AnalyserNode | null>(null);
 
   const setTranscript = useDashboardStore((s) => s.setTranscript);
+  const setIps = useDashboardStore((s) => s.setIps);
 
   const cuesRef = useRef<Cue[]>([]);
   const nextIndexRef = useRef(0);
@@ -89,13 +90,25 @@ export function useConsultPlayback() {
     // 발표자가 첫 발화 전에 종료하거나 중간에 끊어도 상담 내역의 결과가 달라지지 않는다.
     playedRef.current = [...CONSULT_LOG];
     setTranscript(playedRef.current, "fallback");
+    // Asset은 선택 고객의 운용자산을 그대로 표시한다. 나머지 Goal/RRTTLLU는
+    // 이 고정 상담에서 추출한 값으로 채워 전사와 IPS 조율기가 함께 확정되게 한다.
+    setIps({
+      goal: IPS_DEFAULT.goal,
+      returnPct: IPS_DEFAULT.returnPct,
+      risk: IPS_DEFAULT.risk,
+      timeYears: IPS_DEFAULT.timeYears,
+      tax: IPS_DEFAULT.tax,
+      liquidity: IPS_DEFAULT.liquidity,
+      legal: IPS_DEFAULT.legal,
+      unique: IPS_DEFAULT.unique,
+    });
     setIsPaused(false);
     setStatus("stopping");
     timeoutRef.current = setTimeout(() => {
       timeoutRef.current = null;
       setStatus("done");
     }, 400);
-  }, [clearTimers, setTranscript]);
+  }, [clearTimers, setIps, setTranscript]);
 
   const tick = useCallback(() => {
     virtualSecondsRef.current += (TICK_MS / 1000) * PLAYBACK_SPEED;

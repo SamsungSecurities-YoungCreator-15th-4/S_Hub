@@ -88,7 +88,6 @@ export default function TaxWaterfall({
     refund?: number;
   }[];
   let totalSavingManwon: number;
-  let pretaxLabel: string;
   let totalLabel: string;
   let domainMax: number;
   /*
@@ -112,7 +111,6 @@ export default function TaxWaterfall({
     const baselineTax    = actualTax + waterfallData.savingManwon; // 전략 없을 때 예상 세액
     const baselineAfter  = grossManwon - baselineTax;
     totalSavingManwon = waterfallData.savingManwon;
-    pretaxLabel = `세전 총수익 ${grossManwon.toLocaleString()}만원`;
     totalLabel = "연간 절세 효과";
     domainMax = Math.max(grossManwon, afterTaxManwon + actualTax) * 1.15;
     data = [
@@ -128,7 +126,6 @@ export default function TaxWaterfall({
     const afterTax  = Math.round(liveHeadline.tax_amount_after  / 10000);
     totalSavingManwon = Math.round(liveHeadline.annual_tax_saving / 10000);
     const pretaxManwon = beforeAfterTax + beforeTax;
-    pretaxLabel = `세전 총수익 ${pretaxManwon.toLocaleString()}만원`;
     totalLabel = "연간 절세 효과";
     domainMax = Math.max(pretaxManwon, afterAfterTax + afterTax) * 1.15;
     data = [
@@ -149,20 +146,18 @@ export default function TaxWaterfall({
     data = rows;
 
     totalSavingManwon = derived.totalSavingManwon;
-    pretaxLabel = derived.pretaxLabel;
     totalLabel = derived.totalLabel;
     breakdown = derived.breakdown;
     domainMax =
       Math.max(...data.map((d) => d.afterTax + d.tax + (d.refund ?? 0))) * 1.1;
   } else {
-    const { rows, pretaxLabel: pl, totalLabel: tl, totalSavingManwon: ts } = TAX_EFFECT.flow;
+    const { rows, totalLabel: tl, totalSavingManwon: ts } = TAX_EFFECT.flow;
     data = rows.map((r, i) => ({
       name: i === 1 ? "제안 포트폴리오" : r.label,
       afterTax: r.afterTaxManwon,
       tax: r.taxManwon,
     }));
     totalSavingManwon = ts;
-    pretaxLabel = pl;
     totalLabel = tl;
     domainMax = 27000;
   }
@@ -242,7 +237,7 @@ export default function TaxWaterfall({
         도움말 모드에서 제목에 남기는 테두리도 사이드바의 자산 비중 조절기·백테스트와
         같은 규격이라, 설명이 어디에 붙어 있는지 한눈에 보인다.
       */}
-      <div className="mb-2 flex items-center gap-1.5">
+      <div className="mb-2 flex items-center">
         <HelpTooltip
           text={flow ? chartHelp : []}
           placement="bottom"
@@ -260,9 +255,6 @@ export default function TaxWaterfall({
             </span>
           </p>
         </HelpTooltip>
-        <span className="text-[13px] font-semibold text-muted-foreground">
-          {pretaxLabel}
-        </span>
       </div>
       <div className="mb-2 flex items-center justify-between gap-2 rounded-lg bg-muted/60 px-2.5 py-1.5">
         <div className="min-w-0">
@@ -307,11 +299,7 @@ export default function TaxWaterfall({
         </span>
       </div>
 
-      {/*
-        고정 높이 대신 상한·하한 사이에서 남거나 모자란 높이를 흡수한다. 좌측
-        사이드바가 행 높이를 정하므로 이쪽이 따라 줄어야 카드가 그 아래로
-        비어져 나오지 않는다. 상한은 종전 높이라 더 커지지는 않는다.
-      */}
+      {/* 남는 높이를 차트가 사용해 범례 아래에 빈 공간이 생기지 않게 한다. */}
       <div className={flow ? "min-h-32 max-h-56 flex-1" : "h-32"}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart

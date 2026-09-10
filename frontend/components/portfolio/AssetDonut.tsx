@@ -6,9 +6,9 @@ interface Props {
   allocation: { label: string; weight: number; color: string }[];
 }
 
-/** 포트폴리오 카드 자산배분 도넛 차트 + 하단 2열 범례
- *  - 도넛은 항상 h-40 고정 → 아이템 수 무관하게 같은 크기
- *  - 범례는 justify-between으로 항상 하단 고정
+/** 포트폴리오 카드 자산배분 원형 차트 + 우측 1열 범례
+ *  - 원형 차트는 항상 h-64 고정 → 아이템 수 무관하게 같은 크기
+ *  - 범례는 차트 오른쪽에 배치해 자산 비중을 한눈에 비교한다.
  */
 export default function AssetDonut({ allocation }: Props) {
   const data = allocation
@@ -16,9 +16,9 @@ export default function AssetDonut({ allocation }: Props) {
     .map((d) => ({ ...d, fill: d.color }));
 
   return (
-    <div className="flex h-full w-full flex-col justify-between py-1">
-      {/* 도넛: 항상 고정 높이 */}
-      <div className="h-40 w-full">
+    <div className="grid w-full grid-cols-[minmax(0,1.15fr)_minmax(150px,0.85fr)] items-center gap-4 py-1">
+      {/* 원형 차트: 항상 고정 높이 */}
+      <div className="h-64 min-w-0">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
@@ -27,8 +27,8 @@ export default function AssetDonut({ allocation }: Props) {
               nameKey="label"
               cx="50%"
               cy="50%"
-              innerRadius="42%"
-              outerRadius="78%"
+              innerRadius={0}
+              outerRadius="86%"
               startAngle={90}
               endAngle={-270}
               isAnimationActive={false}
@@ -37,8 +37,8 @@ export default function AssetDonut({ allocation }: Props) {
         </ResponsiveContainer>
       </div>
 
-      {/* 범례: 항상 하단 */}
-      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 px-2">
+      {/* 범례: 항상 오른쪽 */}
+      <div className="flex min-w-0 flex-col gap-1.5 pr-2">
         {data.map((d) => {
           const rounded = Math.round(d.weight * 10) / 10;
           const displayWeight = rounded % 1 === 0 ? rounded.toFixed(0) : rounded.toFixed(1);
