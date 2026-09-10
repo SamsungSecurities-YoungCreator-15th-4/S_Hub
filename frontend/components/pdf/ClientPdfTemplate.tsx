@@ -20,6 +20,7 @@ import {
 } from "@/lib/pdfPortfolioData";
 import {
   buildPdfTaxEffect,
+  pdfTaxEffectFromDerived,
   extractTaxOptimizerEntry,
   buildPdfTaxFlow,
   pdfTaxFlowFromDerived,
@@ -145,11 +146,20 @@ function CoverPage() {
   const C = useSelectedCustomer();
   const selectedPortfolioId = useDashboardStore((s) => s.selectedPortfolioId);
   const storePortfolios = useDashboardStore((s) => s.portfolios);
-  const taxEffect = buildPdfTaxEffect(
-    extractTaxOptimizerEntry(
-      useDashboardStore((s) => s.taxOptimizer),
-      selectedPortfolioId,
+  /*
+   * 표지의 "예상 연간 절세" 도 본문과 같은 계산을 따른다 — 표지만 mock 상수를
+   * 인쇄하면 같은 문서 안에서 두 숫자가 갈린다.
+   */
+  const coverFlow = useTaxFlow();
+  const taxEffect = pdfTaxEffectFromDerived(
+    buildPdfTaxEffect(
+      extractTaxOptimizerEntry(
+        useDashboardStore((s) => s.taxOptimizer),
+        selectedPortfolioId,
+      ),
     ),
+    coverFlow ? deriveTaxFlowRows(coverFlow) : null,
+    coverFlow,
   );
   /*
     표지의 "선택 포트폴리오"도 확정 대상을 따른다 — 본문은 조정안인데 표지만
@@ -308,7 +318,7 @@ function CoverPage() {
             { label: "기준 시각", value: `${getNow()} 기준` },
             { label: "선택 포트폴리오", value: selectedPortfolioName },
             {
-              label: "예상 연간 절세",
+              label: taxEffect.headlineLabel ?? "예상 연간 절세",
               value: `+${taxEffect.annualSavingManwon.toLocaleString()}만원`,
             },
           ].map((item, i) => (
@@ -1096,7 +1106,7 @@ function TaxPage() {
     taxOptimizerMap,
     selectedPortfolioId,
   );
-  const taxEffect = buildPdfTaxEffect(taxOptimizerEntry);
+  const taxEffectBase = buildPdfTaxEffect(taxOptimizerEntry);
   /*
    * 카드와 총액은 화면(절세 제안 탭)과 같은 함수를 부른다. 예전에는 리포트만
    * mockData 를 읽어, 화면이 "약 +97만원" 을 말할 때 여기에는 자리표시 문구인
@@ -1124,6 +1134,16 @@ function TaxPage() {
     buildPdfTaxFlow(taxOptimizerEntry, aumEokwon, portfolioTaxEntry) ??
     pdfTaxFlowFromDerived(derivedFlow);
   /*
+   * 머리 배너·세후수익률·실효세도 같은 계산에서 가져온다. 예전에는 이 셋만 mock
+   * 상수로 남아, 같은 페이지의 비교표가 240만 → 252만 을 말하는데 요약은
+   * "1,620 → 540만(-66.7%)" 을, 배너는 "+1,080만원" 을 인쇄했다.
+   */
+  const taxEffect = pdfTaxEffectFromDerived(
+    taxEffectBase,
+    derivedFlow,
+    frontFlow,
+  );
+  /*
    * 사용액이 없을 때 한도의 45% 를 채워 그리고 있었다. 어느 고객이든 막대가 절반쯤
    * 차 보이는데 그 숫자는 아무 데서도 나오지 않은 값이다. 고객 레코드의 기납입액을
    * 쓴다 — 화면의 계좌 배치 막대가 읽는 값과 같다.
@@ -1135,10 +1155,20 @@ function TaxPage() {
     (acct) => {
       const accData = taxEffect.accounts.find((a) => a.name === acct.name);
       const isIsa = acct.key === "isa";
-      const fallbackUsed = isIsa
-        ? (taxCustomer?.isaUsedManwon ?? 0)
-        : (taxCustomer?.pensionUsedManwon ?? 0);
-      const used = accData?.used ?? fallbackUsed;
+      /*
+       * mock 의 accounts 에도 used 가 들어 있어(ISA 2,000 · 연금 900) 그대로 두면
+       * 어느 고객이든 두 계좌를 꽉 채워 쓴 것으로 그려진다. 백엔드 응답이 있을
+       * 때만 그 값을 쓰고, 없으면 고객 레코드의 기납입액을 쓴다 — 화면의 계좌
+       * 배치 막대가 읽는 값과 같다.
+       */
+      const used = taxOptimizerEntry
+        ? (accData?.used ??
+          (isIsa
+            ? (taxCustomer?.isaUsedManwon ?? 0)
+            : (taxCustomer?.pensionUsedManwon ?? 0)))
+        : isIsa
+          ? (taxCustomer?.isaUsedManwon ?? 0)
+          : (taxCustomer?.pensionUsedManwon ?? 0);
       const caption = !plan
         ? acct.caption
         : isIsa
@@ -1207,7 +1237,8 @@ function TaxPage() {
                 marginBottom: 4,
               }}
             >
-              연간 절세 효과 ({selectedPf?.name ?? "안정 추구"} 기준 ·{" "}
+              {taxEffect.headlineLabel ?? "연간 절세 효과"} (
+              {selectedPf?.name ?? "안정 추구"} 기준 ·{" "}
               {C.aumLabel})
             </div>
             <div

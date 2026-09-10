@@ -12,11 +12,12 @@
  *   - strategy_cards → Mass 고객용 절세계좌 3카드(중개형 ISA·연금저축·IRP).
  *     연금저축과 IRP는 pension_credit 합산 계산값을 공유하므로 중복 합산하지 않는다.
  *   - account_cards → 계좌 활용도(used/limit). 캡션 문구는 mock 유지.
- *   - flow(세금 흐름 3행 표)는 calculate에 3분할 소스가 없어 mock 유지 — 백엔드 분할 노출 후 연결 예정(TODO).
+ *   - flow(세금 흐름 3행 표)는 calculate에 3분할 소스가 없다. 백엔드가 없으면
+ *     화면과 같은 프론트 계산으로 채운다(pdfTaxFlowFromDerived·pdfTaxEffectFromDerived).
  */
 import { TAX_EFFECT } from "@/lib/mockData";
 import type { PortfolioTaxResponse, StressTaxData } from "@/lib/api/types";
-import type { TaxFlowRows } from "@/lib/taxPlan";
+import type { TaxFlowInput, TaxFlowRows } from "@/lib/taxPlan";
 
 // selectedPortfolioId("current"|"a"|"b") → tax_optimizer 맵 키
 const PDF_TAX_OPT_KEY: Record<string, string> = {
@@ -48,8 +49,10 @@ type PdfTaxAccount = {
   limit: number | null;
   caption: string;
 };
-type PdfTaxEffect = Omit<typeof TAX_EFFECT, "accounts"> & {
+export type PdfTaxEffect = Omit<typeof TAX_EFFECT, "accounts"> & {
   accounts: PdfTaxAccount[];
+  /** 머리 배너 제목. 프론트 계산으로 채울 때는 화면 머리말과 같은 문구를 쓴다. */
+  headlineLabel?: string;
 };
 
 /** 계좌 활용도 — live used/limit(만원)만 override, 캡션·태그·이름은 mock 유지. */
@@ -217,5 +220,47 @@ export function pdfTaxFlowFromDerived(derived: TaxFlowRows | null): PdfTaxFlow {
             ? "기준"
             : "전환",
     })),
+  };
+}
+
+/**
+ * 헤드라인·세후수익률·실효세를 프론트 계산으로 덮어쓴다.
+ *
+ * 백엔드가 없을 때 이 값들이 mock 상수로 남아 있었다. 같은 페이지의 비교표는
+ * 현재 240만 → 절세 제안 252만 을 말하는데 그 아래 요약은 "실효세 절감
+ * 1,620 → 540만(-66.7%)" 을, 머리 배너는 "+1,080만원" 을 인쇄했다. 셋 다 다른
+ * 고객·다른 자산 기준의 숫자다.
+ */
+export function pdfTaxEffectFromDerived(
+  base: PdfTaxEffect,
+  derived: TaxFlowRows | null,
+  flow: TaxFlowInput | null,
+): PdfTaxEffect {
+  if (!derived || !flow) return base;
+
+  const beforeTax = derived.rows[0].tax;
+  const afterTax = derived.rows[derived.rows.length - 1].tax;
+  const taxDeltaPct =
+    beforeTax > 0 ? ((afterTax - beforeTax) / beforeTax) * 100 : 0;
+
+  const fromPct = flow.current.afterTaxReturnPct;
+  const toPct = flow.selected.afterTaxReturnPct;
+  const b = derived.breakdown;
+
+  return {
+    ...base,
+    annualSavingManwon: derived.totalSavingManwon,
+    headlineLabel: derived.totalLabel,
+    subNote: `현재 포트폴리오 대비 · 금융소득 +${b.financialManwon.toLocaleString()}만 · 근로소득세 환급 +${b.refundManwon.toLocaleString()}만`,
+    afterTaxReturn: {
+      from: `${fromPct.toFixed(1)}%`,
+      to: `${toPct.toFixed(1)}%`,
+      delta: `${toPct - fromPct >= 0 ? "+" : ""}${(toPct - fromPct).toFixed(1)}%p`,
+    },
+    effectiveTax: {
+      from: beforeTax.toLocaleString(),
+      to: `${afterTax.toLocaleString()}만`,
+      delta: `${taxDeltaPct >= 0 ? "+" : ""}${taxDeltaPct.toFixed(1)}%`,
+    },
   };
 }
