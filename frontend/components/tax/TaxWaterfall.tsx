@@ -226,6 +226,7 @@ export default function TaxWaterfall({
           */
           `그 ISA 몫은 잔액이 연 ${(ASSUMPTIONS.isaAssumedIncomeYield * 100).toFixed(1)}% 이자·배당을 낸다는 가정 (법정 수치 아님)`,
           "같은 시점 시장값 — 국고채 3년 3.91%(2026-09-09) · 코스피 배당수익률 0.92%(2026-05)",
+          `비과세 ${ASSUMPTIONS.isaGeneralTaxFreeManwon}만원은 계약기간 통산에 한 번이라 ${ASSUMPTIONS.isaMandatoryHoldingYears}년으로 나눠 반영 (손익 통산·과세이연 미반영)`,
         ]
       : []),
   ];
