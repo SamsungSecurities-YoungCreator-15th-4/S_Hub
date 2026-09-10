@@ -141,7 +141,7 @@ export default function AccountAllocation({
   ];
 
   return (
-    <div className="flex flex-col">
+    <div className="flex w-full flex-col">
       {/*
         여는 자리는 제목 글자뿐이다 — 세금 흐름 비교·절세 제안 카드와 같은 규격이라,
         가이드를 켜면 설명이 붙은 자리가 화면 전체에서 같은 모양으로 보인다.
@@ -164,23 +164,39 @@ export default function AccountAllocation({
         </p>
       </HelpTooltip>
 
-      {/* 세 막대를 같은 두께와 간격으로 묶어 위에서 아래로 일정하게 읽히게 한다. */}
-      <div className="flex flex-col gap-3">
-        <div className="flex items-center">
-          <span className="w-[72px] shrink-0 text-right text-[12px] font-extrabold text-[#4E5968]">
-            전체 계좌
-          </span>
-          <div className="ml-[10px] flex h-4 flex-1 overflow-hidden rounded-md">
-            {allocation.map(({ label, weight, color }) => (
-              <div
-                key={label}
-                style={{ width: `${weight}%`, backgroundColor: color }}
-              />
-            ))}
-          </div>
+      {/* 전체 계좌 세그먼트 바 — 아래 계좌 막대와 같은 72px 라벨 + 10px 간격 */}
+      <div className="mb-1 flex items-center">
+        <span className="w-[72px] shrink-0 text-right text-[12px] font-extrabold text-[#4E5968]">
+          전체 계좌
+        </span>
+        <div className="ml-[10px] flex h-[12px] flex-1 overflow-hidden rounded-md">
+          {allocation.map(({ label, weight, color }) => (
+            <div
+              key={label}
+              style={{ width: `${weight}%`, backgroundColor: color }}
+            />
+          ))}
         </div>
+      </div>
 
-        {/* ISA / 연금저축+IRP — 각자 자기 한도 대비 비율 */}
+      {/* 세그먼트 범례 */}
+      <div className="mb-2 ml-[82px] mr-[16px] flex flex-wrap gap-x-1.5 gap-y-0 leading-tight">
+        {allocation.map(({ label, weight, color }) => (
+          <span
+            key={label}
+            className="flex items-center gap-1 text-[11px] font-semibold text-muted-foreground"
+          >
+            <span
+              className="inline-block size-1.5 rounded-[2px]"
+              style={{ backgroundColor: color }}
+            />
+            {label} {weight}%
+          </span>
+        ))}
+      </div>
+
+      {/* ISA / 연금저축+IRP — 각자 자기 한도 대비 비율 */}
+      <div className="flex flex-col gap-3.5 py-1">
         {bars.map((bar) => {
           const pct =
             bar.limitManwon > 0 ? (bar.usedManwon / bar.limitManwon) * 100 : 0;
@@ -189,7 +205,7 @@ export default function AccountAllocation({
               <span className="w-[72px] shrink-0 text-right text-[12px] font-extrabold leading-tight text-[#4E5968]">
                 {bar.name}
               </span>
-              <div className="ml-[10px] mr-[10px] h-4 flex-1 overflow-hidden rounded-md bg-[#E9EDF3]">
+              <div className="ml-[10px] mr-[10px] h-[18px] flex-1 overflow-hidden rounded-md bg-[#E9EDF3]">
                 <div
                   className="h-full rounded-md"
                   style={{
@@ -212,22 +228,6 @@ export default function AccountAllocation({
             </div>
           );
         })}
-      </div>
-
-      {/* 전체 계좌 범례는 막대 묶음 뒤에 두어 행 사이 간격을 끊지 않는다. */}
-      <div className="mt-2 ml-[82px] mr-[16px] flex flex-wrap gap-x-1.5 gap-y-0 leading-tight">
-        {allocation.map(({ label, weight, color }) => (
-          <span
-            key={label}
-            className="flex items-center gap-1 text-[11px] font-semibold text-muted-foreground"
-          >
-            <span
-              className="inline-block size-1.5 rounded-[2px]"
-              style={{ backgroundColor: color }}
-            />
-            {label} {weight}%
-          </span>
-        ))}
       </div>
 
       {/*

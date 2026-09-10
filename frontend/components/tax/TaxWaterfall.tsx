@@ -299,8 +299,8 @@ export default function TaxWaterfall({
         </span>
       </div>
 
-      {/* 높이를 고정해 세 막대 사이의 간격이 패널 높이에 따라 달라지지 않게 한다. */}
-      <div className={flow ? "h-44 shrink-0" : "h-32"}>
+      {/* 남는 높이를 차트가 사용해 범례 아래에 빈 공간이 생기지 않게 한다. */}
+      <div className={flow ? "min-h-32 max-h-56 flex-1" : "h-32"}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={data}

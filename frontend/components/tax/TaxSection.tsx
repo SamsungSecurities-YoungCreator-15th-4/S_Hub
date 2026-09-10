@@ -188,7 +188,7 @@ export default function TaxSection() {
   }
 
   return (
-    /* 두 탭이 같은 카드 높이를 공유해 전환할 때 아래 콘텐츠가 움직이지 않게 한다. */
+    /* 각 탭은 콘텐츠에 필요한 높이를 사용한다. */
     <Tabs defaultValue="effect" className="flex min-h-0 flex-1 flex-col">
       <div className="mb-2 flex items-center justify-between px-0.5">
         <div className="flex items-center gap-2.5">
@@ -221,9 +221,9 @@ export default function TaxSection() {
         </TabsList>
       </div>
 
-      <Card className="h-[640px] min-h-0 gap-0 p-3">
+      <Card className="min-h-0 flex-1 gap-0 p-3">
         {/* 탭 1: 절세 효과 */}
-        <TabsContent value="effect" className="flex min-h-0 flex-1 flex-col gap-3">
+        <TabsContent value="effect" className="flex min-h-0 flex-1 flex-col gap-2.5">
           {/*
             절세 효과 금액이 없는 상태에서는 왼쪽이 배지 한 줄뿐이라 박스가 비어
             보인다. 세로 여백과 지표 카드를 줄여 내용만큼만 차지하게 한다.
@@ -302,8 +302,8 @@ export default function TaxSection() {
             세로로 쌓으면 남는 높이가 두 그림의 폭으로 바뀐다.
             각각 테두리로 묶어 어디까지가 한 그림인지 경계를 준다.
           */}
-          <div className="flex min-h-0 flex-1 flex-col gap-3">
-            <div className="flex min-h-0 flex-1 flex-col rounded-xl border p-3">
+          <div className="flex min-h-0 w-full flex-1 flex-col gap-2.5">
+            <div className="flex min-h-0 w-full flex-1 flex-col rounded-xl border p-3">
               <TaxWaterfall
                 waterfallData={isStressMode ? null : waterfallData}
                 liveHeadline={isStressMode ? (taxSource?.headline ?? null) : null}
@@ -312,10 +312,10 @@ export default function TaxSection() {
               />
             </div>
             {/*
-              계좌 배치는 내용만큼만 차지한다. 세 막대와 범례라 높이를 더 줘도
+              계좌 배치는 내용만큼만 차지한다. 막대 두 줄과 범례라 높이를 더 줘도
               늘어날 것이 없고, 그 공간은 세로가 길수록 읽기 좋은 흐름 막대가 받는다.
             */}
-            <div className="flex shrink-0 flex-col rounded-xl border p-3">
+            <div className="flex w-full shrink-0 flex-col rounded-xl border p-3">
               <AccountAllocation
                 accounts={[
                   {
@@ -389,10 +389,10 @@ function AdviceCards({ liveCards, plan }: AdviceCardsProps) {
   const { cards, totalSaving } = deriveAdviceCards(plan, liveCards);
 
   return (
-    /* 제안 카드가 남는 높이를 나눠 가져 탭을 바꿔도 패널 밀도가 달라지지 않는다. */
+    /* 카드 본문은 내용에 필요한 높이만 사용한다. */
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="mb-2 min-h-0 flex-1 overflow-y-auto">
-        <div className="grid min-h-full grid-cols-1 gap-3 lg:grid-cols-3">
+      <div className="mb-2 max-h-[520px] overflow-y-auto">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
           {cards.map((card) => {
             // 연계 상품 목록이 비면 "상품추천" 탭 자체를 감춘다 — 빈 탭·빈 박스를 남기지 않는다.
             const hasProducts = card.products.length > 0;
@@ -452,8 +452,8 @@ function AdviceCards({ liveCards, plan }: AdviceCardsProps) {
                 </div>
 
                 {active === "납입안" ? (
-                  <div className="flex min-h-[104px] flex-1">
-                    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pr-0.5">
+                  <div className="h-[104px]">
+                    <div className="flex h-full flex-col overflow-y-auto pr-0.5">
                       <p className="pt-1.5 text-[13px] font-semibold leading-snug text-muted-foreground">
                         {card.summary}
                       </p>
@@ -476,7 +476,7 @@ function AdviceCards({ liveCards, plan }: AdviceCardsProps) {
                     </div>
                   </div>
                 ) : (
-                  <div className="min-h-[104px] flex-1 overflow-y-auto pr-0.5">
+                  <div className="h-[104px] overflow-y-auto pr-0.5">
                     <div className="flex flex-col gap-1.5">
                       {card.products.map((p) => {
                         const url = PRODUCT_LINKS[p.name] ?? "";
