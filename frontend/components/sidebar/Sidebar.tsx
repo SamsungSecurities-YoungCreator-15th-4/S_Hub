@@ -587,18 +587,18 @@ export default function Sidebar() {
             ref={dropdownTriggerRef}
             type="button"
             onClick={handleDropdownToggle}
-            className="flex w-full items-center gap-3 rounded-xl px-1 py-1 hover:bg-muted"
+            className="flex w-full items-center gap-2 rounded-xl px-1 py-1 hover:bg-muted"
           >
             <div className="flex size-11 items-center justify-center rounded-xl bg-linear-to-br from-[#DCE9FF] to-[#B8D4FF] text-lg font-extrabold text-brand-dark">
               {customer.name[0]}
             </div>
-            <div className="flex-1 text-left">
+            <div className="min-w-0 flex-1 text-left">
               <div className="flex items-center gap-2 text-[15px] font-extrabold">
                 {customer.name}
               </div>
-              <div className="mt-0.5 flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground">
-                <span>{customer.aumLabel}</span>
-                <span className="text-muted-foreground/70">
+              <div className="mt-0.5 flex items-center gap-1 whitespace-nowrap text-[10px] leading-none font-semibold text-muted-foreground">
+                <span className="shrink-0">{customer.aumLabel}</span>
+                <span className="shrink-0 text-muted-foreground/70">
                   {customer.lastConsultedAt
                     ? `최근 상담 ${customer.lastConsultedAt}`
                     : "상담 이력 없음"}
