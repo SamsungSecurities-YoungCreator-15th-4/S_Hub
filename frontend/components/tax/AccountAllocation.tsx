@@ -141,7 +141,7 @@ export default function AccountAllocation({
   ];
 
   return (
-    <div className="flex w-full flex-1 flex-col">
+    <div className="flex w-full flex-col">
       {/*
         여는 자리는 제목 글자뿐이다 — 세금 흐름 비교·절세 제안 카드와 같은 규격이라,
         가이드를 켜면 설명이 붙은 자리가 화면 전체에서 같은 모양으로 보인다.
@@ -164,15 +164,12 @@ export default function AccountAllocation({
         </p>
       </HelpTooltip>
 
-      {/*
-        전체 계좌 세그먼트 바 — 82px 라벨 + 8px 간격. 위 세금 흐름 비교의 YAxis
-        width(90) 와 같아서 두 그림의 라벨 끝과 막대 시작이 한 줄에 선다.
-      */}
-      <div className="mb-1.5 flex items-center">
-        <span className="w-[82px] shrink-0 text-right text-[12px] font-extrabold text-[#4E5968]">
+      {/* 전체 계좌 세그먼트 바 — 아래 계좌 막대와 같은 72px 라벨 + 10px 간격 */}
+      <div className="mb-1 flex items-center">
+        <span className="w-[72px] shrink-0 text-right text-[12px] font-extrabold text-[#4E5968]">
           전체 계좌
         </span>
-        <div className="ml-2 flex h-[12px] flex-1 overflow-hidden rounded-md">
+        <div className="ml-[10px] flex h-[12px] flex-1 overflow-hidden rounded-md">
           {allocation.map(({ label, weight, color }) => (
             <div
               key={label}
@@ -183,7 +180,7 @@ export default function AccountAllocation({
       </div>
 
       {/* 세그먼트 범례 */}
-      <div className="mb-4 ml-[90px] flex flex-wrap gap-x-1.5 gap-y-0.5 leading-tight">
+      <div className="mb-2 ml-[82px] mr-[16px] flex flex-wrap gap-x-1.5 gap-y-0 leading-tight">
         {allocation.map(({ label, weight, color }) => (
           <span
             key={label}
@@ -198,23 +195,17 @@ export default function AccountAllocation({
         ))}
       </div>
 
-      {/*
-        ISA / 연금저축+IRP — 각자 자기 한도 대비 비율.
-        값 칸을 auto 열로 둔다. 줄마다 flex 로 두면 "2,000 / 8,000만원" 과
-        "300 / 900만원" 의 글자 폭만큼 막대 끝이 서로 달랐다.
-        content-evenly — 박스가 늘어나면 남는 높이를 범례→ISA→연금→각주 간격에
-        고르게 나눈다. 한 곳에 몰리면 막대가 떨어져 나간 것처럼 보인다.
-      */}
-      <div className="grid flex-1 grid-cols-[82px_1fr_auto] content-evenly items-center gap-x-2 gap-y-4">
+      {/* ISA / 연금저축+IRP — 각자 자기 한도 대비 비율 */}
+      <div className="flex flex-col gap-3.5 py-1">
         {bars.map((bar) => {
           const pct =
             bar.limitManwon > 0 ? (bar.usedManwon / bar.limitManwon) * 100 : 0;
           return (
-            <div key={bar.key} className="contents">
-              <span className="text-right text-[12px] font-extrabold leading-tight text-[#4E5968]">
+            <div key={bar.key} className="flex items-center">
+              <span className="w-[72px] shrink-0 text-right text-[12px] font-extrabold leading-tight text-[#4E5968]">
                 {bar.name}
               </span>
-              <div className="h-[18px] overflow-hidden rounded-md bg-[#E9EDF3]">
+              <div className="ml-[10px] mr-[10px] h-[18px] flex-1 overflow-hidden rounded-md bg-[#E9EDF3]">
                 <div
                   className="h-full rounded-md"
                   style={{
@@ -224,7 +215,7 @@ export default function AccountAllocation({
                   }}
                 />
               </div>
-              <span className="whitespace-nowrap text-right text-[12px] font-semibold tabular-nums text-muted-foreground">
+              <span className="shrink-0 whitespace-nowrap text-[12px] font-semibold tabular-nums text-muted-foreground">
                 <b className="font-extrabold text-foreground">
                   {bar.usedManwon.toLocaleString()}
                 </b>
@@ -243,7 +234,7 @@ export default function AccountAllocation({
         두 막대의 한도가 서로 다른 것을 재고 있다는 사실을 여기서 말한다. 한 줄로
         붙여 두지 않으면 8,000 과 900 이 같은 성격의 숫자로 읽힌다.
       */}
-      <p className="mt-4 text-[11px] font-semibold leading-tight text-muted-foreground">
+      <p className="mt-2 text-[11px] font-semibold leading-tight text-muted-foreground">
         ISA계좌: {bars[0].basis} 한도, 연금계좌: 올해 세액공제 한도
       </p>
     </div>
