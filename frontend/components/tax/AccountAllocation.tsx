@@ -146,7 +146,11 @@ export default function AccountAllocation({
         여는 자리는 제목 글자뿐이다 — 세금 흐름 비교·절세 제안 카드와 같은 규격이라,
         가이드를 켜면 설명이 붙은 자리가 화면 전체에서 같은 모양으로 보인다.
       */}
-      <HelpTooltip text={ACCOUNT_HELP(isaLimit)} placement="bottom" className="w-fit" wide>
+      {/*
+        위로 펼친다. 이 패널은 중앙 열 맨 아래라 아래로 펼치면 뷰포트를 넘어가
+        잘린다(HelpTooltip 은 좌우만 화면 안으로 밀어 넣는다).
+      */}
+      <HelpTooltip text={ACCOUNT_HELP(isaLimit)} className="w-fit" wide>
         <p className="mb-2 cursor-default text-[13px] font-extrabold">
           <span
             className={
