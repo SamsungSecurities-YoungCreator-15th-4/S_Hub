@@ -17,12 +17,14 @@ export interface CreatedClient {
   clientId: string; // DB UUID. fallback 시엔 빈 문자열(미저장).
   name: string;
   aumEokwon: number;
+  age: number;
 }
 
 export interface ListedClient {
   clientId: string;
   name: string;
   aumEokwon: number;
+  age: number | null;
   isPersona: boolean;
   createdAt: string;
 }
@@ -31,6 +33,7 @@ interface ClientCreateResponseRaw {
   client_id: string;
   name: string;
   aum_eokwon: number;
+  age?: number;
   created_at: string;
 }
 
@@ -38,6 +41,7 @@ interface ClientListItemRaw {
   client_id?: string | null;
   name?: string | null;
   aum_eokwon?: number | null;
+  age?: number | null;
   is_persona?: boolean | null;
   created_at?: string | null;
 }
@@ -55,13 +59,15 @@ export type CreateClientResult =
 export async function createClient(
   name: string,
   aumEokwon: number,
+  age: number,
 ): Promise<CreateClientResult> {
-  if (IS_DEMO) return demoCreatedClient(name, aumEokwon);
+  if (IS_DEMO) return demoCreatedClient(name, aumEokwon, age);
 
   try {
     const res = await apiPost<ClientCreateResponseRaw>("/clients", {
       name,
       aum_eokwon: aumEokwon,
+      age,
     });
     return {
       status: "live",
@@ -69,6 +75,7 @@ export async function createClient(
         clientId: res.client_id,
         name: res.name,
         aumEokwon: res.aum_eokwon,
+        age: res.age ?? age,
       },
     };
   } catch (err) {
@@ -81,7 +88,7 @@ export async function createClient(
     if (err instanceof ApiError && (err.status === 400 || err.status === 422)) {
       return {
         status: "invalid",
-        message: "고객명·운용자산 입력값을 확인해주세요.",
+        message: "고객명·나이·운용자산 입력값을 확인해주세요.",
       };
     }
     // 네트워크/타임아웃/5xx — 저장은 실패했으나 화면은 죽지 않게 로컬 데모로 추가.
@@ -91,7 +98,7 @@ export async function createClient(
         : "백엔드 저장 실패: 예시로만 추가되었습니다(새로고침 시 사라짐).";
     return {
       status: "fallback",
-      data: { clientId: "", name, aumEokwon },
+      data: { clientId: "", name, aumEokwon, age },
       note,
     };
   }
@@ -186,6 +193,7 @@ export async function listClients(): Promise<ApiResult<ListedClient[]>> {
         clientId: client.client_id ?? "",
         name: client.name ?? "",
         aumEokwon: client.aum_eokwon ?? 0,
+        age: client.age ?? null,
         isPersona: client.is_persona ?? false,
         createdAt: client.created_at ?? "",
       })),

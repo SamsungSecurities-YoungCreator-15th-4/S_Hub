@@ -317,12 +317,14 @@ function restoredForCustomer(c: Customer | undefined) {
     : null;
 }
 
-/** 첫 화면의 복원값 — 목록 첫 고객 기준. */
-const INITIAL_RESTORED = restoredForCustomer(CUSTOMERS[0]);
+/** 시연 첫 화면은 상담 전 고객인 김성삼으로 고정한다. */
+const INITIAL_CUSTOMER =
+  CUSTOMERS.find((customer) => customer.id === "cust-001") ?? CUSTOMERS[0];
+const INITIAL_RESTORED = restoredForCustomer(INITIAL_CUSTOMER);
 
 export const useDashboardStore = create<DashboardState>((set) => ({
   customers: [...CUSTOMERS],
-  selectedCustomerId: CUSTOMERS[0].id,
+  selectedCustomerId: INITIAL_CUSTOMER.id,
   selectedPortfolioId: "a",
   ips: {
     returnPct: IPS_DEFAULT.returnPct,
@@ -476,9 +478,17 @@ export const useDashboardStore = create<DashboardState>((set) => ({
   setCustomers: (customers) =>
     set((s) => ({
       customers,
-      selectedCustomerId: customers.some((c) => c.id === s.selectedCustomerId)
-        ? s.selectedCustomerId
-        : (customers[0]?.id ?? s.selectedCustomerId),
+      // mock 고객이 DB UUID 고객으로 교체돼도 같은 이름의 선택을 유지한다.
+      selectedCustomerId:
+        customers.find((c) => c.id === s.selectedCustomerId)?.id ??
+        customers.find(
+          (c) =>
+            c.name ===
+            s.customers.find((current) => current.id === s.selectedCustomerId)
+              ?.name,
+        )?.id ??
+        customers[0]?.id ??
+        s.selectedCustomerId,
     })),
   selectCustomer: (id) =>
     set((s) => {

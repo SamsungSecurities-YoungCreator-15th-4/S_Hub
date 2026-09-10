@@ -93,6 +93,7 @@ function toDashboardCustomer(client: ListedClient): Customer {
     pbCode: persona?.pbCode ?? `PB-${displayId.slice(0, 6).toUpperCase()}`,
     aumLabel: aumEokwon > 0 ? `운용자산 ${aumEokwon}억원` : "운용자산 미입력",
     aumEokwon,
+    age: client.age ?? persona?.age ?? DEFAULT_CLIENT_TAX_PROFILE.age,
     clientId: safeClientId || undefined,
     persisted: true,
   };
@@ -154,6 +155,7 @@ export default function Sidebar() {
   const [gateOpen, setGateOpen] = useState(false);
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [newName, setNewName] = useState("");
+  const [newAge, setNewAge] = useState("");
   const [newAum, setNewAum] = useState("");
   const [addLoading, setAddLoading] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
@@ -423,11 +425,21 @@ export default function Sidebar() {
   const handleAddCustomer = async () => {
     const name = newName.trim();
     if (!name || addLoading) return;
+    const age = Number(newAge);
+    if (
+      !/^\d+$/.test(newAge.trim()) ||
+      !Number.isInteger(age) ||
+      age < 0 ||
+      age > 120
+    ) {
+      setAddError("나이는 0세부터 120세 사이의 정수로 입력해주세요.");
+      return;
+    }
     const aumVal = Math.max(0, parseFloat(newAum) || 0);
 
     setAddLoading(true);
     setAddError(null);
-    const result = await createClient(name, aumVal);
+    const result = await createClient(name, aumVal, age);
     setAddLoading(false);
 
     if (result.status === "conflict" || result.status === "invalid") {
@@ -449,7 +461,7 @@ export default function Sidebar() {
       pensionUsedManwon: 0,
       realizedLossManwon: 0,
       marginalRatePct: 38.5,
-      age: 50,
+      age: result.data.age,
       horizonYears: 10,
       nearTermNeedManwon: 0,
       nearTermNeedYears: null,
@@ -460,6 +472,7 @@ export default function Sidebar() {
     });
     selectCustomer(id); // 추가한 고객을 바로 선택 → STT 업로드가 이 고객으로 진행
     setNewName("");
+    setNewAge("");
     setNewAum("");
     setAddModalOpen(false);
   };
@@ -594,7 +607,7 @@ export default function Sidebar() {
             </div>
             <div className="min-w-0 flex-1 text-left">
               <div className="flex items-center gap-2 text-[15px] font-extrabold">
-                {customer.name}
+                {customer.name}({customer.age}세)
               </div>
               <div className="mt-0.5 flex items-center gap-1 whitespace-nowrap text-[10px] leading-none font-semibold text-muted-foreground">
                 <span className="shrink-0">{customer.aumLabel}</span>
@@ -961,7 +974,7 @@ export default function Sidebar() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5 text-[13px] font-extrabold">
-                    {c.name}
+                    {c.name}({c.age}세)
                     {c.persisted === false && (
                       <DataSourceBadge
                         source="fallback"
@@ -1108,6 +1121,20 @@ export default function Sidebar() {
             </div>
             <div>
               <label className="mb-1 block text-[11px] font-bold text-muted-foreground">
+                나이
+              </label>
+              <Input
+                type="number"
+                min={0}
+                max={120}
+                step={1}
+                value={newAge}
+                onChange={(e) => setNewAge(e.target.value)}
+                placeholder="예: 33"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-[11px] font-bold text-muted-foreground">
                 운용자산 (억원)
               </label>
               <Input
@@ -1125,7 +1152,7 @@ export default function Sidebar() {
             <Button
               onClick={handleAddCustomer}
               className="w-full font-bold"
-              disabled={!newName.trim() || addLoading}
+              disabled={!newName.trim() || !newAge.trim() || addLoading}
             >
               {addLoading ? (
                 <>
