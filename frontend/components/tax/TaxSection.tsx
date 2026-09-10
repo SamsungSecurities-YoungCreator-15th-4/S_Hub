@@ -12,7 +12,7 @@ import { TAX_ADVICE } from "@/lib/mockData";
 import { PRODUCT_LINKS } from "@/lib/productLinks";
 import { useDashboardStore } from "@/lib/store";
 // LLM 자리의 시연 대역. 엔드포인트가 생기면 이 import 만 fetch 로 바뀐다.
-import { demoContributionRationale } from "@/lib/demo/fixtures/api";
+import { demoContributionNarrative } from "@/lib/demo/fixtures/api";
 import { useState } from "react";
 import { useTaxFlow, useTaxPlan } from "@/lib/taxPlan";
 import { deriveAdviceCards } from "@/lib/taxAdviceCards";
@@ -348,21 +348,43 @@ export default function TaxSection() {
               budgetManwon={customer.annualContributionManwon ?? 0}
               pensionRequestManwon={pensionRequest}
               onPensionRequestChange={setPensionRequest}
-              needManwon={customer.nearTermNeedManwon}
               needYears={customer.nearTermNeedYears ?? 0}
-              needLabel={customer.nearTermNeedLabel ?? "근시일 필요자금"}
-              maxPensionKeepingNeed={pensionCeilingForNeed}
               targetReturnPct={ips.returnPct}
               horizonYears={customer.horizonYears}
-              rationale={demoContributionRationale(
-                {
-                  manwon: customer.nearTermNeedManwon,
-                  years: customer.nearTermNeedYears ?? 0,
-                  kind: customer.nearTermNeedKind,
-                  label: customer.nearTermNeedLabel,
-                },
-                plan.pension.lockupYears,
-              )}
+              /*
+                판정·근거·코멘트를 한 번에 만든다. 숫자는 전부 여기서 계산해 넘기고
+                LLM 자리는 문장만 만든다 — 환각이 금액으로 새지 않게 한다.
+              */
+              narrative={demoContributionNarrative({
+                needManwon: customer.nearTermNeedManwon,
+                needYears: customer.nearTermNeedYears ?? 0,
+                kind: customer.nearTermNeedKind,
+                label: customer.nearTermNeedLabel,
+                shortfallManwon: Math.max(
+                  customer.nearTermNeedManwon - plan.liquidAtTargetManwon,
+                  0,
+                ),
+                pensionDropManwon:
+                  pensionCeilingForNeed != null
+                    ? Math.max(plan.pensionManwon - pensionCeilingForNeed, 0)
+                    : 0,
+                savingBeforeManwon: plan.pensionSavingManwon,
+                savingAfterManwon:
+                  pensionCeilingForNeed != null
+                    ? pensionCeilingForNeed * plan.pensionRate
+                    : 0,
+                maxPensionKeepingNeed: pensionCeilingForNeed,
+                isaLockupYears: plan.isa.lockupYears,
+                pensionLockupYears: plan.pension.lockupYears,
+                isaHeadroomManwon: plan.isa.headroomManwon,
+                pensionRoomLeftManwon: Math.max(
+                  Math.min(
+                    plan.pension.headroomManwon,
+                    customer.annualContributionManwon ?? 0,
+                  ) - plan.pensionManwon,
+                  0,
+                ),
+              })}
             />
           )}
           <AdviceCards liveCards={liveStrategyCards?.cards ?? null} plan={plan} />

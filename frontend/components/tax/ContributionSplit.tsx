@@ -3,8 +3,9 @@
 import { Slider } from "@/components/ui/slider";
 import { CircleHelp, Sparkles } from "lucide-react";
 import HelpTooltip from "@/components/common/HelpTooltip";
-import { fmtSaving } from "@/lib/formatKrw";
 import { ASSUMPTIONS, type AllocationPlan } from "@/lib/taxAccounts";
+import type { ContributionNarrative } from "@/lib/demo/fixtures/api";
+import { fmtSaving } from "@/lib/formatKrw";
 
 /**
  * 계산에 들어간 가정과 한계. 화면에 접어 두되 지우지는 않는다 — "이 숫자 어디서
@@ -17,6 +18,9 @@ const ASSUMPTION_LINES = (
   horizonYears: number,
 ): string[] => [
   `${needYears}년 뒤 가용액은 납입 원금만: 운용수익 미반영`,
+  // 어디까지가 상담에서 온 값이고 어디부터가 계산인지 긋는다. AI 코멘트만 AI 가
+  // 쓴 문장이고, 화면의 금액은 전부 법정 한도로 계산한 값이다.
+  "필요액·시점·자금 이름은 상담 전사에서 뽑은 값: 나머지 금액은 법정 한도로 계산",
   // IPS 가 비어 있으면 목표수익률이 0 으로 내려온다. 0% 라고 적으면 거짓이라
   // 숫자 없이 말한다.
   targetReturnPct > 0
@@ -54,21 +58,7 @@ interface Props {
   /** 슬라이더가 요청한 연금 납입액(만원) */
   pensionRequestManwon: number;
   onPensionRequestChange: (manwon: number) => void;
-  /** 단기 필요자금(만원)과 시점(년) — IPS Unique */
-  needManwon: number;
   needYears: number;
-  /**
-   * 그 돈의 이름(전세 보증금 인상분·자녀 대학 등록금·인출 예정 자금…).
-   * 고객마다 다르므로 화면에 문구를 박아 두지 않는다 — 박아 두면 등록금이
-   * 필요한 고객에게 "전세 자금이 모자랍니다" 라고 말하게 된다.
-   */
-  needLabel: string;
-  /**
-   * 목표 시점 필요액을 지키면서 연금에 넣을 수 있는 최대 납입액(만원).
-   * 유동액과 같은 규칙으로 구해야 해서 lib/taxAccounts.ts 가 계산하고 여기는 받기만
-   * 한다. 어떤 배분으로도 못 맞추면 null 이다.
-   */
-  maxPensionKeepingNeed: number | null;
   /** IPS 목표수익률(%) — 화면 문구가 IPS 조율기 값을 따라가야 한다. */
   targetReturnPct: number;
   /** IPS 투자기간(년) */
@@ -78,7 +68,7 @@ interface Props {
    * 시연 대역이 들어온다. 비어 있으면(상담 전 고객) 줄을 그리지 않는다 — 빈 상자만
    * 남으면 근거가 있는 것처럼 보이면서 정작 아무것도 없는 상태가 된다.
    */
-  rationale?: string;
+  narrative?: ContributionNarrative | null;
 }
 
 /**
@@ -97,34 +87,12 @@ export default function ContributionSplit({
   budgetManwon,
   pensionRequestManwon,
   onPensionRequestChange,
-  needManwon,
   needYears,
-  needLabel,
-  maxPensionKeepingNeed,
   targetReturnPct,
   horizonYears,
-  rationale,
+  narrative,
 }: Props) {
   const sliderMax = Math.min(plan.pension.headroomManwon, budgetManwon);
-  const shortfall = Math.max(needManwon - plan.liquidAtTargetManwon, 0);
-
-  /*
-   * 부족할 때 읽는 사람이 알아야 하는 건 "얼마를 얼마와 바꾸는가"다. 앞뒤 절대값만
-   * 적으면(148.5 → 137) 차이를 스스로 빼야 하고, 슬라이더가 상한 근처로 오면
-   * 숫자가 작아져 교환비가 아예 안 보인다.
-   *
-   * 감소분은 화면에 찍히는 반올림값끼리 뺀다. 원값으로 빼면 세 숫자가 화면에서
-   * 안 맞는 경우가 생긴다(예: 149 − 137 = 12 인데 원값 차이는 11.5).
-   */
-  const capSavingManwon =
-    maxPensionKeepingNeed != null ? maxPensionKeepingNeed * plan.pensionRate : 0;
-  const shownSaving = Math.round(plan.pensionSavingManwon);
-  const shownCapSaving = Math.round(capSavingManwon);
-  const savingDrop = Math.max(shownSaving - shownCapSaving, 0);
-  const pensionDrop =
-    maxPensionKeepingNeed != null
-      ? Math.max(plan.pensionManwon - maxPensionKeepingNeed, 0)
-      : 0;
 
   return (
     <div className="rounded-xl border p-3.5">
@@ -181,9 +149,13 @@ export default function ContributionSplit({
           </div>
         </div>
 
-        {/* 두 결과가 반대로 움직인다 */}
-        <div className="flex gap-2 lg:w-[380px]">
-          <div className="flex-1 rounded-lg border border-brand/20 bg-brand/5 px-3 py-2">
+        {/*
+          "3년 뒤 쓸 수 있는 돈" 카드를 뺐다. 고객이 알고 싶은 것은 목표 시점에
+          되느냐 안 되느냐이지 얼마가 쌓이느냐가 아니고, 그 결론은 아래 AI 상자가
+          한 줄로 말한다. 카드가 빠진 만큼 슬라이더가 넓어져 눈금이 잘 읽힌다.
+        */}
+        <div className="lg:w-[220px]">
+          <div className="rounded-lg border border-brand/20 bg-brand/5 px-3 py-2">
             <p className="text-[11px] font-bold text-muted-foreground">
               연 절세액
             </p>
@@ -196,100 +168,46 @@ export default function ContributionSplit({
               세액공제 {(plan.pensionRate * 100).toFixed(1)}% 적용
             </p>
           </div>
-          <div
-            className={`flex-1 rounded-lg border px-3 py-2 ${
-              shortfall > 0
-                ? "border-up/30 bg-[#FEECEE]"
-                : "border-brand/20 bg-brand/5"
-            }`}
-          >
-            <p className="text-[11px] font-bold text-muted-foreground">
-              {needYears}년 뒤 쓸 수 있는 돈
-            </p>
-            <p
-              className={`mt-0.5 text-[17px] font-extrabold tabular-nums ${
-                shortfall > 0 ? "text-up" : "text-brand-dark"
-              }`}
-            >
-              {fmt(plan.liquidAtTargetManwon)}
-              <span className="text-[12px]">만원</span>
-            </p>
-            <p className="mt-0.5 text-[10px] font-semibold text-muted-foreground">
-              필요 {fmt(needManwon)}만원
-            </p>
-          </div>
         </div>
       </div>
 
-      {/* 판정 — 한 줄 결론 + 한 줄 근거. 읽는 사람이 찾는 건 "그래서 얼마냐"다. */}
-      <div
-        className={`mt-3 rounded-lg px-3 py-2 ${
-          shortfall > 0 ? "bg-[#FEECEE]" : "bg-brand/5"
-        }`}
-      >
-        {shortfall > 0 && maxPensionKeepingNeed == null ? (
-          // 연금을 0으로 해도 못 맞추는 경우. 남는 돈이 목표 시점에 안 풀리는 ISA 로
-          // 흘러갈 때 생긴다. 이때 "N만원으로 낮추면 된다"고 말하면 거짓이 된다.
-          <>
-            <p className="text-[13px] font-extrabold text-up">
-              어떻게 배분해도 {needYears}년 뒤 {fmt(needManwon)}만원을 못 만듭니다
-            </p>
-            <p className="mt-0.5 text-[12px] font-semibold text-muted-foreground">
-              연금 0으로 해도 {fmt(shortfall)}만원 부족 · ISA 의무보유{" "}
-              {plan.isa.lockupYears}년이라 그 돈도 안 풀립니다
-            </p>
-          </>
-        ) : shortfall > 0 ? (
-          <>
-            <p className="text-[13px] font-extrabold text-up">
-              {needLabel} {fmt(shortfall)}만원 부족
-            </p>
-            <p className="mt-0.5 text-[12px] font-semibold text-muted-foreground">
-              연금 <b className="text-foreground">{fmt(pensionDrop)}만원</b> 줄이면
-              해소 ·{" "}
-              {savingDrop > 0 ? (
-                <>
-                  세액공제 <b className="text-foreground">약 {fmt(savingDrop)}만원</b>{" "}
-                  감소
-                </>
-              ) : (
-                <>세액공제는 거의 그대로</>
-              )}{" "}
-              (약 {fmtSaving(plan.pensionSavingManwon)} →{" "}
-              {fmtSaving(capSavingManwon)}만원)
-            </p>
-          </>
-        ) : (
-          <>
-            <p className="text-[13px] font-extrabold text-brand-dark">
-              {needYears}년 뒤 {fmt(needManwon)}만원 확보
-            </p>
-            <p className="mt-0.5 text-[12px] font-semibold text-muted-foreground">
-              {maxPensionKeepingNeed != null
-                ? `연금 상한 ${fmt(maxPensionKeepingNeed)}만원`
-                : `연금 한도까지 ${fmt(sliderMax - plan.pensionManwon)}만원 남았습니다`}
-            </p>
-          </>
-        )}
-      </div>
-
       {/*
-        근거 문장 — LLM 이 채우는 자리다. 상담 전사와 IPS 를 읽어 "왜 이 시점에 이
-        금액이 필요한지"를 만든다. 지금은 호출을 붙일 수 없어 시연 대역
-        (demoContributionRationale)이 들어가며, demoTaxSummary·demoInsight 와 같은
-        방식이다. 엔드포인트가 생기면 문장을 만드는 쪽만 바뀌고 이 자리는 그대로다.
+        판정과 코멘트를 한 상자에 담는다. 둘 다 LLM 이 쓴 문장이라 출처가 같은데
+        따로 떨어져 있으면 어느 것이 사람이 정한 문구이고 어느 것이 AI 가 쓴 것인지
+        화면에서 알 수 없다.
 
-        화면 숫자는 customer.nearTermNeedManwon 에서 오고 IPS Unique 는 자연어라
-        아무도 파싱하지 않는다. 이 문장이 그 사이를 사람이 읽는 말로 잇는다.
+        색은 하나로 둔다. 슬라이더를 미는 동안 파랑↔빨강이 오가면 값이 바뀌는 것보다
+        색이 먼저 눈에 들어와 읽기가 어렵고, 파랑은 이 화면에서 이미 "좋다" 는 뜻을
+        갖고 있어(절세액·배지) 판정이 아닌 것에 쓰면 뜻이 겹친다. 결론은 문장이
+        말한다 — 색은 "여기는 AI 가 쓴 자리" 만 말하면 된다.
       */}
-      {rationale && (
-        <p className="mt-2 flex gap-1.5 rounded-lg bg-brand/[0.06] px-2.5 py-2 text-[11px] font-semibold leading-relaxed text-muted-foreground">
-          <Sparkles className="mt-[1px] size-3 shrink-0 text-brand" />
-          <span>
-            <b className="mr-1 text-brand-dark">AI 코멘트</b>
-            {rationale}
-          </span>
-        </p>
+      {narrative && (
+        <div className="mt-3 rounded-lg border border-[#F5A623]/25 bg-muted/50 px-3 py-2.5">
+          <div className="flex gap-1.5">
+            {/*
+              아이콘만 색을 준다. 상자 자체는 회색이라 판정의 좋고 나쁨을 말하지
+              않고, 노란 별과 옅은 테두리가 "AI 가 쓴 자리" 라는 것만 표시한다.
+            */}
+            <Sparkles className="mt-[3px] size-3 shrink-0 text-[#F5A623]" />
+            <div className="min-w-0">
+              {/*
+                굵은 첫 줄은 "AI 코멘트" 로 고정한다. 판정 문장을 제목 자리에 두면
+                슬라이더를 밀 때마다 제목이 바뀌어 상자 자체가 흔들려 보이고, 지금은
+                문장이 실시간으로 다시 쓰이는 것도 아니다(값만 갈아 끼운다). 고정된
+                라벨은 "여기부터는 AI 가 쓴 말" 이라는 한 가지만 말한다.
+              */}
+              <p className="text-[13px] font-extrabold text-foreground">
+                AI 코멘트
+              </p>
+              <p className="mt-0.5 text-[12px] font-semibold leading-relaxed text-foreground/80">
+                {narrative.verdict}. {narrative.detail}
+              </p>
+              <p className="mt-1.5 text-[11px] font-semibold leading-relaxed text-muted-foreground">
+                {narrative.comment}
+              </p>
+            </div>
+          </div>
+        </div>
       )}
 
       {/*

@@ -102,50 +102,243 @@ export function demoTaxSummary(portfolioName: string): TaxInsightData {
  *
  * 엔드포인트가 생기면 이 함수를 fetch 로 갈아 끼우고 호출부는 그대로 둔다.
  */
-export function demoContributionRationale(
-  need: {
-    manwon: number;
-    years: number;
-    kind?: NearTermNeedKind;
-    label?: string;
-  },
-  pensionLockupYears: number,
-): string {
-  const { manwon, years, kind, label } = need;
-  if (manwon <= 0 || years <= 0) return "";
+/**
+ * 납입 배분 화면의 말은 전부 LLM 이 쓴다 — 판정 한 줄, 근거 한 줄, 코멘트.
+ *
+ * 판정 문구를 화면에 조건 분기로 박아 두면 이 고객에게 맞춘 화면이 될 뿐, 고객이
+ * 바뀌면 문장 틀은 그대로고 숫자만 갈린다. LLM 이 IPS 와 계산 결과를 함께 읽고
+ * 그 고객의 말로 쓰는 것이 원래 그리려던 그림이다.
+ *
+ * ⚠️ 숫자는 LLM 이 만들지 않는다. 계산이 구한 값을 인자로 받아 문장에 넣기만
+ *    한다(실서비스에서는 프롬프트에 그대로 실어 보내고, 돌아온 문장의 숫자를
+ *    이 값들과 대조해야 한다). 그래야 환각이 금액으로 새지 않는다.
+ *
+ * 지금은 엔드포인트가 없어 시연 대역이 문장을 만든다. demoTaxSummary·demoInsight
+ * 와 같은 방식이고, 붙을 때 바뀌는 것은 이 함수 하나다.
+ */
+export interface ContributionNarrativeInput {
+  /** IPS 에서 읽어낸 목표 — 금액·시점·자금의 이름 */
+  needManwon: number;
+  needYears: number;
+  kind?: NearTermNeedKind;
+  label?: string;
+  /** 아래는 전부 lib/taxAccounts.ts 가 계산한 값이다. */
+  /** 연금이 열릴 때까지 남은 햇수 — 목표 시점과 나란히 놓아야 대비가 선다. */
+  pensionLockupYears: number;
+  /** ISA 누적 잔여 한도(만원) — 목표액을 덮는지가 문장을 가른다. 슬라이더와 무관하다. */
+  isaHeadroomManwon: number;
+  shortfallManwon: number;
+  pensionDropManwon: number;
+  savingBeforeManwon: number;
+  savingAfterManwon: number;
+  maxPensionKeepingNeed: number | null;
+  isaLockupYears: number;
+  pensionRoomLeftManwon: number;
+}
 
-  const amount = `${manwon.toLocaleString()}만원`;
-  const locked = `연금에 넣어 ${pensionLockupYears}년 묶으면 그 시점에 손댈 수 없습니다.`;
+export interface ContributionNarrative {
+  /** 한 줄 결론 */
+  verdict: string;
+  /** 한 줄 근거 — 얼마를 어떻게 하면 되는지 */
+  detail: string;
+  /** 왜 이 시점을 미룰 수 없는지 */
+  comment: string;
+}
 
+const man = (n: number) => `${Math.round(n).toLocaleString()}만원`;
+
+/**
+ * 자금 성격별 근거.
+ *
+ * 자금의 성격만 말하면 누구에게 붙여도 말이 되는 일반론이 된다("전세 재계약은
+ * 날짜가 정해진 지출입니다"). 상담을 읽은 문장이라면 **이 고객의 세 시점**을
+ * 나란히 놓아야 한다 — 돈이 필요한 시점, 연금이 열리는 시점, ISA 가 풀리는 시점.
+ *
+ * 네 마디로 짠다.
+ *   ① 왜 이 돈은 시점을 못 미루나        (자금 성격)
+ *   ② 연금은 언제 열리나                 (겹치지 않는다)
+ *   ③ ISA 는 목표 시점에 풀리나          (대안이 되는가)
+ *   ④ 상담에서 무엇을 확인해야 하나       (PB 가 할 일)
+ *
+ * ①·④ 만 자금 성격을 타고 ②·③ 은 시점 비교라 공통이다. 넷 다 슬라이더를 어디에
+ * 두든 변하지 않으므로, LLM 이 상담 직후 한 번 쓰면 되는 부분이다.
+ */
+function needClauses(kind: NearTermNeedKind | undefined): {
+  nature: string;
+  check: string;
+} {
   switch (kind) {
     case "lease":
-      return (
-        `${years}년 뒤 전세 재계약은 날짜가 정해진 지출이라 ${amount}은 미루거나 줄일 수 ` +
-        `있는 돈이 아닙니다. 은퇴자산은 시점을 넓게 두고 쌓을 수 있지만 이 돈은 그렇지 ` +
-        `않습니다: ${locked}`
-      );
+      return {
+        nature:
+          "전세 보증금은 재계약일에 맞춰 있어야 하는 돈이라 시점을 미루거나 금액을 줄이기 어렵습니다.",
+        check:
+          "상담에서는 인상폭이 확정된 금액인지, 일부를 대출로 메울 여지가 있는지 확인해 주십시오.",
+      };
     case "homePurchase":
-      return (
-        `주택 계약금은 계약일과 대출 실행일에 함께 묶여, ${years}년 뒤 ${amount}이 ` +
-        `현금으로 있어야 합니다. 하루 늦으면 계약 자체가 흔들립니다: ${locked}`
-      );
-    case "startup":
-      return (
-        `창업 자금은 시점을 다소 조절할 수 있어 전세나 계약금만큼 경직되지는 않습니다. ` +
-        `다만 ${years}년을 크게 넘기면 준비해 온 기회를 놓치는 비용이 생깁니다: ${locked}`
-      );
+      return {
+        nature:
+          "주택 계약금은 계약일과 대출 실행일에 함께 묶여 하루도 미루기 어렵습니다.",
+        check:
+          "상담에서는 계약 시점이 확정됐는지, 대출 한도가 얼마나 나오는지 함께 확인해 주십시오.",
+      };
     case "education":
-      return (
-        `학자금은 학기 일정에 묶여 ${years}년 뒤 ${amount}이 필요한 시점을 미룰 수 ` +
-        `없습니다. 한 학기를 건너뛰는 선택지가 사실상 없기 때문입니다: ${locked}`
-      );
+      return {
+        nature:
+          "등록금은 학기 일정에 묶여 한 학기를 건너뛰는 선택지가 사실상 없습니다.",
+        check:
+          "상담에서는 학기별로 나눠 내는지, 장학금이나 학자금 대출로 일부를 덜 수 있는지 확인해 주십시오.",
+      };
+    case "startup":
+      return {
+        nature:
+          "창업 자금은 시점을 다소 조절할 수 있어 전세나 계약금만큼 경직되지는 않습니다.",
+        check:
+          "상담에서는 개시 시점을 얼마나 미룰 수 있는지, 정책자금 같은 다른 재원이 있는지 확인해 주십시오.",
+      };
     default:
-      // 목적을 모르면 "못 미루는 돈"이라고 단정하지 않는다. 금액과 시점만 말한다.
-      return (
-        `${years}년 뒤 ${label ? `${label} ` : ""}${amount}이 필요합니다. 시점을 미룰 수 ` +
-        `있는 지출인지 상담에서 확인해야 합니다: ${locked}`
-      );
+      // 목적을 모르면 "못 미루는 돈" 이라고 단정하지 않는다.
+      return {
+        nature: "이 자금이 시점을 미룰 수 있는 지출인지 아직 확인되지 않았습니다.",
+        check:
+          "상담에서 목적과 시점을 먼저 확인해 주십시오. 미룰 수 있는 돈이라면 배분을 다시 볼 여지가 있습니다.",
+      };
   }
+}
+
+/**
+ * 연금 절 — 목표 시점과 연금 개시 시점의 간격.
+ *
+ * 간격이 22년인 고객과 8년인 고객에게 같은 말을 하면 읽는 사람이 "붙여 넣었구나"
+ * 를 먼저 알아챈다. 간격의 크기 자체가 할 말을 정한다.
+ */
+function pensionClause(needYears: number, lockYears: number): string {
+  const gap = lockYears - needYears;
+  const head = `연금은 ${lockYears}년 뒤에야 열립니다.`;
+
+  if (gap >= 15) {
+    return (
+      `${head} 은퇴까지 남은 기간에 쌓는 돈이라 성격이 아예 다릅니다 — ` +
+      `${needYears}년 뒤에 쓸 돈을 여기에 넣으면 그 시점에는 없는 돈이 됩니다.`
+    );
+  }
+  if (gap >= 5) {
+    return (
+      `${head} ${needYears}년 뒤보다 한참 뒤라, 한도를 채우는 만큼 ` +
+      `${needYears}년 시점에 쓸 돈이 줄어듭니다.`
+    );
+  }
+  return (
+    `${head} 목표 시점과 ${gap}년 차이라 얼핏 가까워 보이지만, ` +
+    `${needYears}년 시점에는 아직 잠겨 있습니다.`
+  );
+}
+
+/**
+ * ISA 절 — 이 화면에서 배분이 ISA 로 흘러가는 이유가 여기서 설명된다.
+ *
+ * 두 가지가 문장을 가른다. 의무보유가 목표 시점 전에 끝나는지, 그리고 남은 한도가
+ * 목표액을 덮는지. 둘 다 슬라이더와 무관해 고객마다 고정이다.
+ */
+function isaClause(
+  needYears: number,
+  needManwon: number,
+  lockYears: number,
+  headroomManwon: number,
+): string {
+  const man = (n: number) => `${Math.round(n).toLocaleString()}만원`;
+
+  if (lockYears > needYears) {
+    return (
+      `ISA 도 의무보유가 ${lockYears}년 남아 ${needYears}년 시점에는 풀리지 ` +
+      `않습니다. 이 목표를 지키려면 절세계좌 밖에 두는 수밖에 없어, 절세액을 일부 ` +
+      `내주어야 합니다.`
+    );
+  }
+
+  const room = headroomManwon >= needManwon;
+  if (lockYears <= 0) {
+    return room
+      ? `반면 ISA 는 의무보유가 이미 끝나 언제든 꺼낼 수 있고, 이월된 한도가 ` +
+          `${man(headroomManwon)} 남아 있습니다. 목표액 ${man(needManwon)}을 담고도 ` +
+          `여유가 있어 이쪽으로 옮길 여지가 큽니다.`
+      : `반면 ISA 는 의무보유가 이미 끝나 언제든 꺼낼 수 있습니다. 다만 남은 한도가 ` +
+          `${man(headroomManwon)}이라 목표액 ${man(needManwon)}을 다 담지는 못하니, ` +
+          `모자라는 만큼은 일반계좌로 가야 합니다.`;
+  }
+
+  return room
+    ? `반면 ISA 는 ${lockYears}년 뒤 의무보유가 끝나 ${needYears}년 시점에는 ` +
+        `풀립니다. 남은 한도도 ${man(headroomManwon)}이라 목표액을 담고도 여유가 ` +
+        `있어, 같은 돈을 ISA 에 두면 목표를 지키면서 절세를 챙길 수 있습니다.`
+    : `반면 ISA 는 ${lockYears}년 뒤 의무보유가 끝나 ${needYears}년 시점에는 ` +
+        `풀립니다. 남은 한도가 ${man(headroomManwon)}이라 목표액을 다 담지는 ` +
+        `못하지만, 담기는 만큼은 절세와 목표를 함께 가져갑니다.`;
+}
+
+function needComment(
+  kind: NearTermNeedKind | undefined,
+  needYears: number,
+  needManwon: number,
+  pensionLockupYears: number,
+  isaLockupYears: number,
+  isaHeadroomManwon: number,
+): string {
+  const { nature, check } = needClauses(kind);
+  return [
+    nature,
+    pensionClause(needYears, pensionLockupYears),
+    isaClause(needYears, needManwon, isaLockupYears, isaHeadroomManwon),
+    check,
+  ].join(" ");
+}
+
+export function demoContributionNarrative(
+  i: ContributionNarrativeInput,
+): ContributionNarrative | null {
+  if (i.needManwon <= 0 || i.needYears <= 0) return null;
+
+  const name = i.label ?? "필요 자금";
+  const comment = needComment(
+    i.kind,
+    i.needYears,
+    i.needManwon,
+    i.pensionLockupYears,
+    i.isaLockupYears,
+    i.isaHeadroomManwon,
+  );
+
+  // 연금을 0 으로 해도 못 맞추는 경우. 남는 돈이 목표 시점에 안 풀리는 ISA 로
+  // 흘러갈 때 생긴다. 이때 "N만원으로 낮추면 된다" 고 말하면 거짓이 된다.
+  if (i.shortfallManwon > 0 && i.maxPensionKeepingNeed == null) {
+    return {
+      verdict: `어떻게 배분해도 ${i.needYears}년 뒤 ${man(i.needManwon)}을 못 만듭니다`,
+      detail: `연금을 0 으로 해도 ${man(i.shortfallManwon)} 모자랍니다. ISA 도 의무보유 ${i.isaLockupYears}년이라 그 시점에 풀리지 않습니다.`,
+      comment,
+    };
+  }
+
+  if (i.shortfallManwon > 0) {
+    const drop = Math.max(i.savingBeforeManwon - i.savingAfterManwon, 0);
+    const cost =
+      drop > 0
+        ? `세액공제가 약 ${man(drop)} 줄어듭니다 (약 ${Math.round(i.savingBeforeManwon).toLocaleString()} → ${Math.round(i.savingAfterManwon).toLocaleString()}만원).`
+        : "세액공제는 거의 그대로입니다.";
+    return {
+      verdict: `${name}이 ${man(i.shortfallManwon)} 모자랍니다`,
+      detail: `연금 납입을 ${man(i.pensionDropManwon)} 줄이면 해소됩니다. ${cost}`,
+      comment,
+    };
+  }
+
+  return {
+    verdict: `${i.needYears}년 뒤 ${man(i.needManwon)}을 확보합니다`,
+    detail:
+      i.maxPensionKeepingNeed != null
+        ? `이 목표를 지키면서 연금에 넣을 수 있는 상한은 ${man(i.maxPensionKeepingNeed)}입니다.`
+        : `연금 한도까지 ${man(i.pensionRoomLeftManwon)} 남았습니다.`,
+    comment,
+  };
 }
 
 /** 포트폴리오 계산 결과. 기존 폴백과 같은 형태 — 상관행렬·세금 맵은 백엔드 산출물이라 null. */
