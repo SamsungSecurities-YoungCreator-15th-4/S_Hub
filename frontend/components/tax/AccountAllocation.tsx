@@ -164,12 +164,12 @@ export default function AccountAllocation({
         </p>
       </HelpTooltip>
 
-      {/* 전체 계좌 세그먼트 바 — YAxis width(72px) 기준 정렬, 2px 여백 */}
+      {/* 전체 계좌 세그먼트 바 — 아래 계좌 막대와 같은 72px 라벨 + 10px 간격 */}
       <div className="mb-1 flex items-center">
         <span className="w-[72px] shrink-0 text-right text-[12px] font-extrabold text-[#4E5968]">
           전체 계좌
         </span>
-        <div className="ml-[2px] mr-[16px] flex h-[12px] flex-1 overflow-hidden rounded-md">
+        <div className="ml-[10px] mr-[16px] flex h-[12px] flex-1 overflow-hidden rounded-md">
           {allocation.map(({ label, weight, color }) => (
             <div
               key={label}
@@ -185,7 +185,7 @@ export default function AccountAllocation({
         사이에서 줄어 그만큼을 흡수하므로 카드 높이는 그대로다. 간격을 좁혀 두
         줄 안에 들어오게 한다.
       */}
-      <div className="mb-2 ml-[74px] mr-[16px] flex flex-wrap gap-x-1.5 gap-y-0 leading-tight">
+      <div className="mb-2 ml-[82px] mr-[16px] flex flex-wrap gap-x-1.5 gap-y-0 leading-tight">
         {allocation.map(({ label, weight, color }) => (
           <span
             key={label}

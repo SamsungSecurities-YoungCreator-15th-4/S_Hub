@@ -233,14 +233,14 @@ export default function TaxSection() {
             절세 효과 금액이 없는 상태에서는 왼쪽이 배지 한 줄뿐이라 박스가 비어
             보인다. 세로 여백과 지표 카드를 줄여 내용만큼만 차지하게 한다.
           */}
-          <div className="flex items-center gap-3 rounded-xl border border-brand/20 bg-brand/5 px-3.5 py-2">
+          <div className="flex items-center gap-3 rounded-xl border border-brand/20 bg-brand/5 px-3 py-2">
             <div className="flex-1">
               <div className="flex items-center gap-2">
                 {/*
                   이 배지가 왼쪽 칸에 홀로 남는다(절세 효과 금액이 없을 때).
                   오른쪽 지표 카드와 무게를 맞추려면 이 정도는 되어야 한다.
                 */}
-                <span className="rounded-full border border-brand/20 bg-white px-3 py-1 text-[15px] font-extrabold text-brand-dark">
+                <span className="text-[15px] font-extrabold text-brand-dark">
                   {baseLabel}
                 </span>
               </div>
@@ -555,7 +555,7 @@ function SummaryStat({
         : "text-foreground";
   // 값과 증감을 한 줄에 둔다. 세 줄로 쌓으면 카드 높이가 박스 전체를 밀어 올린다.
   return (
-    <div className="min-w-29.5 rounded-xl border bg-white px-3 py-1.5">
+    <div className="min-w-29.5 px-1 py-0.5">
       <p className="text-[12px] font-bold text-muted-foreground">{k}</p>
       <p className="mt-0.5 flex items-baseline gap-1.5 whitespace-nowrap">
         <span className="text-[14px] font-extrabold tabular-nums">{v}</span>
