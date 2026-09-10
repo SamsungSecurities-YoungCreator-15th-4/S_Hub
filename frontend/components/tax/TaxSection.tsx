@@ -413,14 +413,19 @@ function AdviceCards({ liveCards, plan }: AdviceCardsProps) {
                 key={card.title}
                 className={`flex flex-col rounded-xl border p-2.5 ${!card.applicable ? "opacity-50" : ""}`}
               >
-                <div className="mb-1.5 flex items-center gap-1.5">
+                <div className="mb-1.5 flex items-center justify-between gap-1.5">
                   {/*
                     설명을 여는 자리는 제목이다. 본문을 감싸면 배분액·절감액 위에서
                     툴팁이 떠 읽던 숫자를 덮고, 어디에 붙은 설명인지도 알 수 없다.
                     도움말 모드의 테두리는 사이드바의 자산 비중 조절기·백테스트·
                     세금 흐름 비교와 같은 규격이다.
                   */}
-                  <HelpTooltip text={card.explain} className="flex-1" wide>
+                  {/*
+                    w-fit 이어야 한다. flex-1 이면 도움말 모드의 hover 배경이
+                    inset-0 으로 제목 줄 전체를 덮어, 글자를 감싼 테두리와 두 겹으로
+                    어긋나 보인다. 탭 버튼은 justify-between 이 오른쪽으로 민다.
+                  */}
+                  <HelpTooltip text={card.explain} className="w-fit" wide>
                     <p className="cursor-default text-[13px] font-extrabold leading-tight">
                       <span
                         className={
