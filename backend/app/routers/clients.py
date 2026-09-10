@@ -7,7 +7,8 @@
 검증해 상담을 저장한다. 고객명은 표시값일 뿐 조회 키로 쓰지 않는다. 동명이인은
 허용하며, 고유성은 PK(id uuid)가 보장한다.
 
-운용자산(AUM)은 client 테이블에 전용 컬럼이 없어 meta.aum_eokwon(억원)으로 저장한다.
+운용자산(AUM)과 나이는 client 테이블에 전용 컬럼이 없어
+meta.aum_eokwon(억원)·meta.age(세)로 저장한다.
 Supabase 호출이 블로킹이라 핸들러는 동기 def 로 둔다(rag.py·tax.py 와 동일).
 """
 
@@ -59,6 +60,7 @@ def _default_ips_raw(aum_eokwon: float) -> dict:
 class ClientCreateRequest(BaseModel):
     name: str
     aum_eokwon: float = Field(ge=0)  # 운용자산(억원). meta.aum_eokwon 으로 저장.
+    age: int = Field(ge=0, le=120)  # 나이(세). meta.age 로 저장.
 
     @field_validator("name")
     @classmethod
@@ -84,6 +86,7 @@ class ClientCreateResponse(BaseModel):
     client_id: str
     name: str
     aum_eokwon: float
+    age: int
     ips_snapshot_id: str  # 함께 생성된 디폴트 initial IPS 스냅샷(추적용)
     created_at: str
 
@@ -92,6 +95,7 @@ class ClientListItem(BaseModel):
     client_id: str
     name: str
     aum_eokwon: float | None
+    age: int | None
     is_persona: bool
     created_at: str
 
@@ -540,6 +544,16 @@ def _to_list_item(row: dict) -> ClientListItem:
     except (TypeError, ValueError):
         aum_eokwon = None
 
+    raw_age = (meta or {}).get("age")
+    try:
+        age = int(raw_age) if raw_age is not None else None
+        if age is not None and (
+            isinstance(raw_age, bool) or float(raw_age) != age or not 0 <= age <= 120
+        ):
+            age = None
+    except (TypeError, ValueError):
+        age = None
+
     created_at_raw = row.get("created_at")
     created_at = _to_kst_iso(created_at_raw) if created_at_raw else ""
 
@@ -547,6 +561,7 @@ def _to_list_item(row: dict) -> ClientListItem:
         client_id=row.get("id") or "",
         name=row.get("name") or "Unknown",
         aum_eokwon=aum_eokwon,
+        age=age,
         is_persona=bool((meta or {}).get("persona", False)),
         created_at=created_at,
     )
@@ -565,8 +580,13 @@ def create_client(
             .insert(
                 {
                     "name": request.name,
-                    # AUM 전용 컬럼이 없어 meta 에 보관. persona=False 로 페르소나 3명과 구분.
-                    "meta": {"aum_eokwon": request.aum_eokwon, "persona": False},
+                    # 전용 컬럼이 없는 AUM·나이는 meta 에 보관한다.
+                    # persona=False 로 페르소나 3명과 구분한다.
+                    "meta": {
+                        "aum_eokwon": request.aum_eokwon,
+                        "age": request.age,
+                        "persona": False,
+                    },
                     # 인증된 PB 에 자동 배정 (RLS 1차 방어선 + 백엔드 2차 방어선).
                     "pb_id": pb_id,
                 }
@@ -618,6 +638,7 @@ def create_client(
         client_id=created["id"],
         name=created["name"],
         aum_eokwon=request.aum_eokwon,
+        age=request.age,
         ips_snapshot_id=snapshot["id"],
         created_at=_to_kst_iso(created["created_at"]),
     )

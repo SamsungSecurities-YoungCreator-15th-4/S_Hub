@@ -133,7 +133,7 @@ export interface Customer {
 export const CUSTOMERS: Customer[] = [
   {
     // 상담 이력이 있는 고객. 화면을 열면 지난 회차의 IPS·비중·확정 상태가 복원된다.
-    // 목록 첫 번째라 초기 선택 고객이기도 하다 — 처음 열었을 때 채워진 화면을 본다.
+    // 상담 이력이 있는 고객을 선택하면 채워진 화면을 복원한다.
     id: "cust-002",
     name: "이사조",
     grade: "일반",

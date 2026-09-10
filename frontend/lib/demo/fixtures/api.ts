@@ -182,8 +182,12 @@ export function demoStressTestPortfolios(): Portfolio[] {
  * 데모에서 저장됐다고 말하면 거짓이 된다. clientId 는 빈 문자열이고
  * 호출부가 로컬 id 를 만들어 붙인다.
  */
-export function demoCreatedClient(name: string, aumEokwon: number): CreateClientResult {
-  const data: CreatedClient = { clientId: "", name, aumEokwon };
+export function demoCreatedClient(
+  name: string,
+  aumEokwon: number,
+  age: number,
+): CreateClientResult {
+  const data: CreatedClient = { clientId: "", name, aumEokwon, age };
   return { status: "fallback", data, note: "시연 고정 데이터: DB에 저장되지 않습니다." };
 }
 
