@@ -22,7 +22,7 @@ export default function RunStatusChip() {
 
   return (
     <span
-      title="상담 실행 상태 — 표시 전용"
+      title="포트폴리오 분석 상태: 표시 전용"
       className={`shrink-0 rounded-lg border px-2 py-0.5 text-[10px] font-bold ${TONE[status]}`}
     >
       {RUN_STATUS_LABEL[status]}

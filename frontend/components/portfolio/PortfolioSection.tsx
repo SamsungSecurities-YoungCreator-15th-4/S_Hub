@@ -24,6 +24,7 @@ import {
 } from "@/lib/store";
 import HelpTooltip from "@/components/common/HelpTooltip";
 import AsOfNote from "@/components/common/AsOfNote";
+import RunStatusChip from "@/components/header/RunStatusChip";
 
 /**
  * 지표 도움말 — 고객이 함께 보는 화면이라 전문용어 대신 일상어로 적는다.
@@ -145,6 +146,7 @@ export default function PortfolioSection() {
       <div className="mb-2 flex items-center justify-between px-0.5">
         <div className="flex items-center gap-2.5">
           <h2 className="text-lg font-extrabold">포트폴리오 대시보드</h2>
+          <RunStatusChip />
           {analyzing ? (
             <div className="flex items-center gap-1.5 rounded-lg bg-muted px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
               <Loader2 className="size-3 animate-spin" />

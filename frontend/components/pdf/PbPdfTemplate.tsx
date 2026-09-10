@@ -1424,7 +1424,7 @@ function TaxPage() {
                 {derivedFlow && (
                   <>
                     <br />✓ {taxFlow?.totalLabel} +
-                    {derivedFlow.totalSavingManwon.toLocaleString()}만원 — 금융소득
+                    {derivedFlow.totalSavingManwon.toLocaleString()}만원: 금융소득
                     +{derivedFlow.breakdown.financialManwon.toLocaleString()}만 (세전
                     +{derivedFlow.breakdown.pretaxGainManwon.toLocaleString()} ·{" "}
                     {derivedFlow.breakdown.switchTaxManwon >= 0
@@ -1630,7 +1630,7 @@ function TaxPage() {
                   lineHeight: 1.5,
                 }}
               >
-                {accountRows[0]?.basis} — 미사용분이 해마다 쌓인다 · 연금은 올해
+                {accountRows[0]?.basis}: 미사용분이 해마다 쌓인다 · 연금은 올해
                 세액공제 한도
               </p>
             </div>

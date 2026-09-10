@@ -88,7 +88,7 @@ export async function createClient(
     const note =
       err instanceof ApiError && err.isTimeout
         ? "응답 시간 초과로 저장되지 않았습니다(예시로만 추가)."
-        : "백엔드 저장 실패 — 예시로만 추가되었습니다(새로고침 시 사라짐).";
+        : "백엔드 저장 실패: 예시로만 추가되었습니다(새로고침 시 사라짐).";
     return {
       status: "fallback",
       data: { clientId: "", name, aumEokwon },

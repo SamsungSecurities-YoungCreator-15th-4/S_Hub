@@ -691,14 +691,14 @@ const METRIC_CARDS = [
     title: "샤프 지수",
     en: "Sharpe Ratio",
     body: "위험 한 단위당 얼마나 수익을 얻는지 나타냅니다. 높을수록 효율적인 포트폴리오입니다.",
-    example: "0.61은 0.43보다 좋음 — 같은 위험으로 더 많이 버는 구조",
+    example: "0.61은 0.43보다 좋음: 같은 위험으로 더 많이 버는 구조",
   },
   {
     num: "④",
     title: "소르티노 지수",
     en: "Sortino Ratio",
     body: "하락 위험(손실이 나는 변동)만을 기준으로 한 효율성 지표입니다. 높을수록 손실 방어력이 좋습니다.",
-    example: "샤프와 달리 하락만 위험으로 봄 — 손실 방어력 측정",
+    example: "샤프와 달리 하락만 위험으로 봄: 손실 방어력 측정",
   },
   {
     num: "⑤",
@@ -1425,7 +1425,7 @@ function TaxPage() {
                 {derivedFlow && (
                   <>
                     <br />✓ {taxFlow?.totalLabel} +
-                    {derivedFlow.totalSavingManwon.toLocaleString()}만원 — 금융소득
+                    {derivedFlow.totalSavingManwon.toLocaleString()}만원: 금융소득
                     +{derivedFlow.breakdown.financialManwon.toLocaleString()}만 (세전
                     +{derivedFlow.breakdown.pretaxGainManwon.toLocaleString()} ·{" "}
                     {derivedFlow.breakdown.switchTaxManwon >= 0
@@ -1631,7 +1631,7 @@ function TaxPage() {
                   lineHeight: 1.5,
                 }}
               >
-                {accountRows[0]?.basis} — 미사용분이 해마다 쌓인다 · 연금은 올해
+                {accountRows[0]?.basis}: 미사용분이 해마다 쌓인다 · 연금은 올해
                 세액공제 한도
               </p>
             </div>
