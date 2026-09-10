@@ -744,7 +744,7 @@ export default function Sidebar() {
               IPS 조율기까지 반영했다고 적으면 사실과 다르다. */}
           {realtimeStatus === "done" && (
             <p className="mt-1.5 text-[10px] font-semibold text-emerald-600">
-              상담 내역에 반영했습니다.
+              상담 내역·IPS 조율기에 반영했습니다.
             </p>
           )}
           {sttStatus === "error" && (
