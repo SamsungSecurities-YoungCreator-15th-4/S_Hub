@@ -123,7 +123,7 @@ export default function AccountAllocation({
   ];
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="flex flex-col">
       <p className="mb-2 flex items-center gap-1.5 text-[13px] font-extrabold">
         계좌 배치 활용도
       </p>
@@ -149,7 +149,7 @@ export default function AccountAllocation({
         사이에서 줄어 그만큼을 흡수하므로 카드 높이는 그대로다. 간격을 좁혀 두
         줄 안에 들어오게 한다.
       */}
-      <div className="mb-3 ml-[74px] mr-[16px] flex flex-wrap gap-x-1.5 gap-y-0 leading-tight">
+      <div className="mb-2 ml-[74px] mr-[16px] flex flex-wrap gap-x-1.5 gap-y-0 leading-tight">
         {allocation.map(({ label, weight, color }) => (
           <span
             key={label}
@@ -166,7 +166,7 @@ export default function AccountAllocation({
 
       {/* ISA / 연금저축+IRP — 각자 자기 한도 대비 비율 */}
       {/* 흐름 차트와 같은 규칙 — 상한은 종전 높이, 모자라면 하한까지 줄어든다. */}
-      <div className="min-h-20 max-h-28 flex flex-1 flex-col justify-center gap-2.5">
+      <div className="flex flex-col gap-2">
         {bars.map((bar) => {
           const pct =
             bar.limitManwon > 0 ? (bar.usedManwon / bar.limitManwon) * 100 : 0;
@@ -204,7 +204,7 @@ export default function AccountAllocation({
         두 막대의 한도가 서로 다른 것을 재고 있다는 사실을 여기서 말한다. 한 줄로
         붙여 두지 않으면 8,000 과 900 이 같은 성격의 숫자로 읽힌다.
       */}
-      <p className="mt-1.5 text-[11px] font-semibold leading-tight text-muted-foreground">
+      <p className="mt-2 text-[11px] font-semibold leading-tight text-muted-foreground">
         ISA 는 {bars[0].basis} 한도 — 미사용분이 해마다 쌓인다 · 연금은 올해
         세액공제 한도
       </p>
