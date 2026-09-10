@@ -3,7 +3,7 @@
  * store 데이터를 PDF 렌더링 shape으로 변환한다. pdfTaxData.ts와 동일한 패턴.
  *
  * 추적성: 모든 값은 useDashboardStore의 실시간 데이터 소스다.
- *   - 자산배분 → Portfolio.allocation(백엔드 실데이터) 또는 toDisplayAllocation 폴백
+ *   - 자산배분 → Portfolio.allocation(백엔드 실데이터) 또는 11종 계산 단위 폴백
  *   - 거시지표 → MacroIndicator.direction/change (MacroTicker가 올린 실데이터)
  *   - 성과지표 → Portfolio.metrics (calculate 응답)
  */
@@ -26,7 +26,7 @@ export type PdfAssetSlice = { label: string; weight: number; color: string };
 /**
  * 포트폴리오 자산 배분 슬라이스.
  * PortfolioSection과 동일하게 pf.allocation(백엔드 실데이터) 우선,
- * 없으면 toDisplayAllocation(6-그룹 변환) 폴백. 비중 0 항목 제외.
+ * 없으면 11종 계산 단위(toCalcUnitAllocation) 폴백. 비중 0 항목 제외.
  */
 export function buildPdfAllocation(pf: Portfolio): PdfAssetSlice[] {
   if (pf.allocation?.length) {

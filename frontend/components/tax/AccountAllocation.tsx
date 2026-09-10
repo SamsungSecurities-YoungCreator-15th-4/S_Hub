@@ -10,7 +10,7 @@ import {
   YAxis,
 } from "recharts";
 import { TAX_EFFECT, PORTFOLIOS } from "@/lib/mockData";
-import { toDisplayAllocation, DISPLAY_GROUP_COLORS } from "@/lib/assetMapping";
+import { toCalcUnitAllocation } from "@/lib/assetMapping";
 import { useDashboardStore } from "@/lib/store";
 import { useViewedPortfolio } from "@/lib/viewedPortfolio";
 import type { AccountSlot } from "@/lib/types";
@@ -73,7 +73,14 @@ export default function AccountAllocation({
    */
   const { viewed } = useViewedPortfolio();
   const portfolio = viewed ?? portfolios[1] ?? PORTFOLIOS[1];
-  const allocation = toDisplayAllocation(portfolio.weights).filter(
+  /*
+   * 11종 계산 단위를 그대로 쓴다. 6분류(toDisplayAllocation)는 세제 기준 묶음이라
+   * 리츠·금·인프라펀드가 전부 "분리과세" 한 조각이 되고, 신흥국주식이 해외성장주에
+   * 합쳐진다. 그 결과 바로 위 도넛과 리포트는 "해외성장주 9%" 인데 이 막대만
+   * "해외성장주 12%" 라고 적혀, 같은 이름이 한 화면에서 다른 숫자를 말했다.
+   * 도넛(PortfolioSection)·리포트(buildPdfAllocation)와 같은 축으로 맞춘다.
+   */
+  const allocation = toCalcUnitAllocation(portfolio.weights).filter(
     ({ weight }) => weight > 0,
   );
 
@@ -94,30 +101,32 @@ export default function AccountAllocation({
           전체 계좌
         </span>
         <div className="ml-[2px] mr-[16px] flex h-[10px] flex-1 overflow-hidden rounded-md">
-          {allocation.map(({ group, weight }) => (
+          {allocation.map(({ label, weight, color }) => (
             <div
-              key={group}
-              style={{
-                width: `${weight}%`,
-                backgroundColor: DISPLAY_GROUP_COLORS[group],
-              }}
+              key={label}
+              style={{ width: `${weight}%`, backgroundColor: color }}
             />
           ))}
         </div>
       </div>
 
       {/* 세그먼트 범례 */}
-      <div className="mb-3 ml-[74px] mr-[16px] flex flex-wrap gap-x-2 gap-y-0.5">
-        {allocation.map(({ group, weight }) => (
+      {/*
+        6분류일 때는 한 줄이었지만 11종이면 두 줄이 된다. 아래 차트가 상한·하한
+        사이에서 줄어 그만큼을 흡수하므로 카드 높이는 그대로다. 간격을 좁혀 두
+        줄 안에 들어오게 한다.
+      */}
+      <div className="mb-3 ml-[74px] mr-[16px] flex flex-wrap gap-x-1.5 gap-y-0 leading-tight">
+        {allocation.map(({ label, weight, color }) => (
           <span
-            key={group}
+            key={label}
             className="flex items-center gap-1 text-[11px] font-semibold text-muted-foreground"
           >
             <span
               className="inline-block size-1.5 rounded-[2px]"
-              style={{ backgroundColor: DISPLAY_GROUP_COLORS[group] }}
+              style={{ backgroundColor: color }}
             />
-            {group} {weight}%
+            {label} {weight}%
           </span>
         ))}
       </div>
