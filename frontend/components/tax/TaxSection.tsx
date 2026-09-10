@@ -101,7 +101,7 @@ export default function TaxSection() {
       ? Math.round(selectedTax.saved_vs_current / 10000)
       : null;
 
-  // 실효세 절감: taxSource.headline의 세전→세후 실효세 (만원)
+  // taxSource.headline 의 전→후 금융소득세 (만원)
   const effectiveTaxBeforeMan =
     taxSource?.headline.tax_amount_before != null
       ? Math.round(taxSource.headline.tax_amount_before / 10000)
@@ -279,7 +279,9 @@ export default function TaxSection() {
                 {effectiveTaxBeforeMan != null &&
                 effectiveTaxAfterMan != null ? (
                   <SummaryStat
-                    k="실효세 절감"
+                    // 값이 전→후 세액이라 늘어날 수도 있다. "절감" 이라 쓰면
+                    // 세금이 는 화면에서도 아꼈다는 말이 된다.
+                    k="금융소득세"
                     v={`${effectiveTaxBeforeMan.toLocaleString()} → ${effectiveTaxAfterMan.toLocaleString()}만`}
                     d={
                       effectiveTaxDeltaPct != null

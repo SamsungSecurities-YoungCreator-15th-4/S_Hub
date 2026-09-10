@@ -1302,7 +1302,11 @@ function TaxPage() {
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr style={{ borderBottom: `1px solid ${BORDER}` }}>
-                  {["구분", "세후 수익", "절세액", "비고"].map((h) => (
+                  {/*
+                    이 칸에 들어가는 값은 그 해에 내는 세금이지 절감액이 아니다.
+                    "절세액 240만" 은 240만원을 아꼈다는 말로 읽힌다.
+                  */}
+                  {["구분", "세후 수익", "금융소득세", "비고"].map((h) => (
                     <th
                       key={h}
                       style={{
@@ -1399,7 +1403,7 @@ function TaxPage() {
               <div style={{ fontSize: 10, color: MUTED, lineHeight: 1.7 }}>
                 ✓ 세후 수익률 {taxEffect.afterTaxReturn.from} →{" "}
                 {taxEffect.afterTaxReturn.to} ({taxEffect.afterTaxReturn.delta})
-                <br />✓ 실효세 절감 {taxEffect.effectiveTax.from} →{" "}
+                <br />✓ 금융소득세 {taxEffect.effectiveTax.from} →{" "}
                 {taxEffect.effectiveTax.to} ({taxEffect.effectiveTax.delta})
                 {/*
                   화면 머리말과 같은 분해다. 총액만 적으면 절반이 다른 세목(근로
