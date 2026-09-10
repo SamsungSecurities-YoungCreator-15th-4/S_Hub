@@ -11,27 +11,27 @@ import {
 } from "@/components/ui/dialog";
 import { RUN_STATUS, canTransition } from "@/lib/runStatus";
 import { CALC_UNITS } from "@/lib/assetMapping";
-import {
-  useDashboardStore,
-  useRunStatus,
-} from "@/lib/store";
+import { useDashboardStore, useRunStatus } from "@/lib/store";
 import {
   CITATIONS,
-  CVAR_CONTRIBUTIONS,
-  CVAR_CONTRIBUTION_NOTE,
   DISCLAIMERS,
-  IPS_CONFLICTS,
-  IPS_CONFLICT_NOTE,
   REPORT_AS_OF,
   REPORT_META,
   REPRODUCIBILITY_HASHES,
   REPRODUCIBILITY_NOTE,
-  RISK_METRICS,
   VERIFICATIONS,
   VERIFICATION_NOTE,
   formatWon,
 } from "@/lib/mock/symphonyReport";
 import { STRESS_SCENARIOS, runStress } from "@/lib/stressScenarios";
+import { conflictSummary, evaluateIpsConflicts } from "@/lib/ipsConflicts";
+import {
+  CONFIDENCE_LEVEL_PCT,
+  contributionNote,
+  cvarContributions,
+  riskMetricRows,
+} from "@/lib/riskModel";
+import { useSymphonySubject } from "@/lib/symphonySubject";
 
 /** 스크롤 게이트의 여유. 하단에서 이 거리 안에 들어오면 끝까지 본 것으로 본다. */
 const BOTTOM_THRESHOLD_PX = 24;
@@ -46,8 +46,13 @@ const BOTTOM_THRESHOLD_PX = 24;
  * 표시하는 값은 전부 lib/mock/symphonyReport.ts 의 상수다. 이 화면은 지표를 다시
  * 계산하지 않는다 — 6지표 산출의 SSOT 는 엔진의 calculate_metrics 하나뿐이다.
  */
-export default function ReportDetailModal({ onClose }: { onClose: () => void }) {
+export default function ReportDetailModal({
+  onClose,
+}: {
+  onClose: () => void;
+}) {
   const runStatus = useRunStatus();
+  const { totalKrw, label } = useSymphonySubject();
   const lockReport = useDashboardStore((s) => s.lockReport);
   const [atBottom, setAtBottom] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -89,9 +94,7 @@ export default function ReportDetailModal({ onClose }: { onClose: () => void }) 
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent
-        className="flex h-[92vh] w-full max-w-[980px] flex-col gap-0 overflow-hidden p-0 sm:max-w-[980px]"
-      >
+      <DialogContent className="flex h-[92vh] w-full max-w-[980px] flex-col gap-0 overflow-hidden p-0 sm:max-w-[980px]">
         {/* 상태 헤더 — 스크롤과 무관하게 상단 고정 */}
         <div className="shrink-0 border-b px-5 py-3.5">
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 pr-9">
@@ -111,12 +114,13 @@ export default function ReportDetailModal({ onClose }: { onClose: () => void }) 
               <span className="tabular-nums">기준일 {REPORT_AS_OF}</span>
               <span className="text-muted-foreground/40">·</span>
               <span className="tabular-nums">
-                총 평가금액 {formatWon(REPORT_META.totalValuationKrw)}
+                총 평가금액 {formatWon(totalKrw)}
               </span>
             </div>
           </div>
           <DialogDescription className="mt-1 text-[11px] font-semibold text-muted-foreground">
-            리스크 연산은 6개 자산군 기준입니다.
+            진단 대상은 {label} 구성입니다. 상담 전 보유 비중은 충돌 검사에서
+            비교 대상으로만 씁니다.
           </DialogDescription>
         </div>
 
@@ -208,29 +212,19 @@ const TH = "px-2 py-1.5 text-left text-[11px] font-bold text-muted-foreground";
 const TD = "px-2 py-1.5 text-[12px] font-semibold";
 
 /**
- * 자산 배분 — 현재 포트폴리오 기준.
+ * 자산 배분 — 확정 대상 안 기준.
  *
- * 이 리포트는 한 장짜리 **진단서**다. 아래 칸이 전부 지금 들고 있는 자산을 두고
- * 말한다 — IPS 충돌은 "국내주식 42.0% 가 상한 40.0% 를 넘었다", CVaR 기여도는
- * "국내주식이 손실의 55.4%", 스트레스는 현재 비중의 손실액이다. 맨 위 칸만
- * 보고 있는 제안을 따라가면 같은 문서에서 국내주식이 20% 이기도 하고 42% 이기도
- * 한 상태가 된다. 20% 는 40% 상한을 넘을 수 없는데 바로 아래에서 넘었다고 한다.
+ * 이 리포트가 진단하는 대상은 **옮겨 갈 안**이다. 아래 칸이 전부 같은 비중을
+ * 본다 — IPS 충돌·VaR·손실 기여도·스트레스가 한 포트폴리오를 두고 말하므로
+ * 한 문서 안에서 국내주식이 두 값을 갖는 일이 없다.
  *
- * 한때 보고 있는 제안을 읽게 둔 적이 있다. "확정 대상은 지금 보는 안인데 배분이
- * 안 따라오면 두 화면이 다른 포트폴리오를 말한다" 는 이유였고, 지적 자체는
- * 맞다. 다만 그 우려는 여기서 풀 것이 아니다 — **어느 안을 확정했는지는 확정
- * 스냅샷이 들고 있고**(`lib/store.ts` lockedSnapshot), 보는 안이 확정한 안과
- * 달라지면 PDF 추출이 잠긴다. 진단서 본문까지 제안을 따라가게 만들면 진단이
- * 흔들린다. 옮겨 갈 안의 수치는 PDF 의 Stress Test 가 따로 낸다.
- *
- * VaR·CVaR 은 여전히 상수다 — 수익률 시계열이 있어야 나오는 값이라 화면에서
- * 다시 만들 수 없다. 배분·스트레스는 비중만으로 되므로 실제 값에서 읽는다.
+ * 상담 전 보유 비중은 사라진 것이 아니라 **비교 대상**이 되었다. 충돌 검사가
+ * "상한을 넘었었고 이 안에서 풀렸다" 를 말할 수 있는 것이 그 자리다.
  */
 function AllocationBlock() {
-  const portfolios = useDashboardStore((s) => s.portfolios);
+  const { portfolio, label } = useSymphonySubject();
 
-  const weights: Record<string, number | undefined> =
-    portfolios.find((pf) => pf.id === "current")?.weights ?? {};
+  const weights: Record<string, number | undefined> = portfolio?.weights ?? {};
 
   const rows = CALC_UNITS.map((unit) => ({
     label: unit.label,
@@ -251,7 +245,7 @@ function AllocationBlock() {
   ];
 
   return (
-    <Block title="자산 배분" sub="현재 포트폴리오 기준">
+    <Block title="자산 배분" sub={`${label} 기준`}>
       <div className="mb-2.5 flex flex-wrap gap-x-4 gap-y-1">
         {summary.map((row) => (
           <span key={row.label} className="text-[12px] font-bold tabular-nums">
@@ -277,50 +271,88 @@ function AllocationBlock() {
   );
 }
 
+/**
+ * IPS 충돌 검사 — 확정 대상 안을 `config/ips_policy.yaml` 기준으로 판정한다.
+ *
+ * 상담 전 비중도 함께 넘겨 "그때는 걸렸고 이 안에서 풀렸다" 를 한 줄로 남긴다.
+ * 해소된 항목까지 보여야 제안이 무엇을 고쳤는지가 문서에 남는다.
+ */
 function ConflictBlock() {
+  const { portfolio, baselineWeights, totalKrw, customer, label } =
+    useSymphonySubject();
+  if (!portfolio) return null;
+
+  const rows = evaluateIpsConflicts({
+    weights: portfolio.weights,
+    baselineWeights,
+    nearTermNeedManwon: customer?.nearTermNeedManwon ?? 0,
+    nearTermNeedYears: customer?.nearTermNeedYears ?? null,
+    nearTermNeedLabel: customer?.nearTermNeedLabel,
+    totalKrw,
+  });
+  const { sub, note } = conflictSummary(rows);
+
   return (
-    <Block
-      title="IPS 충돌 검사"
-      sub={`${IPS_CONFLICTS.length}건`}
-      note={IPS_CONFLICT_NOTE}
-    >
+    <Block title="IPS 충돌 검사" sub={`${label} 기준 · ${sub}`} note={note}>
       <div className="space-y-2">
-        {IPS_CONFLICTS.map((c) => (
-          <div key={c.rule} className="rounded-lg border bg-muted/30 p-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-extrabold uppercase text-amber-700">
-                {c.severity}
-              </span>
-              <span className="text-[12px] font-extrabold">{c.message}</span>
-              <code className="text-[10px] font-semibold text-muted-foreground">
-                {c.rule}
-              </code>
+        {rows.map((c) => {
+          const resolved = c.status === "resolved";
+          return (
+            <div key={c.rule} className="rounded-lg border bg-muted/30 p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span
+                  className={`rounded px-1.5 py-0.5 text-[10px] font-extrabold uppercase ${
+                    resolved
+                      ? "bg-positive/10 text-positive"
+                      : "bg-amber-100 text-amber-700"
+                  }`}
+                >
+                  {resolved ? "해소" : c.severity}
+                </span>
+                <span className="text-[12px] font-extrabold">{c.message}</span>
+                <code className="text-[10px] font-semibold text-muted-foreground">
+                  {c.rule}
+                </code>
+              </div>
+              <div className="mt-1.5 flex flex-wrap gap-x-5 gap-y-0.5 text-[12px] font-semibold tabular-nums">
+                <span>
+                  <span className="text-muted-foreground">관측값</span>{" "}
+                  {c.observed}
+                </span>
+                <span>
+                  <span className="text-muted-foreground">기준값</span>{" "}
+                  {c.threshold}
+                </span>
+                {c.previousObserved ? (
+                  <span className="text-muted-foreground">
+                    상담 전 {c.previousObserved}
+                  </span>
+                ) : null}
+              </div>
+              <p className="mt-1 text-[11px] font-semibold text-muted-foreground">
+                {c.basis}
+              </p>
             </div>
-            <div className="mt-1.5 flex flex-wrap gap-x-5 gap-y-0.5 text-[12px] font-semibold tabular-nums">
-              <span>
-                <span className="text-muted-foreground">관측값</span>{" "}
-                {c.observed}
-              </span>
-              <span>
-                <span className="text-muted-foreground">기준값</span>{" "}
-                {c.threshold}
-              </span>
-            </div>
-            <p className="mt-1 text-[11px] font-semibold text-muted-foreground">
-              {c.basis}
-            </p>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </Block>
   );
 }
 
+/**
+ * VaR / CVaR — 확정 대상 안의 연 변동성과 고객 총 평가금액으로 계산한다.
+ * 산식과 근거는 `lib/riskModel.ts` 주석에 있다.
+ */
 function RiskMetricBlock() {
+  const { portfolio, totalKrw, label } = useSymphonySubject();
+  if (!portfolio || totalKrw <= 0) return null;
+  const metrics = riskMetricRows(portfolio.metrics.volatilityPct, totalKrw);
+
   return (
     <Block
       title="VaR / CVaR"
-      sub={`신뢰수준 ${REPORT_META.confidenceLevelPct}% · ${formatWon(REPORT_META.totalValuationKrw)} 기준`}
+      sub={`${label} · 신뢰수준 ${CONFIDENCE_LEVEL_PCT}% · ${formatWon(totalKrw)} 기준`}
     >
       <div className="overflow-x-auto">
         <table className="w-full min-w-[520px] border-collapse">
@@ -333,7 +365,7 @@ function RiskMetricBlock() {
             </tr>
           </thead>
           <tbody>
-            {RISK_METRICS.map((m) => (
+            {metrics.map((m) => (
               <tr key={m.label} className="border-b last:border-0">
                 <td className={`${TD} font-bold`}>{m.label}</td>
                 <td className={`${TD} text-right tabular-nums`}>
@@ -356,17 +388,28 @@ function RiskMetricBlock() {
   );
 }
 
+/**
+ * CVaR 자산군 기여도 — 확정 대상 안의 비중에서 한계기여도로 계산한다.
+ * 배분 칸과 같은 계산단위 이름을 써서 "비중은 얼마인데 기여도는 얼마" 를 나란히 읽는다.
+ */
 function ContributionBlock() {
-  const total = CVAR_CONTRIBUTIONS.reduce((a, r) => a + r.weightPct, 0);
-  const max = Math.max(...CVAR_CONTRIBUTIONS.map((r) => r.weightPct), 1);
+  const { portfolio, label } = useSymphonySubject();
+  const rows = portfolio ? cvarContributions(portfolio.weights) : [];
+  if (rows.length === 0) return null;
+
+  const total = rows.reduce((a, r) => a + r.weightPct, 0);
+  const max = Math.max(...rows.map((r) => r.weightPct), 1);
+  // 비중보다 기여도가 큰 자산군이 이 안의 손실을 끌고 간다 — 그 한 줄만 남긴다.
+  const note = contributionNote(rows[0]);
+
   return (
     <Block
       title="CVaR 자산군 기여도"
-      sub={`6자산군 · 합계 ${total.toFixed(1)}%`}
-      note={CVAR_CONTRIBUTION_NOTE}
+      sub={`${label} · 합계 ${total.toFixed(1)}%`}
+      note={note}
     >
       <div className="space-y-1.5">
-        {CVAR_CONTRIBUTIONS.map((row) => (
+        {rows.map((row) => (
           <div key={row.label} className="flex items-center gap-2">
             <span className="w-[78px] shrink-0 text-[12px] font-semibold">
               {row.label}
@@ -388,37 +431,27 @@ function ContributionBlock() {
 }
 
 /**
- * 스트레스 시나리오 — 현재 포트폴리오 기준.
+ * 스트레스 시나리오 — 확정 대상 안 기준.
  *
- * 상수로 적어 두지 않고 화면과 같은 `runStress` 로 계산한다. 예전에는 여기만
+ * 상수로 적어 두지 않고 PDF 와 같은 `runStress` 로 계산한다. 예전에는 여기만
  * 상수였는데, 그 표에는 엔진에 존재하지 않는 시나리오(2008)가 들어 있었고
  * 같은 "2022 금리" 가 PDF 와 520만원 어긋났다. 숫자의 출처가 하나여야 두 화면이
  * 같은 말을 한다 — SSOT 는 `engine/engine/stress.py` 이고 프론트 사본은
  * `lib/stressScenarios.ts` 다.
- *
- * 대상은 **현재 포트폴리오**다. 이 리포트의 충돌 검사·CVaR 기여도가 전부 지금
- * 들고 있는 자산을 진단하는 블록이라, 여기만 제안을 보면 앞뒤가 어긋난다.
- * (PDF 의 Stress Test 는 반대로 "옮겨 갈 안" 을 보므로 값이 다른 것이 정상이고,
- *  양쪽 모두 어느 안인지 화면에 적는다.)
  */
 function StressBlock() {
-  const customers = useDashboardStore((s) => s.customers);
-  const selectedCustomerId = useDashboardStore((s) => s.selectedCustomerId);
-  const portfolios = useDashboardStore((s) => s.portfolios);
-
-  const customer =
-    customers.find((c) => c.id === selectedCustomerId) ?? customers[0];
-  const totalKrw = (customer?.aumEokwon ?? 0) * 100_000_000;
-  const current = portfolios.find((pf) => pf.id === "current");
-  if (!current || totalKrw <= 0) return null;
+  const { portfolio, customer, totalKrw, label } = useSymphonySubject();
+  if (!portfolio || totalKrw <= 0) return null;
 
   // lossKrw 는 양수가 손실이다(lib/stressScenarios.ts StressLoss).
   const rows = STRESS_SCENARIOS.map((sc) => ({
     key: sc.key,
     label: sc.label,
-    loss: runStress(current.weights, totalKrw, sc),
+    loss: runStress(portfolio.weights, totalKrw, sc),
   }));
-  const worst = rows.reduce((w, r) => (r.loss.lossKrw > w.loss.lossKrw ? r : w));
+  const worst = rows.reduce((w, r) =>
+    r.loss.lossKrw > w.loss.lossKrw ? r : w,
+  );
 
   /*
     근시일에 써야 할 돈과 견준다. 금액을 문구에 박아 두면 고객이 바뀌었을 때
@@ -443,7 +476,7 @@ function StressBlock() {
   return (
     <Block
       title="스트레스 시나리오"
-      sub={`${rows.length}종 · 현재 포트폴리오 기준`}
+      sub={`${rows.length}종 · ${label} 기준`}
       note={note}
     >
       <div className="rounded-lg border border-down/30 bg-down/5 p-3">
@@ -472,7 +505,9 @@ function StressBlock() {
           <tbody>
             {rows.map((r) => (
               <tr key={r.key} className="border-b last:border-0">
-                <td className={`${TD} ${r.key === worst.key ? "font-bold" : ""}`}>
+                <td
+                  className={`${TD} ${r.key === worst.key ? "font-bold" : ""}`}
+                >
                   {r.label}
                 </td>
                 <td className={`${TD} text-right tabular-nums text-down`}>

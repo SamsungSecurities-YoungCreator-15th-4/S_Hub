@@ -1,95 +1,28 @@
 /**
  * S.ymphony 리스크 리포트 — 화면 상수.
  *
- * 이 파일은 "자세히" 리포트 화면(components/dashboard/ReportDetailModal.tsx)이
- * 그대로 표시하는 값만 담는다. 계산은 하지 않는다 — 6지표 산출의 SSOT 는 엔진의
- * `calculate_metrics` 하나뿐이고, 화면에서 다시 계산하면 같은 숫자가 두 곳에서
- * 나오게 된다. 여기 있는 값은 엔진 산출물을 옮겨 적은 것이며, 화면은 표시만 한다.
+ * 이 파일에는 **비중과 무관한 값만** 남긴다 — 인용 목록·검증 항목·재현성 해시·면책처럼
+ * 어느 안을 진단하든 같은 것들이다.
  *
- * 백엔드 연동 시 교체 대상은 이 파일 하나다(화면 컴포넌트는 형태만 읽는다).
+ * IPS 충돌·VaR/CVaR·손실 기여도·스트레스는 예전에 여기 상수로 있었다. 그 값들은
+ * 김성삼의 상담 전 비중 하나에만 맞아서, 리포트가 제안안을 진단하게 되자 본문과
+ * 어긋났다. 지금은 각각 `lib/ipsConflicts.ts` · `lib/riskModel.ts` ·
+ * `lib/stressScenarios.ts` 가 비중에서 계산한다.
  */
 
 /** 리포트 기준일. 확정 승인 표기도 같은 값을 쓴다. */
 export const REPORT_AS_OF = "2026-09-10";
 
-/** 리포트 산출 조건 — 헤더·재현성 블록이 함께 읽는다. */
+/**
+ * 리포트 산출 조건 — 재현성 블록이 읽는다.
+ *
+ * 총 평가금액과 신뢰수준은 여기 있지 않다. 전자는 고객 레코드에서, 후자는
+ * `lib/riskModel.ts` 에서 읽는다 — 한 값을 두 곳에 적으면 갈라진다.
+ */
 export const REPORT_META = {
-  totalValuationKrw: 100_000_000,
   seed: 20260910,
   engineVersion: "v0.9.3",
-  confidenceLevelPct: 99,
 } as const;
-
-/** 라벨 + 비중(%) 한 줄. 배분 집계·기여도 표가 공유한다. */
-interface AllocationRow {
-  label: string;
-  weightPct: number;
-}
-
-// ── ② IPS 충돌 검사 ──────────────────────────────────────────────
-
-interface ConflictRow {
-  rule: string;
-  message: string;
-  observed: string;
-  threshold: string;
-  severity: "review" | "block";
-  basis: string;
-}
-
-export const IPS_CONFLICTS: ConflictRow[] = [
-  {
-    rule: "liquidity_cash_shortfall",
-    message: "현금성 자산이 근시일 필요자금에 미달합니다",
-    observed: "현금성 자산 0원",
-    threshold: "필요자금 20,000,000원 (3년 내)",
-    severity: "review",
-    basis:
-      "근거: IPS Liquidity(중간), IPS Unique(3년 내 전세 보증금 인상분 2,000만원)",
-  },
-  {
-    rule: "single_risky_asset_concentration",
-    message: "단일 위험자산 비중이 상한을 초과했습니다",
-    observed: "국내주식 42.0%",
-    threshold: "상한 40.0%",
-    severity: "review",
-    basis: "근거: ips_policy.yaml · single_risky_asset_max 0.40",
-  },
-];
-
-export const IPS_CONFLICT_NOTE =
-  "두 건 모두 review 등급입니다. 차단 대상이 아니며 PB 판단으로 예외 승인할 수 있습니다.";
-
-// ── ③ VaR / CVaR ────────────────────────────────────────────────
-
-interface RiskMetricRow {
-  label: string;
-  ratioPct: number;
-  amountKrw: number;
-  /** 90% 신뢰구간(비율 하한·상한). */
-  ciPct: [number, number];
-}
-
-export const RISK_METRICS: RiskMetricRow[] = [
-  { label: "1일 VaR", ratioPct: 2.21, amountKrw: 2_210_000, ciPct: [2.03, 2.41] },
-  { label: "1일 CVaR", ratioPct: 2.53, amountKrw: 2_530_000, ciPct: [2.32, 2.76] },
-  { label: "10일 VaR", ratioPct: 6.99, amountKrw: 6_990_000, ciPct: [6.42, 7.62] },
-  { label: "10일 CVaR", ratioPct: 8.0, amountKrw: 8_000_000, ciPct: [7.34, 8.73] },
-];
-
-// ── ④ CVaR 자산군 기여도 (6자산군 · 합계 100.0%) ─────────────────
-
-export const CVAR_CONTRIBUTIONS: AllocationRow[] = [
-  { label: "국내주식", weightPct: 55.4 },
-  { label: "해외성장주", weightPct: 26.3 },
-  { label: "금", weightPct: 8.0 },
-  { label: "해외배당주", weightPct: 6.5 },
-  { label: "국내채권", weightPct: 3.8 },
-  { label: "현금", weightPct: 0.0 },
-];
-
-export const CVAR_CONTRIBUTION_NOTE =
-  "국내주식은 보유 비중 42.0%보다 손실 기여도가 높습니다.";
 
 // ── ⑥ 인용·출처 ─────────────────────────────────────────────────
 
