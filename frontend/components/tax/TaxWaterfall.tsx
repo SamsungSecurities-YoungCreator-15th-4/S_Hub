@@ -213,20 +213,20 @@ export default function TaxWaterfall({
 
   const chartHelp = [
     "막대 전체 길이 = 세전 수익 (세후 수익 + 금융소득세)",
-    "전환은 절세가 아니라 수익 증가 — 수익이 커지면 세금도 는다",
-    "ISA 절감은 금융소득세를 직접 깎아 세후 수익 쪽으로 넘어간다",
-    "세액공제는 근로소득세 환급이라 세목이 달라 막대 밖에 붙인다",
+    "전환은 절세가 아니라 수익 증가 — 수익이 커지면 세금도 증가",
+    "ISA 절감은 금융소득세를 직접 차감 — 세후 수익 쪽으로 이동",
+    "세액공제는 근로소득세 환급 — 세목이 달라 막대 밖에 표기",
     ...(breakdown
       ? [
-          `전환으로 금융소득세가 ${breakdown.switchTaxManwon.toLocaleString()}만원 늘고 ISA 가 ${breakdown.isaCutManwon.toLocaleString()}만원을 도로 깎는다`,
+          `금융소득세 변동 — 전환 +${breakdown.switchTaxManwon.toLocaleString()}만원 · ISA 절감 −${breakdown.isaCutManwon.toLocaleString()}만원`,
           /*
             그 ISA 몫만 법정 수치가 아니라 시장 가정에서 나온다. 이 툴팁에도
             18만원이 적히므로 근거가 여기 없으면 이 탭만 열어 본 사람에게는
             출처가 보이지 않는다. 납입 배분 화면의 같은 줄과 문구를 맞춘다.
           */
-          `그 ISA 몫은 잔액이 연 ${(ASSUMPTIONS.isaAssumedIncomeYield * 100).toFixed(1)}% 이자·배당을 낸다는 가정 (법정 수치 아님)`,
+          `ISA 절감액은 잔액의 연 ${(ASSUMPTIONS.isaAssumedIncomeYield * 100).toFixed(1)}% 이자·배당 가정 — 법정 수치 아님`,
           "같은 시점 시장값 — 국고채 3년 3.91%(2026-09-09) · 코스피 배당수익률 0.92%(2026-05)",
-          `비과세 ${ASSUMPTIONS.isaGeneralTaxFreeManwon}만원은 계약기간 통산에 한 번이라 ${ASSUMPTIONS.isaMandatoryHoldingYears}년으로 나눠 반영 (손익 통산·과세이연 미반영)`,
+          `비과세 ${ASSUMPTIONS.isaGeneralTaxFreeManwon}만원은 계약기간 통산에 1회 — ${ASSUMPTIONS.isaMandatoryHoldingYears}년 안분 반영 (손익 통산·과세이연 미반영)`,
         ]
       : []),
   ];
