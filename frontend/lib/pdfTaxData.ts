@@ -251,7 +251,7 @@ export function pdfTaxEffectFromDerived(
     ...base,
     annualSavingManwon: derived.totalSavingManwon,
     headlineLabel: derived.totalLabel,
-    subNote: `현재 포트폴리오 대비 · 금융소득 +${b.financialManwon.toLocaleString()}만 · 근로소득세 환급 +${b.refundManwon.toLocaleString()}만`,
+    subNote: `현재 포트폴리오 대비 · 투자수익 +${b.financialManwon.toLocaleString()}만 · 근로소득세 환급 +${b.refundManwon.toLocaleString()}만`,
     afterTaxReturn: {
       from: `${fromPct.toFixed(1)}%`,
       to: `${toPct.toFixed(1)}%`,

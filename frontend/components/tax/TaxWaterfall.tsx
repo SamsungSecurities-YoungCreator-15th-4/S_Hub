@@ -25,7 +25,7 @@ const AFTER_TAX_COLORS = ["#AEB5BD", "#0064FF", "#3D8BFF"];
 const TAX_COLORS = ["#F04452", "#F4A8AE", "transparent"];
 /** 프론트 계산 흐름 — 3행 모두 세금이 있으므로 마지막을 transparent 로 두지 않는다. */
 const FLOW_TAX_COLORS = ["#F04452", "#F04452", "#F4A8AE"];
-/** 연금 세액공제. 근로소득세에서 돌려받는 돈이라 금융소득세(빨강)와 세목이 달라 색을 나눈다. */
+/** 연금 세액공제. 근로소득세에서 돌려받는 돈이라 투자 세금(빨강)과 세목이 달라 색을 나눈다. */
 const CREDIT_COLOR = "#16B47A";
 
 /*
@@ -45,9 +45,9 @@ const money = (manwon: number) =>
  *
  * 세 단계가 서로 다른 말을 한다.
  *   현재 → 제안   수익이 늘고 **세금도 같이 는다**. 전환은 절세가 아니다.
- *   제안 → +절세  금융소득세가 줄고(ISA), 근로소득세에서 환급이 들어온다(연금).
+ *   제안 → +절세  이자·배당세가 줄고(ISA), 근로소득세에서 환급이 들어온다(연금).
  *
- * 연금 세액공제는 **근로소득세** 환급이라 금융소득세 막대에서 뺄 수 없다. 뺐다가는
+ * 연금 세액공제는 **근로소득세** 환급이라 투자 세금 막대에서 뺄 수 없다. 뺐다가는
  * 세금(150만)보다 절감(155만)이 커져 음수가 난다. 별도 조각으로 오른쪽에 붙인다 —
  * 세목은 안 섞이면서 "손에 들어오는 돈"이라는 한 줄기로 읽힌다.
  */
@@ -91,12 +91,12 @@ export default function TaxWaterfall({
   let totalLabel: string;
   let domainMax: number;
   /*
-   * 총액을 세목으로 쪼갠 줄. 금융소득세에서 아낀 돈과 근로소득세에서 돌려받는
+   * 총액을 세목으로 쪼갠 줄. 투자에 붙는 세금에서 아낀 돈과 근로소득세에서 돌려받는
    * 돈은 다른 세목인데 합계만 적으면 한 덩어리로 읽힌다. 세금이 얼마나 늘었는지도
    * 이 줄에서만 보인다 — 막대는 세후 기준이라 증가분이 이미 안에 녹아 있다.
    */
   /*
-   * 총액을 세목으로 쪼갠 줄. 금융소득세에서 아낀 돈과 근로소득세에서 돌려받는
+   * 총액을 세목으로 쪼갠 줄. 투자에 붙는 세금에서 아낀 돈과 근로소득세에서 돌려받는
    * 돈은 다른 세목인데 합계만 적으면 한 덩어리로 읽힌다. 세금이 얼마나 늘었는지도
    * 이 줄에서만 보인다 — 막대는 세후 기준이라 증가분이 이미 안에 녹아 있다.
    */
@@ -207,13 +207,14 @@ export default function TaxWaterfall({
   };
 
   const chartHelp = [
-    "막대 전체 길이 = 세전 수익 (세후 수익 + 금융소득세)",
+    "막대 전체 길이 = 세전 수익 (세후 수익 + 세금)",
+    "세금 = 세전 수익 − 세후 수익: 이자·배당 원천징수 15.4%(소득세 14% + 지방소득세 1.4%)가 주된 항목이고 해외주식 양도세 등도 들어간다",
     "전환은 절세가 아니라 수익 증가: 수익이 커지면 세금도 증가",
-    "ISA 절감은 금융소득세를 직접 차감: 세후 수익 쪽으로 이동",
+    "ISA 절감은 이자·배당세를 직접 차감: 세후 수익 쪽으로 이동",
     "세액공제는 근로소득세 환급: 세목이 달라 막대 밖에 표기",
     ...(breakdown
       ? [
-          `금융소득세 변동: 전환 +${breakdown.switchTaxManwon.toLocaleString()}만원 · ISA 절감 −${breakdown.isaCutManwon.toLocaleString()}만원`,
+          `세금 변동: 전환 +${breakdown.switchTaxManwon.toLocaleString()}만원 · ISA 절감 −${breakdown.isaCutManwon.toLocaleString()}만원`,
           /*
             그 ISA 몫만 법정 수치가 아니라 시장 가정에서 나온다. 이 툴팁에도
             18만원이 적히므로 근거가 여기 없으면 이 탭만 열어 본 사람에게는
@@ -263,14 +264,14 @@ export default function TaxWaterfall({
           </span>
           {breakdown && (
             /*
-              세목을 나눠 적는다. 왼쪽은 금융소득세를 덜 내서 남는 돈, 오른쪽은
+              세목을 나눠 적는다. 왼쪽은 투자에 붙는 세금을 덜 내서 남는 돈, 오른쪽은
               근로소득세에서 돌려받는 돈이다. 괄호 안의 세전·세금은 왼쪽 금액이
               어떻게 나왔는지를 보인다 — 더 벌면 세금도 는다는 사실이 여기서만
               드러난다(막대는 세후 기준이라 증가분이 이미 녹아 있다).
             */
             <div className="mt-0.5 flex flex-wrap items-baseline gap-x-1.5 text-[11px] font-semibold leading-tight">
               <span className="text-brand-dark">
-                금융소득 +{breakdown.financialManwon.toLocaleString()}만
+                투자수익 +{breakdown.financialManwon.toLocaleString()}만
               </span>
               <span className="text-muted-foreground">
                 {/*
@@ -374,7 +375,7 @@ export default function TaxWaterfall({
 
       <div className={`flex flex-wrap gap-x-3 gap-y-1 ${flow ? "mt-2" : "mt-8"}`}>
         <LegendDot color="#0064FF" label="세후 수익" />
-        <LegendDot color="#F04452" label={flow ? "금융소득세" : "세금"} />
+        <LegendDot color="#F04452" label="세금" />
         {flow && (
           <LegendDot color={CREDIT_COLOR} label="세액공제" />
         )}
