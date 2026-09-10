@@ -16,6 +16,7 @@ import {
   type TaxFlowInput,
 } from "@/lib/taxPlan";
 import { TAX_EFFECT } from "@/lib/mockData";
+import { ASSUMPTIONS } from "@/lib/taxAccounts";
 import type { StressTaxHeadline, TaxWaterfallResponse } from "@/lib/api";
 
 // 현재(회색) / 포폴A(원래 파랑) / 절세제안(약간 밝은 파랑)
@@ -223,6 +224,13 @@ export default function TaxWaterfall({
     ...(breakdown
       ? [
           `전환으로 금융소득세가 ${breakdown.switchTaxManwon.toLocaleString()}만원 늘고 ISA 가 ${breakdown.isaCutManwon.toLocaleString()}만원을 도로 깎는다`,
+          /*
+            그 ISA 몫만 법정 수치가 아니라 시장 가정에서 나온다. 이 툴팁에도
+            18만원이 적히므로 근거가 여기 없으면 이 탭만 열어 본 사람에게는
+            출처가 보이지 않는다. 납입 배분 화면의 같은 줄과 문구를 맞춘다.
+          */
+          `그 ISA 몫은 잔액이 연 ${(ASSUMPTIONS.isaAssumedIncomeYield * 100).toFixed(1)}% 이자·배당을 낸다는 가정 (법정 수치 아님)`,
+          "같은 시점 시장값 — 국고채 3년 3.91%(2026-09-09) · 코스피 배당수익률 0.92%(2026-05)",
         ]
       : []),
     ...(taxScale > 1.05
