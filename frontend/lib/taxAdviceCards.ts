@@ -86,7 +86,7 @@ export function deriveAdviceCards(
       headroomManwon: account.headroomManwon,
       savingManwon: isIsa ? plan.isaSavingManwon : plan.pensionSavingManwon,
       note: isIsa
-        ? `이 고객은 ${plan.isaType.type === "seogmin" ? "서민형" : "일반형"} — 비과세 ${plan.isaType.taxFreeManwon}만원 (${plan.isaType.reason})`
+        ? `이 고객은 ${plan.isaType.type === "seogmin" ? "서민형" : "일반형"}: 비과세 ${plan.isaType.taxFreeManwon}만원 (${plan.isaType.reason})`
         : card.key === "irp"
           ? "연금저축 단독 한도 600만원 초과분이 여기로 배분"
           : "연금저축 단독 한도는 600만원",

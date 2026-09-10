@@ -58,7 +58,7 @@ export default function AnalyzeGateDialog({
             이 입력으로 분석하시겠습니까?
           </DialogTitle>
           <DialogDescription className="mt-2 text-[13px] font-medium leading-relaxed text-muted-foreground">
-            아래 IPS와 보유 비중이 그대로 계산에 들어갑니다.
+            입력한 IPS와 보유 비중으로 포트폴리오를 제안합니다.
           </DialogDescription>
         </DialogHeader>
 
