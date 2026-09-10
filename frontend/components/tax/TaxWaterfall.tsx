@@ -299,12 +299,8 @@ export default function TaxWaterfall({
         </span>
       </div>
 
-      {/*
-        고정 높이 대신 상한·하한 사이에서 남거나 모자란 높이를 흡수한다. 좌측
-        사이드바가 행 높이를 정하므로 이쪽이 따라 줄어야 카드가 그 아래로
-        비어져 나오지 않는다. 상한은 종전 높이라 더 커지지는 않는다.
-      */}
-      <div className={flow ? "min-h-32 max-h-56 flex-1" : "h-32"}>
+      {/* 높이를 고정해 세 막대 사이의 간격이 패널 높이에 따라 달라지지 않게 한다. */}
+      <div className={flow ? "h-44 shrink-0" : "h-32"}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={data}
