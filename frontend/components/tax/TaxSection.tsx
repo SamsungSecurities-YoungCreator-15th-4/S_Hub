@@ -188,8 +188,11 @@ export default function TaxSection() {
   }
 
   return (
-    /* 각 탭은 콘텐츠에 필요한 높이를 사용한다. */
-    <Tabs defaultValue="effect" className="flex min-h-0 flex-1 flex-col">
+    /*
+      왼쪽 상담 내역·IPS가 길어져도 이 섹션은 그 높이를 따라 늘어나지 않는다.
+      각 탭의 실제 콘텐츠 높이만 사용해야 고객·분석 경로에 따라 차트가 커지지 않는다.
+    */
+    <Tabs defaultValue="effect" className="flex w-full flex-col">
       <div className="mb-2 flex items-center justify-between px-0.5">
         <div className="flex items-center gap-2.5">
           <h2 className="text-lg font-extrabold">절세 최적화 시뮬레이터</h2>
@@ -221,9 +224,9 @@ export default function TaxSection() {
         </TabsList>
       </div>
 
-      <Card className="min-h-0 flex-1 gap-0 p-3">
+      <Card className="w-full gap-0 p-3">
         {/* 탭 1: 절세 효과 */}
-        <TabsContent value="effect" className="flex min-h-0 flex-1 flex-col gap-2.5">
+        <TabsContent value="effect" className="flex w-full flex-none flex-col gap-2.5">
           {/*
             절세 효과 금액이 없는 상태에서는 왼쪽이 배지 한 줄뿐이라 박스가 비어
             보인다. 세로 여백과 지표 카드를 줄여 내용만큼만 차지하게 한다.
@@ -302,8 +305,8 @@ export default function TaxSection() {
             세로로 쌓으면 남는 높이가 두 그림의 폭으로 바뀐다.
             각각 테두리로 묶어 어디까지가 한 그림인지 경계를 준다.
           */}
-          <div className="flex min-h-0 w-full flex-1 flex-col gap-2.5">
-            <div className="flex min-h-0 w-full flex-1 flex-col rounded-xl border p-3">
+          <div className="flex w-full flex-col gap-2.5">
+            <div className="flex w-full flex-col rounded-xl border p-3">
               <TaxWaterfall
                 waterfallData={isStressMode ? null : waterfallData}
                 liveHeadline={isStressMode ? (taxSource?.headline ?? null) : null}
@@ -335,7 +338,7 @@ export default function TaxSection() {
         </TabsContent>
 
         {/* 탭 2: 절세 제안 */}
-        <TabsContent value="advice" className="flex min-h-0 flex-1 flex-col gap-2.5">
+        <TabsContent value="advice" className="flex w-full flex-none flex-col gap-2.5">
           {plan &&
             customer &&
             (customer.annualContributionManwon ?? 0) > 0 &&
@@ -390,7 +393,7 @@ function AdviceCards({ liveCards, plan }: AdviceCardsProps) {
 
   return (
     /* 카드 본문은 내용에 필요한 높이만 사용한다. */
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="flex w-full flex-col">
       <div className="mb-2 max-h-[520px] overflow-y-auto">
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
           {cards.map((card) => {

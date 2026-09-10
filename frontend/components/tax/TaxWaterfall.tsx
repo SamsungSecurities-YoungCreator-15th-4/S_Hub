@@ -228,7 +228,7 @@ export default function TaxWaterfall({
   ];
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="flex w-full flex-col">
       {/*
         세목 구분과 ISA 가정의 근거를 가이드 툴팁에 둔다. 화면에 늘 띄우면 차트보다
         주석이 길어진다.
@@ -300,19 +300,19 @@ export default function TaxWaterfall({
         </span>
       </div>
 
-      {/* 남는 높이를 차트가 사용해 범례 아래에 빈 공간이 생기지 않게 한다. */}
-      <div className={flow ? "min-h-32 max-h-56 flex-1" : "h-32"}>
+      {/* 데이터 출처와 행 수가 달라도 차트가 같은 크기를 유지한다. */}
+      <div className="h-44 w-full shrink-0">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={data}
             layout="vertical"
-            margin={{ top: 4, right: flow ? 108 : 52, bottom: 4, left: 0 }}
+            margin={{ top: 4, right: 108, bottom: 4, left: 0 }}
             /*
               막대를 두껍게 하는 대신 사이를 띄운다. 칸 높이는 차트 높이를 행 수로
               나눈 값이고 막대는 그 가운데에 놓이므로, barSize 를 줄인 만큼이 그대로
               행간이 된다. 46 은 세 행이 서로 붙어 한 덩어리로 보였다.
             */
-            barSize={flow ? 30 : 28}
+            barSize={30}
             barCategoryGap="30%"
           >
             <XAxis type="number" hide domain={[0, domainMax]} />
@@ -373,7 +373,7 @@ export default function TaxWaterfall({
         </ResponsiveContainer>
       </div>
 
-      <div className={`flex flex-wrap gap-x-3 gap-y-1 ${flow ? "mt-2" : "mt-8"}`}>
+      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
         <LegendDot color="#0064FF" label="세후 수익" />
         <LegendDot color="#F04452" label="세금" />
         {flow && (
