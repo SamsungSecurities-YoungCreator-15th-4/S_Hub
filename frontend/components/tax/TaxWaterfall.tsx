@@ -17,6 +17,7 @@ import {
 } from "@/lib/taxPlan";
 import { TAX_EFFECT } from "@/lib/mockData";
 import { ASSUMPTIONS } from "@/lib/taxAccounts";
+import { useDashboardStore } from "@/lib/store";
 import type { StressTaxHeadline, TaxWaterfallResponse } from "@/lib/api";
 
 // 현재(회색) / 포폴A(원래 파랑) / 절세제안(약간 밝은 파랑)
@@ -79,6 +80,7 @@ export default function TaxWaterfall({
   liveAumEokwon,
   flow,
 }: Props) {
+  const helpMode = useDashboardStore((s) => s.helpMode);
   let data: {
     name: string;
     afterTax: number;
@@ -231,18 +233,36 @@ export default function TaxWaterfall({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/*
-        막대 길이를 손본 사실과 세목 구분을 가이드 툴팁에 둔다. 화면에 늘 띄우면
-        차트보다 주석이 길어지는데, 근거 없이 지우면 2배로 늘려 그린 막대에 아무
-        표시가 없게 된다. 가이드를 켜면 나온다.
+        세목 구분과 ISA 가정의 근거를 가이드 툴팁에 둔다. 화면에 늘 띄우면 차트보다
+        주석이 길어진다.
+
+        툴팁을 여는 자리는 제목 글자뿐이다. 제목 줄 전체를 감싸면 기준 문구가 있는
+        오른쪽 빈 자리에 커서만 스쳐도 툴팁이 떠, 무엇에 붙은 설명인지 알 수 없다.
+        도움말 모드에서 제목에 남기는 테두리도 사이드바의 자산 비중 조절기·백테스트와
+        같은 규격이라, 설명이 어디에 붙어 있는지 한눈에 보인다.
       */}
-      <HelpTooltip text={flow ? chartHelp : []} placement="bottom">
-        <p className="mb-2 flex items-center gap-1.5 text-[13px] font-extrabold">
-          세금 흐름 비교
-          <span className="text-[13px] font-semibold text-muted-foreground">
-            {pretaxLabel}
-          </span>
-        </p>
-      </HelpTooltip>
+      <div className="mb-2 flex items-center gap-1.5">
+        <HelpTooltip
+          text={flow ? chartHelp : []}
+          placement="bottom"
+          className="w-fit"
+        >
+          <p className="cursor-default text-[13px] font-extrabold">
+            <span
+              className={
+                helpMode && flow
+                  ? "rounded border border-brand/40 bg-brand/[0.06] px-1"
+                  : ""
+              }
+            >
+              세금 흐름 비교
+            </span>
+          </p>
+        </HelpTooltip>
+        <span className="text-[13px] font-semibold text-muted-foreground">
+          {pretaxLabel}
+        </span>
+      </div>
       <div className="mb-2 flex items-center justify-between gap-2 rounded-lg bg-muted/60 px-2.5 py-1.5">
         <div className="min-w-0">
           <span className="text-[12px] font-semibold text-muted-foreground">
