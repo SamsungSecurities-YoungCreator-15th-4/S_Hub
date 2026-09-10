@@ -8,7 +8,9 @@ import {
   formatKrwLoss,
   runStress,
 } from "@/lib/stressScenarios";
-import { DISCLAIMERS, IPS_CONFLICTS } from "@/lib/mock/symphonyReport";
+import { DISCLAIMERS } from "@/lib/mock/symphonyReport";
+import { evaluateIpsConflicts } from "@/lib/ipsConflicts";
+import { useSymphonySubject } from "@/lib/symphonySubject";
 import { useDashboardStore } from "@/lib/store";
 import { deriveTaxFlowRows, useTaxFlow, useTaxPlan } from "@/lib/taxPlan";
 import { deriveAdviceCards } from "@/lib/taxAdviceCards";
@@ -1770,6 +1772,7 @@ function RiskCheckPage() {
   const C = useSelectedCustomer();
   // 스트레스는 비중만 있으면 계산되므로 조정안 비중을 그대로 쓴다.
   const { viewed: selectedPf } = useViewedPortfolio();
+  const { baselineWeights } = useSymphonySubject();
   if (!C || !selectedPf) return null;
 
   const totalKrw = (C.aumEokwon ?? 0) * 100_000_000;
@@ -1778,6 +1781,20 @@ function RiskCheckPage() {
     shock: sc.shockSummary,
     loss: runStress(selectedPf.weights, totalKrw, sc),
   }));
+  /*
+    확인 항목도 이 안을 기준으로 판정한다 — 스트레스는 옮겨 갈 안으로 재고
+    확인 항목만 상담 전 비중으로 적으면 한 페이지가 두 포트폴리오를 말한다.
+  */
+  // 고객용 문서의 이 칸 제목이 "확인이 필요한 항목" 이라, 이 안에서 이미 풀린
+  // 항목은 싣지 않는다. 해소 내역은 PB 용 리포트가 남긴다.
+  const conflicts = evaluateIpsConflicts({
+    weights: selectedPf.weights,
+    baselineWeights,
+    nearTermNeedManwon: C.nearTermNeedManwon ?? 0,
+    nearTermNeedYears: C.nearTermNeedYears ?? null,
+    nearTermNeedLabel: C.nearTermNeedLabel,
+    totalKrw,
+  }).filter((c) => c.status === "violation");
 
   return (
     <div
@@ -1937,7 +1954,7 @@ function RiskCheckPage() {
           </div>
         </div>
 
-        {IPS_CONFLICTS.map((c) => (
+        {conflicts.map((c) => (
           <div
             key={c.rule}
             style={{
@@ -1953,6 +1970,7 @@ function RiskCheckPage() {
             </div>
             <div style={{ fontSize: 11, color: TEXT }}>
               {c.observed} · 기준 {c.threshold}
+              {c.previousObserved ? ` (상담 전 ${c.previousObserved})` : ""}
             </div>
           </div>
         ))}

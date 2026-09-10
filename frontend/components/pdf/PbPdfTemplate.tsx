@@ -6,20 +6,22 @@
 import { STRESS_SCENARIOS, runStress } from "@/lib/stressScenarios";
 import {
   CITATIONS,
-  CVAR_CONTRIBUTIONS,
-  CVAR_CONTRIBUTION_NOTE,
   DISCLAIMERS,
-  IPS_CONFLICTS,
-  IPS_CONFLICT_NOTE,
   REPORT_AS_OF,
   REPORT_META,
   REPRODUCIBILITY_HASHES,
   REPRODUCIBILITY_NOTE,
-  RISK_METRICS,
   VERIFICATIONS,
   VERIFICATION_NOTE,
   formatWon,
 } from "@/lib/mock/symphonyReport";
+import { conflictSummary, evaluateIpsConflicts } from "@/lib/ipsConflicts";
+import {
+  CONFIDENCE_LEVEL_PCT,
+  cvarContributions,
+  riskMetricRows,
+} from "@/lib/riskModel";
+import { useSymphonySubject } from "@/lib/symphonySubject";
 import { useDashboardStore } from "@/lib/store";
 import { useViewedPortfolio } from "@/lib/viewedPortfolio";
 import { deriveTaxFlowRows, useTaxFlow, useTaxPlan } from "@/lib/taxPlan";
@@ -1966,7 +1968,8 @@ function AiPage() {
 //
 // "자세히" 화면(components/dashboard/ReportDetailModal)이 보여 주는 내용을
 // 그대로 싣는다. PB 리포트는 근거·검증·재현성까지 남기는 문서라 전부 넣는다.
-// 값의 출처는 lib/mock/symphonyReport.ts 하나이며 여기서 계산하지 않는다.
+// 진단 대상은 화면과 같은 확정 대상 안이며(lib/symphonySubject), 수치도 같은
+// 모듈에서 계산한다 — 두 문서가 다른 숫자를 말하지 않게 하려면 출처가 하나여야 한다.
 
 const RTH: React.CSSProperties = {
   padding: "7px 10px",
@@ -2011,10 +2014,32 @@ function ReportSection({
 }
 
 function RiskReportPage() {
-  const contributionTotal = CVAR_CONTRIBUTIONS.reduce(
+  const { portfolio, baselineWeights, customer, totalKrw, label } =
+    useSymphonySubject();
+
+  const conflicts = portfolio
+    ? evaluateIpsConflicts({
+        weights: portfolio.weights,
+        baselineWeights,
+        nearTermNeedManwon: customer?.nearTermNeedManwon ?? 0,
+        nearTermNeedYears: customer?.nearTermNeedYears ?? null,
+        nearTermNeedLabel: customer?.nearTermNeedLabel,
+        totalKrw,
+      })
+    : [];
+  const conflictNote = conflictSummary(conflicts);
+  const metrics =
+    portfolio && totalKrw > 0
+      ? riskMetricRows(portfolio.metrics.volatilityPct, totalKrw)
+      : [];
+  const contributions = portfolio ? cvarContributions(portfolio.weights) : [];
+  const contributionTotal = contributions.reduce(
     (acc, r) => acc + r.weightPct,
     0,
   );
+  // cvarContributions 는 큰 것부터 정렬해 돌려준다.
+  const topContribution = contributions[0] ?? null;
+
   return (
     <div
       data-pdf-page=""
@@ -2030,15 +2055,15 @@ function RiskReportPage() {
       <PageHeader
         pageNum="⑤"
         title="S.ymphony 리스크 리포트"
-        subtitle={`IPS 충돌 검사 · VaR/CVaR · 손실 기여도 · 기준일 ${REPORT_AS_OF}`}
+        subtitle={`${label} 기준 · IPS 충돌 검사 · VaR/CVaR · 손실 기여도 · 기준일 ${REPORT_AS_OF}`}
       />
 
       <div style={{ padding: "22px 40px 80px", wordBreak: "keep-all" }}>
         <ReportSection
-          title={`IPS 충돌 검사 ${IPS_CONFLICTS.length}건`}
-          note={IPS_CONFLICT_NOTE}
+          title={`IPS 충돌 검사 ${conflictNote.sub}`}
+          note={conflictNote.note}
         >
-          {IPS_CONFLICTS.map((c) => (
+          {conflicts.map((c) => (
             <div
               key={c.rule}
               style={{
@@ -2061,13 +2086,13 @@ function RiskReportPage() {
                   style={{
                     fontSize: 9,
                     fontWeight: 800,
-                    color: "#92400E",
-                    background: "#FEF3C7",
+                    color: c.status === "resolved" ? "#0F7B54" : "#92400E",
+                    background: c.status === "resolved" ? "#DCFCE7" : "#FEF3C7",
                     padding: "2px 6px",
                     borderRadius: 4,
                   }}
                 >
-                  {c.severity.toUpperCase()}
+                  {c.status === "resolved" ? "해소" : c.severity.toUpperCase()}
                 </span>
                 <span style={{ fontSize: 11.5, fontWeight: 800, color: TEXT }}>
                   {c.message}
@@ -2076,6 +2101,7 @@ function RiskReportPage() {
               </div>
               <div style={{ fontSize: 10.5, color: TEXT, marginBottom: 2 }}>
                 관측값 {c.observed} · 기준값 {c.threshold}
+                {c.previousObserved ? ` · 상담 전 ${c.previousObserved}` : ""}
               </div>
               <div style={{ fontSize: 10, color: MUTED }}>{c.basis}</div>
             </div>
@@ -2083,7 +2109,7 @@ function RiskReportPage() {
         </ReportSection>
 
         <ReportSection
-          title={`VaR / CVaR 신뢰수준 ${REPORT_META.confidenceLevelPct}% · ${formatWon(REPORT_META.totalValuationKrw)} 기준`}
+          title={`VaR / CVaR 신뢰수준 ${CONFIDENCE_LEVEL_PCT}% · ${formatWon(totalKrw)} 기준`}
         >
           <table
             style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}
@@ -2103,7 +2129,7 @@ function RiskReportPage() {
               </tr>
             </thead>
             <tbody>
-              {RISK_METRICS.map((m) => (
+              {metrics.map((m) => (
                 <tr key={m.label}>
                   <td style={{ ...RTD, fontWeight: 800 }}>{m.label}</td>
                   <td style={{ ...RTD, textAlign: "right" }}>
@@ -2123,13 +2149,17 @@ function RiskReportPage() {
 
         <ReportSection
           title={`CVaR 자산군 기여도 합계 ${contributionTotal.toFixed(1)}%`}
-          note={CVAR_CONTRIBUTION_NOTE}
+          note={
+            topContribution
+              ? `${topContribution.label}이(가) 손실의 ${topContribution.weightPct.toFixed(1)}% 를 차지합니다.`
+              : undefined
+          }
         >
           <table
             style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}
           >
             <tbody>
-              {CVAR_CONTRIBUTIONS.map((r) => (
+              {contributions.map((r) => (
                 <tr key={r.label}>
                   <td style={{ ...RTD, fontWeight: 700 }}>{r.label}</td>
                   <td style={{ ...RTD, textAlign: "right" }}>
