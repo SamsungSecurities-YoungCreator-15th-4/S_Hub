@@ -577,16 +577,7 @@ export default function Sidebar() {
         onResume={resumeRealtime}
         onStop={stopRealtime}
       />
-      {/*
-        좌·중·우 세 열의 바닥을 한 선에 맞춘다. 높이의 기준은 중앙 대시보드다 —
-        contain:size 로 사이드바 내용이 줄 높이를 늘리지 못하게 하고, 줄 높이까지
-        늘어난 뒤 내용이 더 길면 안에서 스크롤한다(우측 패널과 같은 방식).
-        self-start 로 내용 높이만 쓰던 때는 중앙보다 짧거나 길어 바닥이 어긋났다.
-        min-h — 분석 전처럼 중앙이 짧을 때도 사이드바가 짓눌리지 않는 바닥값.
-        *:shrink-0 — 높이가 정해진 flex 열이라, 없으면 overflow-hidden 인 카드들이
-        스크롤로 넘기지 않고 제 내용을 잘라 가며 줄어든다.
-      */}
-      <aside className="flex min-h-[640px] w-[300px] shrink-0 flex-col gap-2.5 overflow-y-auto rounded-2xl bg-card p-2.5 ring-1 ring-foreground/10 *:shrink-0 [contain:size] [scrollbar-width:thin]">
+      <aside className="flex w-[300px] shrink-0 self-start flex-col gap-2.5 rounded-2xl bg-card p-2.5 ring-1 ring-foreground/10">
         {/* 패널 헤더 */}
         <div className="flex items-center justify-end px-0.5 pb-0.5">
           <button
@@ -920,35 +911,28 @@ export default function Sidebar() {
           IPS 반영 거절은 여기 넣지 않는다 — 그건 분석을 막지 않는다.
           우측 IPS 반영하기 버튼 위에 둔다.
         */}
-        {/*
-          분석하기는 스크롤과 상관없이 늘 바닥에 붙인다 — 우측 IPS 반영하기와 같은 자리.
-          내용이 짧으면 mt-auto 가 바닥으로 밀고, 길면 sticky 가 붙잡는다.
-          sticky 는 aside 의 안쪽 여백 위에서 멈추므로 -bottom-2.5 로 그 여백까지 내려오고,
-          -mb-2.5·pb-2.5 로 버튼 자리는 그대로 두면서 스크롤한 내용이 버튼 밑으로 비치지 않게 덮는다.
-        */}
-        <div className="sticky -bottom-2.5 -mb-2.5 mt-auto flex flex-col gap-2.5 bg-card pt-1 pb-2.5">
-          {gateNotice && (
-            <p className="-mb-1 px-0.5 text-[11px] font-semibold text-destructive">
-              {gateNotice}
-            </p>
-          )}
+        {gateNotice && (
+          <p className="-mb-1 px-0.5 text-[11px] font-semibold text-destructive">
+            {gateNotice}
+          </p>
+        )}
 
-          <Button
-            size="lg"
-            disabled={analyzing || !isCurrentWeightsInputValid(currentWeightsInput)}
-            onClick={() => setGateOpen(true)}
-            className="w-full rounded-xl py-6 text-sm font-extrabold shadow-[0_4px_14px_rgba(0,100,255,0.28)]"
-          >
-            {analyzing ? (
-              <>
-                <Loader2 className="size-4 animate-spin" />
-                분석 중…
-              </>
-            ) : (
-              "분석하기"
-            )}
-          </Button>
-        </div>
+        <Button
+          size="lg"
+          disabled={analyzing || !isCurrentWeightsInputValid(currentWeightsInput)}
+          onClick={() => setGateOpen(true)}
+          className="w-full rounded-xl py-6 text-sm font-extrabold shadow-[0_4px_14px_rgba(0,100,255,0.28)]"
+        >
+          {analyzing ? (
+            <>
+              <Loader2 className="size-4 animate-spin" />
+              분석 중…
+            </>
+          ) : (
+            "분석하기"
+          )}
+        </Button>
+
       </aside>
 
       <AnalyzeGateDialog
