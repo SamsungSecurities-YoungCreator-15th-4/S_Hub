@@ -87,7 +87,10 @@ export default function TaxSection() {
 
   // 세후수익률 비교 — 현재 vs 선택 포트폴리오
   const currentAfterTax = currentPortfolio?.metrics.afterTaxReturnPct ?? null;
-  const selectedAfterTax = selectedPortfolio?.metrics.afterTaxReturnPct ?? null;
+  // 지표 카드도 흐름 막대와 같은 안을 봐야 한다(아래 baseLabel 주석 참고).
+  // waterfallFlow 는 이 줄 아래에서 만들어지므로 실제 대입은 그쪽에서 한다.
+  const selectedAfterTaxBase =
+    selectedPortfolio?.metrics.afterTaxReturnPct ?? null;
 
   // 절세 효과 헤드라인: 스트레스 모드면 taxSource(stressed) headline, 아니면 calculate saved_vs_current
   const annualSavingManwon = isStressMode
@@ -155,7 +158,15 @@ export default function TaxSection() {
   } = useTaxPlan();
   const waterfallFlow = useTaxFlow();
 
-  const baseLabel = selectedPortfolio?.name ?? "포트폴리오";
+  /*
+   * 머리 박스의 배지는 아래 흐름 막대가 어느 안을 기준으로 그려졌는지를 말한다.
+   * 막대가 확정 대상 안을 따르므로 배지도 같은 이름이어야 한다 — 안 그러면
+   * PB 가 비중을 조정했을 때 배지는 "안정 추구", 막대는 "제안 조정" 이 된다.
+   */
+  const baseLabel =
+    waterfallFlow?.selected.name ?? selectedPortfolio?.name ?? "포트폴리오";
+  const selectedAfterTax =
+    waterfallFlow?.selected.afterTaxReturnPct ?? selectedAfterTaxBase;
 
   if (
     portfolioSource === "fallback" &&
