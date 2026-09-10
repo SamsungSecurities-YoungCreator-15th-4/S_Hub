@@ -375,6 +375,7 @@ export default function TaxSection() {
                     : 0,
                 maxPensionKeepingNeed: pensionCeilingForNeed,
                 isaLockupYears: plan.isa.lockupYears,
+                pensionLockupYears: plan.pension.lockupYears,
                 pensionRoomLeftManwon: Math.max(
                   Math.min(
                     plan.pension.headroomManwon,

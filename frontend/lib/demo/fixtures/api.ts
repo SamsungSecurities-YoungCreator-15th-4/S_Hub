@@ -123,6 +123,8 @@ export interface ContributionNarrativeInput {
   kind?: NearTermNeedKind;
   label?: string;
   /** 아래는 전부 lib/taxAccounts.ts 가 계산한 값이다. */
+  /** 연금이 열릴 때까지 남은 햇수 — 목표 시점과 나란히 놓아야 대비가 선다. */
+  pensionLockupYears: number;
   shortfallManwon: number;
   pensionDropManwon: number;
   savingBeforeManwon: number;
@@ -143,30 +145,52 @@ export interface ContributionNarrative {
 
 const man = (n: number) => `${Math.round(n).toLocaleString()}만원`;
 
-/** 자금 성격별 근거. IPS 의 목적을 읽어 "왜 못 미루는지"를 말한다. */
-function needComment(kind: NearTermNeedKind | undefined): string {
+/**
+ * 자금 성격별 근거.
+ *
+ * 자금의 성격만 말하면 누구에게 붙여도 말이 되는 일반론이 된다("전세 재계약은
+ * 날짜가 정해진 지출입니다"). 상담을 읽은 문장이라면 **이 고객의 두 시점**을
+ * 나란히 놓아야 한다 — 돈이 필요한 시점과 연금이 열리는 시점.
+ *
+ * 그 둘이 겹치지 않는다는 것이 이 화면의 논지이고, 슬라이더를 어디에 두든 변하지
+ * 않는 사실이라 LLM 이 한 번 쓰면 되는 부분이기도 하다.
+ */
+function needComment(
+  kind: NearTermNeedKind | undefined,
+  needYears: number,
+  pensionLockupYears: number,
+): string {
+  const gap = `연금은 ${pensionLockupYears}년 뒤에야 열립니다`;
+
   switch (kind) {
     case "lease":
       return (
-        "전세 재계약은 날짜가 정해진 지출이라 미루거나 줄일 수 있는 돈이 아닙니다. " +
-        "은퇴자산은 시점을 넓게 두고 쌓을 수 있지만 이 돈은 그렇지 않습니다."
+        `전세 보증금은 재계약일에 맞춰 있어야 하는 돈이라 시점을 미루거나 금액을 ` +
+        `줄이기 어렵습니다. 그런데 ${gap}. ${needYears}년과 ${pensionLockupYears}년, ` +
+        `두 시점이 겹치지 않으니 한도를 채우는 만큼 ${needYears}년 뒤 쓸 돈이 줄어듭니다.`
       );
     case "homePurchase":
       return (
-        "주택 계약금은 계약일과 대출 실행일에 함께 묶입니다. 하루 늦으면 계약 자체가 흔들립니다."
-      );
-    case "startup":
-      return (
-        "창업 자금은 시점을 다소 조절할 수 있어 전세나 계약금만큼 경직되지는 않습니다. " +
-        "다만 크게 미루면 준비해 온 기회를 놓치는 비용이 생깁니다."
+        `주택 계약금은 계약일과 대출 실행일에 함께 묶여 하루도 미루기 어렵습니다. ` +
+        `${gap}. 한도를 채운 만큼은 ${needYears}년 뒤에 없는 돈으로 보고 계획해야 합니다.`
       );
     case "education":
       return (
-        "학자금은 학기 일정에 묶여 시점을 미룰 수 없습니다. 한 학기를 건너뛰는 선택지가 사실상 없기 때문입니다."
+        `등록금은 학기 일정에 묶여 한 학기를 건너뛰는 선택지가 사실상 없습니다. ` +
+        `${gap}. 지금 한도를 채우면 ${needYears}년 뒤 그 돈에는 손댈 수 없습니다.`
+      );
+    case "startup":
+      return (
+        `창업 자금은 시점을 다소 조절할 수 있어 전세나 계약금만큼 경직되지는 ` +
+        `않습니다. 다만 ${gap}. 계획을 크게 미룰 생각이 아니라면 한도를 다 채우지 ` +
+        `않는 편이 안전합니다.`
       );
     default:
       // 목적을 모르면 "못 미루는 돈" 이라고 단정하지 않는다.
-      return "시점을 미룰 수 있는 지출인지 상담에서 확인해야 합니다.";
+      return (
+        `이 자금이 시점을 미룰 수 있는 지출인지 상담에서 확인해야 합니다. ${gap} — ` +
+        `미룰 수 없는 돈이라면 한도를 채우는 만큼 ${needYears}년 뒤에 부족해집니다.`
+      );
   }
 }
 
@@ -176,7 +200,7 @@ export function demoContributionNarrative(
   if (i.needManwon <= 0 || i.needYears <= 0) return null;
 
   const name = i.label ?? "필요 자금";
-  const comment = `${needComment(i.kind)} 연금에 넣은 돈은 그 시점에 손댈 수 없습니다.`;
+  const comment = needComment(i.kind, i.needYears, i.pensionLockupYears);
 
   // 연금을 0 으로 해도 못 맞추는 경우. 남는 돈이 목표 시점에 안 풀리는 ISA 로
   // 흘러갈 때 생긴다. 이때 "N만원으로 낮추면 된다" 고 말하면 거짓이 된다.
