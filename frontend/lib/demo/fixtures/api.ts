@@ -125,6 +125,8 @@ export interface ContributionNarrativeInput {
   /** 아래는 전부 lib/taxAccounts.ts 가 계산한 값이다. */
   /** 연금이 열릴 때까지 남은 햇수 — 목표 시점과 나란히 놓아야 대비가 선다. */
   pensionLockupYears: number;
+  /** ISA 누적 잔여 한도(만원) — 목표액을 덮는지가 문장을 가른다. 슬라이더와 무관하다. */
+  isaHeadroomManwon: number;
   shortfallManwon: number;
   pensionDropManwon: number;
   savingBeforeManwon: number;
@@ -204,29 +206,91 @@ function needClauses(kind: NearTermNeedKind | undefined): {
   }
 }
 
+/**
+ * 연금 절 — 목표 시점과 연금 개시 시점의 간격.
+ *
+ * 간격이 22년인 고객과 8년인 고객에게 같은 말을 하면 읽는 사람이 "붙여 넣었구나"
+ * 를 먼저 알아챈다. 간격의 크기 자체가 할 말을 정한다.
+ */
+function pensionClause(needYears: number, lockYears: number): string {
+  const gap = lockYears - needYears;
+  const head = `연금은 ${lockYears}년 뒤에야 열립니다.`;
+
+  if (gap >= 15) {
+    return (
+      `${head} 은퇴까지 남은 기간에 쌓는 돈이라 성격이 아예 다릅니다 — ` +
+      `${needYears}년 뒤에 쓸 돈을 여기에 넣으면 그 시점에는 없는 돈이 됩니다.`
+    );
+  }
+  if (gap >= 5) {
+    return (
+      `${head} ${needYears}년 뒤보다 한참 뒤라, 한도를 채우는 만큼 ` +
+      `${needYears}년 시점에 쓸 돈이 줄어듭니다.`
+    );
+  }
+  return (
+    `${head} 목표 시점과 ${gap}년 차이라 얼핏 가까워 보이지만, ` +
+    `${needYears}년 시점에는 아직 잠겨 있습니다.`
+  );
+}
+
+/**
+ * ISA 절 — 이 화면에서 배분이 ISA 로 흘러가는 이유가 여기서 설명된다.
+ *
+ * 두 가지가 문장을 가른다. 의무보유가 목표 시점 전에 끝나는지, 그리고 남은 한도가
+ * 목표액을 덮는지. 둘 다 슬라이더와 무관해 고객마다 고정이다.
+ */
+function isaClause(
+  needYears: number,
+  needManwon: number,
+  lockYears: number,
+  headroomManwon: number,
+): string {
+  const man = (n: number) => `${Math.round(n).toLocaleString()}만원`;
+
+  if (lockYears > needYears) {
+    return (
+      `ISA 도 의무보유가 ${lockYears}년 남아 ${needYears}년 시점에는 풀리지 ` +
+      `않습니다. 이 목표를 지키려면 절세계좌 밖에 두는 수밖에 없어, 절세액을 일부 ` +
+      `내주어야 합니다.`
+    );
+  }
+
+  const room = headroomManwon >= needManwon;
+  if (lockYears <= 0) {
+    return room
+      ? `반면 ISA 는 의무보유가 이미 끝나 언제든 꺼낼 수 있고, 이월된 한도가 ` +
+          `${man(headroomManwon)} 남아 있습니다. 목표액 ${man(needManwon)}을 담고도 ` +
+          `여유가 있어 이쪽으로 옮길 여지가 큽니다.`
+      : `반면 ISA 는 의무보유가 이미 끝나 언제든 꺼낼 수 있습니다. 다만 남은 한도가 ` +
+          `${man(headroomManwon)}이라 목표액 ${man(needManwon)}을 다 담지는 못하니, ` +
+          `모자라는 만큼은 일반계좌로 가야 합니다.`;
+  }
+
+  return room
+    ? `반면 ISA 는 ${lockYears}년 뒤 의무보유가 끝나 ${needYears}년 시점에는 ` +
+        `풀립니다. 남은 한도도 ${man(headroomManwon)}이라 목표액을 담고도 여유가 ` +
+        `있어, 같은 돈을 ISA 에 두면 목표를 지키면서 절세를 챙길 수 있습니다.`
+    : `반면 ISA 는 ${lockYears}년 뒤 의무보유가 끝나 ${needYears}년 시점에는 ` +
+        `풀립니다. 남은 한도가 ${man(headroomManwon)}이라 목표액을 다 담지는 ` +
+        `못하지만, 담기는 만큼은 절세와 목표를 함께 가져갑니다.`;
+}
+
 function needComment(
   kind: NearTermNeedKind | undefined,
   needYears: number,
+  needManwon: number,
   pensionLockupYears: number,
   isaLockupYears: number,
+  isaHeadroomManwon: number,
 ): string {
   const { nature, check } = needClauses(kind);
-
-  const pension =
-    `연금은 ${pensionLockupYears}년 뒤에야 열립니다. ${needYears}년과 ` +
-    `${pensionLockupYears}년, 두 시점이 겹치지 않으니 한도를 채우는 만큼 ` +
-    `${needYears}년 뒤 쓸 돈이 줄어듭니다.`;
-
-  // ISA 가 목표 시점에 풀리는지가 갈림길이다. 풀리면 절세를 포기하지 않고도 목표를
-  // 지킬 수 있고, 안 풀리면 둘 중 하나를 내줘야 한다.
-  const isa =
-    isaLockupYears <= needYears
-      ? `반면 ISA 는 의무보유가 ${isaLockupYears > 0 ? `${isaLockupYears}년 뒤 끝나 ` : "이미 끝나 "}` +
-        `${needYears}년 시점에는 풀립니다. 같은 돈이라도 ISA 쪽에 두면 목표를 지키면서 절세를 챙길 수 있습니다.`
-      : `ISA 도 의무보유가 ${isaLockupYears}년 남아 ${needYears}년 시점에는 풀리지 않습니다. ` +
-        `이 목표를 지키려면 절세계좌 밖에 두는 수밖에 없어, 절세액을 일부 내주어야 합니다.`;
-
-  return `${nature} 그런데 ${pension} ${isa} ${check}`;
+  return [
+    nature,
+    pensionClause(needYears, pensionLockupYears),
+    isaClause(needYears, needManwon, isaLockupYears, isaHeadroomManwon),
+    check,
+  ].join(" ");
 }
 
 export function demoContributionNarrative(
@@ -238,8 +302,10 @@ export function demoContributionNarrative(
   const comment = needComment(
     i.kind,
     i.needYears,
+    i.needManwon,
     i.pensionLockupYears,
     i.isaLockupYears,
+    i.isaHeadroomManwon,
   );
 
   // 연금을 0 으로 해도 못 맞추는 경우. 남는 돈이 목표 시점에 안 풀리는 ISA 로
