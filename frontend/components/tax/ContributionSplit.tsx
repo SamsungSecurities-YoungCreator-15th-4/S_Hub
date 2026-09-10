@@ -186,13 +186,19 @@ export default function ContributionSplit({
           <div className="flex gap-1.5">
             <Sparkles className="mt-[3px] size-3 shrink-0 text-muted-foreground" />
             <div className="min-w-0">
+              {/*
+                굵은 첫 줄은 "AI 코멘트" 로 고정한다. 판정 문장을 제목 자리에 두면
+                슬라이더를 밀 때마다 제목이 바뀌어 상자 자체가 흔들려 보이고, 지금은
+                문장이 실시간으로 다시 쓰이는 것도 아니다(값만 갈아 끼운다). 고정된
+                라벨은 "여기부터는 AI 가 쓴 말" 이라는 한 가지만 말한다.
+              */}
               <p className="text-[13px] font-extrabold text-foreground">
-                {narrative.verdict}
+                AI 코멘트
               </p>
-              <p className="mt-0.5 text-[12px] font-semibold leading-relaxed text-muted-foreground">
-                {narrative.detail}
+              <p className="mt-0.5 text-[12px] font-semibold leading-relaxed text-foreground/80">
+                {narrative.verdict}. {narrative.detail}
               </p>
-              <p className="mt-1.5 text-[11px] font-semibold leading-relaxed text-muted-foreground/90">
+              <p className="mt-1.5 text-[11px] font-semibold leading-relaxed text-muted-foreground">
                 {narrative.comment}
               </p>
             </div>
