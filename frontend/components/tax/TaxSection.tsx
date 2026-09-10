@@ -224,9 +224,17 @@ export default function TaxSection() {
         </TabsList>
       </div>
 
-      <Card className="w-full gap-0 p-3">
+      {/*
+        두 탭을 같은 칸에 겹쳐 두고(forceMount) 보이지 않는 탭은 invisible 로만 감춘다.
+        카드 높이가 두 탭 중 큰 쪽에 맞춰져, 절세 제안 탭에서도 바닥이 절세 효과와 같은 자리에 선다.
+      */}
+      <Card className="grid w-full gap-0 p-3">
         {/* 탭 1: 절세 효과 */}
-        <TabsContent value="effect" className="flex w-full flex-none flex-col gap-2.5">
+        <TabsContent
+          value="effect"
+          forceMount
+          className="col-start-1 row-start-1 flex w-full flex-none flex-col gap-2.5 data-[state=inactive]:invisible"
+        >
           {/*
             절세 효과 금액이 없는 상태에서는 왼쪽이 배지 한 줄뿐이라 박스가 비어
             보인다. 세로 여백과 지표 카드를 줄여 내용만큼만 차지하게 한다.
@@ -338,7 +346,11 @@ export default function TaxSection() {
         </TabsContent>
 
         {/* 탭 2: 절세 제안 */}
-        <TabsContent value="advice" className="flex w-full flex-none flex-col gap-2.5">
+        <TabsContent
+          value="advice"
+          forceMount
+          className="col-start-1 row-start-1 flex w-full flex-none flex-col gap-3 data-[state=inactive]:invisible"
+        >
           {plan &&
             customer &&
             (customer.annualContributionManwon ?? 0) > 0 &&
@@ -414,10 +426,13 @@ function AdviceCards({ liveCards, plan }: AdviceCardsProps) {
   const { cards, totalSaving } = deriveAdviceCards(plan, liveCards);
 
   return (
-    /* 카드 본문은 내용에 필요한 높이만 사용한다. */
-    <div className="flex w-full flex-col">
-      <div className="mb-2 max-h-[520px] overflow-y-auto">
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+    /*
+      절세 효과 탭 높이에 맞춰 늘어난 자리는 위 납입 배분 상자와 반씩 나눈다(둘 다 grow).
+      카드 본문은 104px 에서 늘어나고, 요약은 위·절감액은 아래에 붙어 그 사이가 여백이 된다.
+    */
+    <div className="flex w-full grow flex-col gap-3">
+      <div className="flex max-h-[520px] flex-1 flex-col overflow-y-auto">
+        <div className="grid flex-1 grid-cols-1 gap-3 lg:grid-cols-3">
           {cards.map((card) => {
             // 연계 상품 목록이 비면 "상품추천" 탭 자체를 감춘다 — 빈 탭·빈 박스를 남기지 않는다.
             const hasProducts = card.products.length > 0;
@@ -427,9 +442,9 @@ function AdviceCards({ liveCards, plan }: AdviceCardsProps) {
             return (
               <div
                 key={card.title}
-                className={`flex flex-col rounded-xl border p-2.5 ${!card.applicable ? "opacity-50" : ""}`}
+                className={`flex flex-col rounded-xl border p-3 ${!card.applicable ? "opacity-50" : ""}`}
               >
-                <div className="mb-1.5 flex items-center justify-between gap-1.5">
+                <div className="mb-2 flex items-center justify-between gap-1.5">
                   {/*
                     설명을 여는 자리는 제목이다. 본문을 감싸면 배분액·절감액 위에서
                     툴팁이 떠 읽던 숫자를 덮고, 어디에 붙은 설명인지도 알 수 없다.
@@ -477,7 +492,7 @@ function AdviceCards({ liveCards, plan }: AdviceCardsProps) {
                 </div>
 
                 {active === "납입안" ? (
-                  <div className="h-[104px]">
+                  <div className="h-0 min-h-[104px] flex-1">
                     <div className="flex h-full flex-col overflow-y-auto pr-0.5">
                       <p className="pt-1.5 text-[13px] font-semibold leading-snug text-muted-foreground">
                         {card.summary}
@@ -501,7 +516,7 @@ function AdviceCards({ liveCards, plan }: AdviceCardsProps) {
                     </div>
                   </div>
                 ) : (
-                  <div className="h-[104px] overflow-y-auto pr-0.5">
+                  <div className="h-0 min-h-[104px] flex-1 overflow-y-auto pr-0.5">
                     <div className="flex flex-col gap-1.5">
                       {card.products.map((p) => {
                         const url = PRODUCT_LINKS[p.name] ?? "";
@@ -540,7 +555,7 @@ function AdviceCards({ liveCards, plan }: AdviceCardsProps) {
           })}
         </div>
       </div>
-      <div className="mt-auto flex shrink-0 items-center justify-between rounded-xl bg-brand/10 px-3 py-2">
+      <div className="flex shrink-0 items-center justify-between rounded-xl bg-brand/10 px-3 py-2.5">
         <span className="text-[13px] font-bold text-brand-dark">
           {TAX_ADVICE.totalLabel}
         </span>
