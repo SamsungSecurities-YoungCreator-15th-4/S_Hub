@@ -385,6 +385,7 @@ interface AdviceCardsProps {
 
 function AdviceCards({ liveCards, plan }: AdviceCardsProps) {
   const [tabs, setTabs] = useState<Record<string, AdviceTab>>({});
+  const helpMode = useDashboardStore((s) => s.helpMode);
 
   const { cards, totalSaving } = deriveAdviceCards(plan, liveCards);
 
@@ -409,9 +410,25 @@ function AdviceCards({ liveCards, plan }: AdviceCardsProps) {
                 className={`flex flex-col rounded-xl border p-2.5 ${!card.applicable ? "opacity-50" : ""}`}
               >
                 <div className="mb-1.5 flex items-center gap-1.5">
-                  <span className="flex-1 text-[13px] font-extrabold leading-tight">
-                    {card.title}
-                  </span>
+                  {/*
+                    설명을 여는 자리는 제목이다. 본문을 감싸면 배분액·절감액 위에서
+                    툴팁이 떠 읽던 숫자를 덮고, 어디에 붙은 설명인지도 알 수 없다.
+                    도움말 모드의 테두리는 사이드바의 자산 비중 조절기·백테스트·
+                    세금 흐름 비교와 같은 규격이다.
+                  */}
+                  <HelpTooltip text={card.explain} className="flex-1" wide>
+                    <p className="cursor-default text-[13px] font-extrabold leading-tight">
+                      <span
+                        className={
+                          helpMode
+                            ? "rounded border border-brand/40 bg-brand/[0.06] px-1"
+                            : ""
+                        }
+                      >
+                        {card.title}
+                      </span>
+                    </p>
+                  </HelpTooltip>
                   {hasProducts && (
                     <div className="flex shrink-0 rounded-md bg-muted p-0.5">
                       {(["납입안", "상품추천"] as AdviceTab[]).map((t) => (
@@ -435,9 +452,7 @@ function AdviceCards({ liveCards, plan }: AdviceCardsProps) {
                 </div>
 
                 {active === "납입안" ? (
-                  /* 카드 전체가 아니라 본문만 감싼다 — 탭 버튼·상품 링크 위에서
-                     툴팁이 떠 카드를 덮으면 누르기 거슬린다. */
-                  <HelpTooltip text={card.explain} className="h-[104px]" wide>
+                  <div className="h-[104px]">
                     <div className="flex h-full flex-col overflow-y-auto pr-0.5">
                       <p className="pt-1.5 text-[13px] font-semibold leading-snug text-muted-foreground">
                         {card.summary}
@@ -459,7 +474,7 @@ function AdviceCards({ liveCards, plan }: AdviceCardsProps) {
                         )}
                       </div>
                     </div>
-                  </HelpTooltip>
+                  </div>
                 ) : (
                   <div className="h-[104px] overflow-y-auto pr-0.5">
                     <div className="flex flex-col gap-1.5">

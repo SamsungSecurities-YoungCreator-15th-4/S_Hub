@@ -16,6 +16,8 @@ import {
   type TaxFlowInput,
 } from "@/lib/taxPlan";
 import { TAX_EFFECT } from "@/lib/mockData";
+import { ASSUMPTIONS } from "@/lib/taxAccounts";
+import { useDashboardStore } from "@/lib/store";
 import type { StressTaxHeadline, TaxWaterfallResponse } from "@/lib/api";
 
 // 현재(회색) / 포폴A(원래 파랑) / 절세제안(약간 밝은 파랑)
@@ -78,18 +80,13 @@ export default function TaxWaterfall({
   liveAumEokwon,
   flow,
 }: Props) {
+  const helpMode = useDashboardStore((s) => s.helpMode);
   let data: {
     name: string;
     afterTax: number;
     tax: number;
-    /** 막대에 그릴 세금 길이. 세금이 세후 수익의 1/5 수준이라 실제 비율로 그리면
-     *  80만과 150만의 차이가 몇 px 로 뭉개진다. 길이만 늘리고 라벨은 실제 값을
-     *  쓰며, 확대했다는 사실을 차트 아래에 적는다. */
-    taxPlot?: number;
     refund?: number;
   }[];
-  /** 세금 막대를 몇 배로 늘려 그렸는지. 1 이면 실제 비율 그대로다. */
-  let taxScale = 1;
   let totalSavingManwon: number;
   let pretaxLabel: string;
   let totalLabel: string;
@@ -143,21 +140,20 @@ export default function TaxWaterfall({
     const derived = deriveTaxFlowRows(flow);
     const rows = derived.rows;
 
-    // 가장 큰 세금 막대가 가장 긴 세후 막대의 이만큼을 차지하도록 늘린다.
-    const TAX_TARGET_SHARE = 0.32;
-    const maxAfter = Math.max(...rows.map((r) => r.afterTax));
-    const maxTax = Math.max(...rows.map((r) => r.tax));
-    taxScale =
-      maxTax > 0 ? Math.max((maxAfter * TAX_TARGET_SHARE) / maxTax, 1) : 1;
-    data = rows.map((r) => ({ ...r, taxPlot: r.tax * taxScale }));
+    /*
+      세금 막대는 실제 비율 그대로 그린다. 한때 2배로 늘렸는데, 그건 숫자를 조각
+      안에 넣으려던 때의 이야기다. 조각이 좁아 "80만" 이 잘렸기 때문이다. 지금은
+      숫자를 막대 밖에 적으므로 늘릴 이유가 없다 — 길이를 손대면 세후와 세금의
+      비율이 눈에 거짓으로 들어온다.
+    */
+    data = rows;
 
     totalSavingManwon = derived.totalSavingManwon;
     pretaxLabel = derived.pretaxLabel;
     totalLabel = derived.totalLabel;
     breakdown = derived.breakdown;
     domainMax =
-      Math.max(...data.map((d) => d.afterTax + (d.taxPlot ?? 0) + (d.refund ?? 0))) *
-      1.1;
+      Math.max(...data.map((d) => d.afterTax + d.tax + (d.refund ?? 0))) * 1.1;
   } else {
     const { rows, pretaxLabel: pl, totalLabel: tl, totalSavingManwon: ts } = TAX_EFFECT.flow;
     data = rows.map((r, i) => ({
@@ -223,11 +219,13 @@ export default function TaxWaterfall({
     ...(breakdown
       ? [
           `전환으로 금융소득세가 ${breakdown.switchTaxManwon.toLocaleString()}만원 늘고 ISA 가 ${breakdown.isaCutManwon.toLocaleString()}만원을 도로 깎는다`,
-        ]
-      : []),
-    ...(taxScale > 1.05
-      ? [
-          `금융소득세 막대는 보이도록 ${taxScale.toFixed(1)}배로 늘려 그렸다 (적힌 금액은 실제 값)`,
+          /*
+            그 ISA 몫만 법정 수치가 아니라 시장 가정에서 나온다. 이 툴팁에도
+            18만원이 적히므로 근거가 여기 없으면 이 탭만 열어 본 사람에게는
+            출처가 보이지 않는다. 납입 배분 화면의 같은 줄과 문구를 맞춘다.
+          */
+          `그 ISA 몫은 잔액이 연 ${(ASSUMPTIONS.isaAssumedIncomeYield * 100).toFixed(1)}% 이자·배당을 낸다는 가정 (법정 수치 아님)`,
+          "같은 시점 시장값 — 국고채 3년 3.91%(2026-09-09) · 코스피 배당수익률 0.92%(2026-05)",
         ]
       : []),
   ];
@@ -235,18 +233,36 @@ export default function TaxWaterfall({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/*
-        막대 길이를 손본 사실과 세목 구분을 가이드 툴팁에 둔다. 화면에 늘 띄우면
-        차트보다 주석이 길어지는데, 근거 없이 지우면 2배로 늘려 그린 막대에 아무
-        표시가 없게 된다. 가이드를 켜면 나온다.
+        세목 구분과 ISA 가정의 근거를 가이드 툴팁에 둔다. 화면에 늘 띄우면 차트보다
+        주석이 길어진다.
+
+        툴팁을 여는 자리는 제목 글자뿐이다. 제목 줄 전체를 감싸면 기준 문구가 있는
+        오른쪽 빈 자리에 커서만 스쳐도 툴팁이 떠, 무엇에 붙은 설명인지 알 수 없다.
+        도움말 모드에서 제목에 남기는 테두리도 사이드바의 자산 비중 조절기·백테스트와
+        같은 규격이라, 설명이 어디에 붙어 있는지 한눈에 보인다.
       */}
-      <HelpTooltip text={flow ? chartHelp : []} placement="bottom">
-        <p className="mb-2 flex items-center gap-1.5 text-[13px] font-extrabold">
-          세금 흐름 비교
-          <span className="text-[13px] font-semibold text-muted-foreground">
-            {pretaxLabel}
-          </span>
-        </p>
-      </HelpTooltip>
+      <div className="mb-2 flex items-center gap-1.5">
+        <HelpTooltip
+          text={flow ? chartHelp : []}
+          placement="bottom"
+          className="w-fit"
+        >
+          <p className="cursor-default text-[13px] font-extrabold">
+            <span
+              className={
+                helpMode && flow
+                  ? "rounded border border-brand/40 bg-brand/[0.06] px-1"
+                  : ""
+              }
+            >
+              세금 흐름 비교
+            </span>
+          </p>
+        </HelpTooltip>
+        <span className="text-[13px] font-semibold text-muted-foreground">
+          {pretaxLabel}
+        </span>
+      </div>
       <div className="mb-2 flex items-center justify-between gap-2 rounded-lg bg-muted/60 px-2.5 py-1.5">
         <div className="min-w-0">
           <span className="text-[12px] font-semibold text-muted-foreground">
@@ -339,16 +355,8 @@ export default function TaxWaterfall({
                 ))}
               </Bar>
             )}
-            {/*
-              세금 막대. flow 에서는 taxPlot(확대한 길이)으로 그리고 숫자는 막대 밖
-              RowSummary 가 적는다. 실제 비율로는 세후 수익의 1/5 이라 80만과 150만의
-              차이가 몇 px 로 뭉개지고, 조각 안에 글자를 넣으면 잘린다.
-            */}
-            <Bar
-              dataKey={flow ? "taxPlot" : "tax"}
-              stackId="flow"
-              isAnimationActive={false}
-            >
+            {/* 세금 막대. 숫자는 막대 밖에서 RowSummary 가 적는다. */}
+            <Bar dataKey="tax" stackId="flow" isAnimationActive={false}>
               {data.map((_, i) => (
                 <Cell key={i} fill={colors.tax[i] ?? "transparent"} radius={10} />
               ))}
