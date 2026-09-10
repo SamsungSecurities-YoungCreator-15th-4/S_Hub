@@ -102,59 +102,113 @@ export function demoTaxSummary(portfolioName: string): TaxInsightData {
  *
  * 엔드포인트가 생기면 이 함수를 fetch 로 갈아 끼우고 호출부는 그대로 둔다.
  */
-export function demoContributionRationale(
-  need: {
-    manwon: number;
-    years: number;
-    kind?: NearTermNeedKind;
-    label?: string;
-  },
-): string {
-  const { manwon, years, kind } = need;
-  if (manwon <= 0 || years <= 0) return "";
+/**
+ * 납입 배분 화면의 말은 전부 LLM 이 쓴다 — 판정 한 줄, 근거 한 줄, 코멘트.
+ *
+ * 판정 문구를 화면에 조건 분기로 박아 두면 이 고객에게 맞춘 화면이 될 뿐, 고객이
+ * 바뀌면 문장 틀은 그대로고 숫자만 갈린다. LLM 이 IPS 와 계산 결과를 함께 읽고
+ * 그 고객의 말로 쓰는 것이 원래 그리려던 그림이다.
+ *
+ * ⚠️ 숫자는 LLM 이 만들지 않는다. 계산이 구한 값을 인자로 받아 문장에 넣기만
+ *    한다(실서비스에서는 프롬프트에 그대로 실어 보내고, 돌아온 문장의 숫자를
+ *    이 값들과 대조해야 한다). 그래야 환각이 금액으로 새지 않는다.
+ *
+ * 지금은 엔드포인트가 없어 시연 대역이 문장을 만든다. demoTaxSummary·demoInsight
+ * 와 같은 방식이고, 붙을 때 바뀌는 것은 이 함수 하나다.
+ */
+export interface ContributionNarrativeInput {
+  /** IPS 에서 읽어낸 목표 — 금액·시점·자금의 이름 */
+  needManwon: number;
+  needYears: number;
+  kind?: NearTermNeedKind;
+  label?: string;
+  /** 아래는 전부 lib/taxAccounts.ts 가 계산한 값이다. */
+  shortfallManwon: number;
+  pensionDropManwon: number;
+  savingBeforeManwon: number;
+  savingAfterManwon: number;
+  maxPensionKeepingNeed: number | null;
+  isaLockupYears: number;
+  pensionRoomLeftManwon: number;
+}
 
-  /*
-   * 금액과 시점은 말하지 않는다.
-   *
-   * 바로 위 지표 카드가 "3년 뒤 쓸 수 있는 돈 4,230만원 · 필요 5,000만원" 을,
-   * 판정 박스가 "770만원 부족" 을 이미 적는다. 여기서 같은 숫자를 또 적으면 한
-   * 화면이 같은 사실을 세 번 말한다 — 화면이 난잡해 보이던 원인이다.
-   *
-   * 역할을 가른다. 숫자는 계산이 말하고, 여기서는 **그 시점을 왜 미룰 수 없는지**
-   * 만 말한다. 그래야 이 자리가 근거를 대는 자리로 읽히고, 계산 결과가 AI 가
-   * 만든 값으로 오해되지 않는다.
-   */
-  // 잠기는 햇수와 만 55세는 패널 머리말이 이미 적는다("연금은 N년 뒤, 만 55세부터
-  // 받을 수 있습니다"). 여기서는 그 사실과 이 자금을 잇기만 한다.
-  const locked = "연금에 넣은 돈은 그 시점에 손댈 수 없습니다.";
+export interface ContributionNarrative {
+  /** 한 줄 결론 */
+  verdict: string;
+  /** 한 줄 근거 — 얼마를 어떻게 하면 되는지 */
+  detail: string;
+  /** 왜 이 시점을 미룰 수 없는지 */
+  comment: string;
+}
 
+const man = (n: number) => `${Math.round(n).toLocaleString()}만원`;
+
+/** 자금 성격별 근거. IPS 의 목적을 읽어 "왜 못 미루는지"를 말한다. */
+function needComment(kind: NearTermNeedKind | undefined): string {
   switch (kind) {
     case "lease":
       return (
-        `전세 재계약은 날짜가 정해진 지출이라 미루거나 줄일 수 있는 돈이 아닙니다. ` +
-        `은퇴자산은 시점을 넓게 두고 쌓을 수 있지만 이 돈은 그렇지 않습니다: ${locked}`
+        "전세 재계약은 날짜가 정해진 지출이라 미루거나 줄일 수 있는 돈이 아닙니다. " +
+        "은퇴자산은 시점을 넓게 두고 쌓을 수 있지만 이 돈은 그렇지 않습니다."
       );
     case "homePurchase":
       return (
-        `주택 계약금은 계약일과 대출 실행일에 함께 묶입니다. 하루 늦으면 계약 자체가 ` +
-        `흔들립니다: ${locked}`
+        "주택 계약금은 계약일과 대출 실행일에 함께 묶입니다. 하루 늦으면 계약 자체가 흔들립니다."
       );
     case "startup":
       return (
-        `창업 자금은 시점을 다소 조절할 수 있어 전세나 계약금만큼 경직되지는 ` +
-        `않습니다. 다만 크게 미루면 준비해 온 기회를 놓치는 비용이 생깁니다: ${locked}`
+        "창업 자금은 시점을 다소 조절할 수 있어 전세나 계약금만큼 경직되지는 않습니다. " +
+        "다만 크게 미루면 준비해 온 기회를 놓치는 비용이 생깁니다."
       );
     case "education":
       return (
-        `학자금은 학기 일정에 묶여 시점을 미룰 수 없습니다. 한 학기를 건너뛰는 ` +
-        `선택지가 사실상 없기 때문입니다: ${locked}`
+        "학자금은 학기 일정에 묶여 시점을 미룰 수 없습니다. 한 학기를 건너뛰는 선택지가 사실상 없기 때문입니다."
       );
     default:
-      // 목적을 모르면 "못 미루는 돈" 이라고 단정하지 않는다. 확인이 필요하다고만 말한다.
-      return (
-        `시점을 미룰 수 있는 지출인지 상담에서 확인해야 합니다: ${locked}`
-      );
+      // 목적을 모르면 "못 미루는 돈" 이라고 단정하지 않는다.
+      return "시점을 미룰 수 있는 지출인지 상담에서 확인해야 합니다.";
   }
+}
+
+export function demoContributionNarrative(
+  i: ContributionNarrativeInput,
+): ContributionNarrative | null {
+  if (i.needManwon <= 0 || i.needYears <= 0) return null;
+
+  const name = i.label ?? "필요 자금";
+  const comment = `${needComment(i.kind)} 연금에 넣은 돈은 그 시점에 손댈 수 없습니다.`;
+
+  // 연금을 0 으로 해도 못 맞추는 경우. 남는 돈이 목표 시점에 안 풀리는 ISA 로
+  // 흘러갈 때 생긴다. 이때 "N만원으로 낮추면 된다" 고 말하면 거짓이 된다.
+  if (i.shortfallManwon > 0 && i.maxPensionKeepingNeed == null) {
+    return {
+      verdict: `어떻게 배분해도 ${i.needYears}년 뒤 ${man(i.needManwon)}을 못 만듭니다`,
+      detail: `연금을 0 으로 해도 ${man(i.shortfallManwon)} 모자랍니다. ISA 도 의무보유 ${i.isaLockupYears}년이라 그 시점에 풀리지 않습니다.`,
+      comment,
+    };
+  }
+
+  if (i.shortfallManwon > 0) {
+    const drop = Math.max(i.savingBeforeManwon - i.savingAfterManwon, 0);
+    const cost =
+      drop > 0
+        ? `세액공제가 약 ${man(drop)} 줄어듭니다 (약 ${Math.round(i.savingBeforeManwon).toLocaleString()} → ${Math.round(i.savingAfterManwon).toLocaleString()}만원).`
+        : "세액공제는 거의 그대로입니다.";
+    return {
+      verdict: `${name}이 ${man(i.shortfallManwon)} 모자랍니다`,
+      detail: `연금 납입을 ${man(i.pensionDropManwon)} 줄이면 해소됩니다. ${cost}`,
+      comment,
+    };
+  }
+
+  return {
+    verdict: `${i.needYears}년 뒤 ${man(i.needManwon)}을 확보합니다`,
+    detail:
+      i.maxPensionKeepingNeed != null
+        ? `이 목표를 지키면서 연금에 넣을 수 있는 상한은 ${man(i.maxPensionKeepingNeed)}입니다.`
+        : `연금 한도까지 ${man(i.pensionRoomLeftManwon)} 남았습니다.`,
+    comment,
+  };
 }
 
 /** 포트폴리오 계산 결과. 기존 폴백과 같은 형태 — 상관행렬·세금 맵은 백엔드 산출물이라 null. */
