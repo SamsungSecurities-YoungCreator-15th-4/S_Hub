@@ -1785,7 +1785,7 @@ function RiskCheckPage() {
     확인 항목도 이 안을 기준으로 판정한다 — 스트레스는 옮겨 갈 안으로 재고
     확인 항목만 상담 전 비중으로 적으면 한 페이지가 두 포트폴리오를 말한다.
   */
-  // 고객용 문서의 이 칸 제목이 "짚고 넘어갈 점" 이라, 이 안에서 이미 풀린 항목은
+  // 고객용 문서의 이 칸 제목이 "보완할 점" 이라, 이 안에서 이미 풀린 항목은
   // 싣지 않는다. 해소 내역은 PB 용 리포트가 남긴다.
   const conflicts = evaluateIpsConflicts({
     weights: selectedPf.weights,
@@ -1828,7 +1828,7 @@ function RiskCheckPage() {
               marginTop: 2,
             }}
           >
-            시장이 흔들릴 때의 손실 추정 · 짚고 넘어갈 점
+            시장이 흔들릴 때의 손실 추정 · 보완할 점
           </div>
         </div>
       </div>
@@ -1950,9 +1950,17 @@ function RiskCheckPage() {
         >
           <SectionBar />
           <div style={{ fontSize: 15, fontWeight: 800, color: TEXT }}>
-            짚고 넘어갈 점
+            보완할 점
           </div>
         </div>
+
+        {/*
+          안내문을 항목보다 먼저 둔다 — 미달 문장을 먼저 읽고 나면 "막히는 건가"
+          하는 인상이 남고, 그 뒤에 오는 해명은 늦다. 성격을 먼저 말하고 항목을 보인다.
+        */}
+        <p style={{ margin: "0 0 10px", fontSize: 10.5, color: MUTED, lineHeight: 1.7 }}>
+          아래 항목은 투자를 막는 사유가 아니라, 담당 PB 와 함께 확인하고 조정할 지점입니다.
+        </p>
 
         {conflicts.map((c) => (
           <div
@@ -1974,9 +1982,6 @@ function RiskCheckPage() {
             </div>
           </div>
         ))}
-        <p style={{ margin: "6px 0 0", fontSize: 10.5, color: MUTED, lineHeight: 1.7 }}>
-          위 항목은 투자를 막는 사유가 아니라, 담당 PB 와 함께 확인하고 조정할 지점입니다.
-        </p>
 
         <div
           style={{
