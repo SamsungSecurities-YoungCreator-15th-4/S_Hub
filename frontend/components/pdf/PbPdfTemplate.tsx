@@ -814,10 +814,17 @@ function PortfolioPage() {
   const selectedPf = adjusted ?? (selId === "a" ? portA : portB);
   const stressTotalKrw = aumEokwon * 100_000_000;
 
+  /*
+    억 단위로 반올림하면 1억원 고객의 손실이 전부 "-0.2억원" 으로 뭉개져 시나리오
+    간 차이가 사라진다. 리포트의 다른 표(리스크 리포트 스트레스)가 원 단위라
+    표기도 그쪽에 맞춘다.
+  */
   const fmtLoss = (lossKrw: number): { text: string; color: string } => {
-    const eok = lossKrw / 100_000_000;
-    if (Math.abs(eok) < 0.001) return { text: "0.0억원", color: TEXT };
-    return { text: `▼ -${Math.abs(eok).toFixed(1)}억원`, color: BRAND };
+    if (Math.abs(lossKrw) < 1) return { text: "0원", color: TEXT };
+    return {
+      text: `▼ -${Math.round(Math.abs(lossKrw)).toLocaleString("ko-KR")}원`,
+      color: BRAND,
+    };
   };
 
   // 예상 평가손익은 선택한 포트폴리오(selId) 기준으로 표시한다.
@@ -840,12 +847,17 @@ function PortfolioPage() {
     {
       name: "현재 (충격 없음)",
       shock: "—",
+      ratio: { text: "—", color: MUTED },
       pnl: { text: "기준", color: MUTED },
       selected: false,
     },
     ...stressLosses.map(({ sc, loss }) => ({
       name: sc.label,
       shock: sc.shockSummary,
+      ratio: {
+        text: `-${(loss.lossPct * 100).toFixed(1)}%`,
+        color: BRAND,
+      },
       pnl: fmtLoss(loss.lossKrw),
       selected: sc.key === worstKey,
     })),
@@ -1044,27 +1056,31 @@ function PortfolioPage() {
               }}
             >
               <colgroup>
-                <col style={{ width: 180 }} />
+                <col style={{ width: 150 }} />
                 <col />
-                <col style={{ width: 130 }} />
+                <col style={{ width: 80 }} />
+                <col style={{ width: 140 }} />
               </colgroup>
               <thead>
                 <tr style={{ background: BG_ALT }}>
-                  {["시나리오", "충격 가정", "예상 평가손익"].map((h) => (
-                    <th
-                      key={h}
-                      style={{
-                        padding: "7px 10px",
-                        textAlign: "left",
-                        fontSize: 11,
-                        fontWeight: 700,
-                        color: TEXT,
-                        borderBottom: `1.5px solid #D1D5DB`,
-                      }}
-                    >
-                      {h}
-                    </th>
-                  ))}
+                  {["시나리오", "충격 가정", "손실률", "예상 평가손익"].map(
+                    (h, i) => (
+                      <th
+                        key={h}
+                        style={{
+                          padding: "7px 10px",
+                          // 숫자 열은 오른쪽으로 몰아 자릿수를 맞춰 읽게 한다.
+                          textAlign: i >= 2 ? "right" : "left",
+                          fontSize: 11,
+                          fontWeight: 700,
+                          color: TEXT,
+                          borderBottom: `1.5px solid #D1D5DB`,
+                        }}
+                      >
+                        {h}
+                      </th>
+                    ),
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -1097,6 +1113,18 @@ function PortfolioPage() {
                     <td
                       style={{
                         padding: "8px 10px",
+                        textAlign: "right",
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: row.ratio.color,
+                      }}
+                    >
+                      {row.ratio.text}
+                    </td>
+                    <td
+                      style={{
+                        padding: "8px 10px",
+                        textAlign: "right",
                         fontSize: 11,
                         fontWeight: 700,
                         color: row.pnl.color,
