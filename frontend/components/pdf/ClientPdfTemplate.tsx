@@ -1785,8 +1785,8 @@ function RiskCheckPage() {
     확인 항목도 이 안을 기준으로 판정한다 — 스트레스는 옮겨 갈 안으로 재고
     확인 항목만 상담 전 비중으로 적으면 한 페이지가 두 포트폴리오를 말한다.
   */
-  // 고객용 문서의 이 칸 제목이 "확인이 필요한 항목" 이라, 이 안에서 이미 풀린
-  // 항목은 싣지 않는다. 해소 내역은 PB 용 리포트가 남긴다.
+  // 고객용 문서의 이 칸 제목이 "보완할 점" 이라, 이 안에서 이미 풀린 항목은
+  // 싣지 않는다. 해소 내역은 PB 용 리포트가 남긴다.
   const conflicts = evaluateIpsConflicts({
     weights: selectedPf.weights,
     baselineWeights,
@@ -1828,7 +1828,7 @@ function RiskCheckPage() {
               marginTop: 2,
             }}
           >
-            과거 충격 국면에서의 손실 추정 · 확인이 필요한 항목
+            시장이 흔들릴 때의 손실 추정 · 보완할 점
           </div>
         </div>
       </div>
@@ -1950,7 +1950,7 @@ function RiskCheckPage() {
         >
           <SectionBar />
           <div style={{ fontSize: 15, fontWeight: 800, color: TEXT }}>
-            확인이 필요한 항목
+            보완할 점
           </div>
         </div>
 

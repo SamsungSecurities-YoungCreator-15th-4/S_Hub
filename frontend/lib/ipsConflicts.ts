@@ -129,7 +129,11 @@ export function evaluateIpsConflicts(input: ConflictInput): ConflictRow[] {
       message: short
         ? "현금성 자산이 근시일 필요자금에 미달합니다"
         : "현금성 자산이 근시일 필요자금을 덮습니다",
-      observed: `현금성 자산 ${fmtManwon(Math.round(cashManwon))}`,
+      // 0 에 단위를 붙이면 "0만원" 이 되어 읽히지 않는다.
+      observed:
+        cashManwon < 1
+          ? "현금성 자산 없음"
+          : `현금성 자산 ${fmtManwon(Math.round(cashManwon))}`,
       threshold: `필요자금 ${fmtManwon(needManwon)} (${input.nearTermNeedYears}년 내)`,
       severity: "review",
       basis: `근거: IPS Liquidity · IPS Unique(${purpose})`,
