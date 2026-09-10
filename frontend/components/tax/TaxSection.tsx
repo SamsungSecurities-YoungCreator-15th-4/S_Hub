@@ -314,9 +314,13 @@ export default function TaxSection() {
             세로로 쌓으면 남는 높이가 두 그림의 폭으로 바뀐다.
             각각 테두리로 묶어 어디까지가 한 그림인지 경계를 준다.
           */}
+          {/*
+            카드가 늘어나면 늘어난 몫을 두 상자가 반씩 받는다(둘 다 grow, 기준은 내용 높이).
+            흐름 막대 상자 혼자 받으면 그쪽만 비고 계좌 배치는 빠듯해 보였다.
+            내용은 각 상자 가운데에 선다.
+          */}
           <div className="flex w-full flex-1 flex-col gap-2.5">
-            {/* 카드가 늘어나면 흐름 막대 상자가 그 몫을 받고, 막대는 상자 가운데에 선다. */}
-            <div className="flex w-full flex-1 flex-col justify-center rounded-xl border p-3">
+            <div className="flex w-full grow flex-col justify-center rounded-xl border p-3">
               <TaxWaterfall
                 waterfallData={isStressMode ? null : waterfallData}
                 liveHeadline={isStressMode ? (taxSource?.headline ?? null) : null}
@@ -324,11 +328,7 @@ export default function TaxSection() {
                 flow={waterfallFlow}
               />
             </div>
-            {/*
-              계좌 배치는 내용만큼만 차지한다. 막대 두 줄과 범례라 높이를 더 줘도
-              늘어날 것이 없고, 그 공간은 세로가 길수록 읽기 좋은 흐름 막대가 받는다.
-            */}
-            <div className="flex w-full shrink-0 flex-col rounded-xl border p-3">
+            <div className="flex w-full grow flex-col justify-center rounded-xl border p-3">
               <AccountAllocation
                 accounts={[
                   {
