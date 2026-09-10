@@ -189,10 +189,11 @@ export default function TaxSection() {
 
   return (
     /*
-      왼쪽 상담 내역·IPS가 길어져도 이 섹션은 그 높이를 따라 늘어나지 않는다.
-      각 탭의 실제 콘텐츠 높이만 사용해야 고객·분석 경로에 따라 차트가 커지지 않는다.
+      flex-1 — 좌측 사이드바가 중앙보다 길어지면(상담 내역이 찼을 때) 카드가 남은 높이를 채워
+      좌·중·우 바닥이 한 선에 선다. 사이드바에 스크롤을 두는 방식은 #110 에서 되돌렸다.
+      차트는 고정 높이(h-44)라 커지지 않고, 늘어난 몫은 탭 안 여백이 받는다.
     */
-    <Tabs defaultValue="effect" className="flex w-full flex-col">
+    <Tabs defaultValue="effect" className="flex w-full flex-1 flex-col">
       <div className="mb-2 flex items-center justify-between px-0.5">
         <div className="flex items-center gap-2.5">
           <h2 className="text-lg font-extrabold">절세 최적화 시뮬레이터</h2>
@@ -228,7 +229,7 @@ export default function TaxSection() {
         두 탭을 같은 칸에 겹쳐 두고(forceMount) 보이지 않는 탭은 invisible 로만 감춘다.
         카드 높이가 두 탭 중 큰 쪽에 맞춰져, 절세 제안 탭에서도 바닥이 절세 효과와 같은 자리에 선다.
       */}
-      <Card className="grid w-full gap-0 p-3">
+      <Card className="grid w-full flex-1 gap-0 p-3">
         {/* 탭 1: 절세 효과 */}
         <TabsContent
           value="effect"
@@ -313,8 +314,9 @@ export default function TaxSection() {
             세로로 쌓으면 남는 높이가 두 그림의 폭으로 바뀐다.
             각각 테두리로 묶어 어디까지가 한 그림인지 경계를 준다.
           */}
-          <div className="flex w-full flex-col gap-2.5">
-            <div className="flex w-full flex-col rounded-xl border p-3">
+          <div className="flex w-full flex-1 flex-col gap-2.5">
+            {/* 카드가 늘어나면 흐름 막대 상자가 그 몫을 받고, 막대는 상자 가운데에 선다. */}
+            <div className="flex w-full flex-1 flex-col justify-center rounded-xl border p-3">
               <TaxWaterfall
                 waterfallData={isStressMode ? null : waterfallData}
                 liveHeadline={isStressMode ? (taxSource?.headline ?? null) : null}
