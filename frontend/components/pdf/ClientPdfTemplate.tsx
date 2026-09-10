@@ -10,7 +10,7 @@ import {
 } from "@/lib/stressScenarios";
 import { DISCLAIMERS, IPS_CONFLICTS } from "@/lib/mock/symphonyReport";
 import { useDashboardStore } from "@/lib/store";
-import { useTaxPlan } from "@/lib/taxPlan";
+import { deriveTaxFlowRows, useTaxFlow, useTaxPlan } from "@/lib/taxPlan";
 import { deriveAdviceCards } from "@/lib/taxAdviceCards";
 import { useViewedPortfolio } from "@/lib/viewedPortfolio";
 import { formatSharpe } from "@/lib/sharpe";
@@ -22,6 +22,7 @@ import {
   buildPdfTaxEffect,
   extractTaxOptimizerEntry,
   buildPdfTaxFlow,
+  pdfTaxFlowFromDerived,
   extractPortfolioTaxEntry,
 } from "@/lib/pdfTaxData";
 
@@ -1112,11 +1113,16 @@ function TaxPage() {
     portfolioTaxMap,
     selectedPortfolioId,
   );
-  const taxFlow = buildPdfTaxFlow(
-    taxOptimizerEntry,
-    aumEokwon,
-    portfolioTaxEntry,
-  );
+  /*
+   * 백엔드 흐름이 없으면 화면과 같은 프론트 계산으로 채운다. 예전에는 여기서
+   * null 이 되어 표가 통째로 "분석 후 확인할 수 있습니다" 로 비었는데, 데모
+   * 픽스처에는 portfolioTax·taxOptimizer 가 없어 시연에서는 늘 그 상태였다.
+   */
+  const frontFlow = useTaxFlow();
+  const derivedFlow = frontFlow ? deriveTaxFlowRows(frontFlow) : null;
+  const taxFlow =
+    buildPdfTaxFlow(taxOptimizerEntry, aumEokwon, portfolioTaxEntry) ??
+    pdfTaxFlowFromDerived(derivedFlow);
   const accountRows = ACCOUNT_PDF.filter((acct) => acct.key !== "general").map(
     (acct) => {
       const accData = taxEffect.accounts.find((a) => a.name === acct.name);
@@ -1269,7 +1275,7 @@ function TaxPage() {
               </thead>
               <tbody>
                 {taxFlow ? (
-                  taxFlow.rows.map((row, i) => (
+                  taxFlow.rows.map((row) => (
                     <tr
                       key={row.label}
                       style={{
@@ -1316,7 +1322,7 @@ function TaxPage() {
                           color: MUTED,
                         }}
                       >
-                        {i === 0 ? "기준" : "절세 적용"}
+                        {row.note}
                       </td>
                     </tr>
                   ))
@@ -1350,6 +1356,28 @@ function TaxPage() {
                 {taxEffect.afterTaxReturn.to} ({taxEffect.afterTaxReturn.delta})
                 <br />✓ 실효세 절감 {taxEffect.effectiveTax.from} →{" "}
                 {taxEffect.effectiveTax.to} ({taxEffect.effectiveTax.delta})
+                {/*
+                  화면 머리말과 같은 분해다. 총액만 적으면 절반이 다른 세목(근로
+                  소득세 환급)이라는 사실이 묻히고, 전환으로 세금이 늘었다는 것도
+                  이 줄에서만 보인다.
+                */}
+                {derivedFlow && (
+                  <>
+                    <br />✓ {taxFlow?.totalLabel} +
+                    {derivedFlow.totalSavingManwon.toLocaleString()}만원 — 금융소득
+                    +{derivedFlow.breakdown.financialManwon.toLocaleString()}만 (세전
+                    +{derivedFlow.breakdown.pretaxGainManwon.toLocaleString()} ·{" "}
+                    {derivedFlow.breakdown.switchTaxManwon >= 0
+                      ? "전환 세금 −"
+                      : "전환 세금 절감 +"}
+                    {Math.abs(
+                      derivedFlow.breakdown.switchTaxManwon,
+                    ).toLocaleString()}{" "}
+                    · ISA 절감 +
+                    {derivedFlow.breakdown.isaCutManwon.toLocaleString()}) · 근로소득세
+                    환급 +{derivedFlow.breakdown.refundManwon.toLocaleString()}만
+                  </>
+                )}
               </div>
             </div>
           </div>

@@ -10,7 +10,11 @@ import {
   YAxis,
 } from "recharts";
 import HelpTooltip from "@/components/common/HelpTooltip";
-import type { TaxFlowInput } from "@/lib/taxPlan";
+import {
+  deriveTaxFlowRows,
+  type TaxFlowBreakdown,
+  type TaxFlowInput,
+} from "@/lib/taxPlan";
 import { TAX_EFFECT } from "@/lib/mockData";
 import type { StressTaxHeadline, TaxWaterfallResponse } from "@/lib/api";
 
@@ -95,15 +99,12 @@ export default function TaxWaterfall({
    * 돈은 다른 세목인데 합계만 적으면 한 덩어리로 읽힌다. 세금이 얼마나 늘었는지도
    * 이 줄에서만 보인다 — 막대는 세후 기준이라 증가분이 이미 안에 녹아 있다.
    */
-  let breakdown: {
-    financialManwon: number;
-    pretaxGainManwon: number;
-    /** 전환으로 늘어난 금융소득세 — 금융소득에서 빠지는 몫이라 부호가 뒤집힌다. */
-    switchTaxManwon: number;
-    /** ISA 가 도로 깎은 금융소득세. switchTax − isaCut 이 실제 세금 증가분이다. */
-    isaCutManwon: number;
-    refundManwon: number;
-  } | null = null;
+  /*
+   * 총액을 세목으로 쪼갠 줄. 금융소득세에서 아낀 돈과 근로소득세에서 돌려받는
+   * 돈은 다른 세목인데 합계만 적으면 한 덩어리로 읽힌다. 세금이 얼마나 늘었는지도
+   * 이 줄에서만 보인다 — 막대는 세후 기준이라 증가분이 이미 안에 녹아 있다.
+   */
+  let breakdown: TaxFlowBreakdown | null = null;
 
   if (waterfallData) {
     // /portfolio/calculate tax.waterfall 실데이터
@@ -138,28 +139,9 @@ export default function TaxWaterfall({
       { name: "절세 제안 적용",  afterTax: afterAfterTax,  tax: afterTax  },
     ];
   } else if (flow && flow.aumManwon > 0) {
-    const { aumManwon: aum, current, selected } = flow;
-    const pct = (v: number) => Math.round((aum * v) / 100);
-
-    const curAfter = pct(current.afterTaxReturnPct);
-    const curTax = pct(current.expectedReturnPct) - curAfter;
-    const selAfter = pct(selected.afterTaxReturnPct);
-    const selTax = pct(selected.expectedReturnPct) - selAfter;
-
-    const isaSaving = Math.round(flow.financialTaxSavingManwon);
-    const refund = Math.round(flow.creditRefundManwon);
-
-    const rows = [
-      { name: "현재", afterTax: curAfter, tax: curTax, refund: 0 },
-      { name: selected.name, afterTax: selAfter, tax: selTax, refund: 0 },
-      {
-        // ISA 절감은 금융소득세를 직접 깎으므로 세후 수익으로 넘어간다.
-        name: "+ 절세 제안",
-        afterTax: selAfter + isaSaving,
-        tax: Math.max(selTax - isaSaving, 0),
-        refund,
-      },
-    ];
+    // 막대와 분해 줄은 lib/taxPlan.ts 가 만든다 — 리포트도 같은 값을 그린다.
+    const derived = deriveTaxFlowRows(flow);
+    const rows = derived.rows;
 
     // 가장 큰 세금 막대가 가장 긴 세후 막대의 이만큼을 차지하도록 늘린다.
     const TAX_TARGET_SHARE = 0.32;
@@ -169,41 +151,10 @@ export default function TaxWaterfall({
       maxTax > 0 ? Math.max((maxAfter * TAX_TARGET_SHARE) / maxTax, 1) : 1;
     data = rows.map((r) => ({ ...r, taxPlot: r.tax * taxScale }));
 
-    // 전환은 절세가 아니라 수익 증가다. 화면이 그렇게 말해야 한다.
-    const gainFromSwitch = selAfter - curAfter;
-    const gainFromTax = isaSaving + refund;
-    totalSavingManwon = gainFromSwitch + gainFromTax;
-    pretaxLabel = `${selected.name} 기준 · 자산 ${(aum / 10000).toFixed(1)}억`;
-    /*
-     * "손에 남는 돈" 은 세후 수익 전체로 읽혀 총액처럼 보였다. 이 값은 현재
-     * 포트폴리오를 그대로 뒀을 때와 견준 1년치 차이다.
-     *
-     * 고객 앞에서 그대로 읽는 화면이라 다른 라벨과 같은 명사구·존대 어투로
-     * 맞춘다("연간 절세 효과", "3대 절세계좌 활용 시 예상 추가 절감").
-     * "따지면" 은 따져 묻는 말로 들리고 "남는 돈"·"순증" 은 총액으로 읽히거나
-     * 어려웠다. "세후 기준" 이 이 카드의 핵심을, "기대" 가 추정치임을 말한다 —
-     * 위 지표 카드가 이미 "세후 수익률" 이라 용어도 이어진다.
-     *
-     * "연간" 은 빼지 않는다 — 금융소득도 세액공제도 매년 되풀이되는 금액인데
-     * 기간이 없으면 한 번 받는 돈으로 읽힌다.
-     */
-    totalLabel = "세후 기준 연간 기대 효과";
-    /*
-     * 세 값을 막대에서 직접 뺀다. 전환 이익과 ISA 절감을 따로 더하면 세금 조각에
-     * 걸린 하한(Math.max(selTax - isaSaving, 0))을 지나쳐 화면과 어긋날 수 있다.
-     * 이렇게 두면 세전 = 세후 + 세금 이 막대와 항상 같은 값으로 맞는다.
-     */
-    const financialManwon = rows[2].afterTax - rows[0].afterTax;
-    const taxDeltaManwon = rows[2].tax - rows[0].tax;
-    const switchTaxManwon = rows[1].tax - rows[0].tax;
-    breakdown = {
-      financialManwon,
-      pretaxGainManwon: financialManwon + taxDeltaManwon,
-      switchTaxManwon,
-      // 차액으로 구한다. 이렇게 두면 세전 − 전환세금 + ISA 가 늘 금융소득과 맞는다.
-      isaCutManwon: switchTaxManwon - taxDeltaManwon,
-      refundManwon: refund,
-    };
+    totalSavingManwon = derived.totalSavingManwon;
+    pretaxLabel = derived.pretaxLabel;
+    totalLabel = derived.totalLabel;
+    breakdown = derived.breakdown;
     domainMax =
       Math.max(...data.map((d) => d.afterTax + (d.taxPlot ?? 0) + (d.refund ?? 0))) *
       1.1;

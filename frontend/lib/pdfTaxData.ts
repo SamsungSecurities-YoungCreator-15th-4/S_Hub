@@ -16,6 +16,7 @@
  */
 import { TAX_EFFECT } from "@/lib/mockData";
 import type { PortfolioTaxResponse, StressTaxData } from "@/lib/api/types";
+import type { TaxFlowRows } from "@/lib/taxPlan";
 
 // selectedPortfolioId("current"|"a"|"b") → tax_optimizer 맵 키
 const PDF_TAX_OPT_KEY: Record<string, string> = {
@@ -114,7 +115,13 @@ export function buildPdfTaxEffect(
 
 // ── 세금 효과 비교 흐름 행 (flow rows) ────────────────────────────────────────
 
-export type PdfFlowRow = { label: string; afterTaxManwon: number; taxManwon: number };
+export type PdfFlowRow = {
+  label: string;
+  afterTaxManwon: number;
+  taxManwon: number;
+  /** 비고 칸 문구. 세액공제가 붙는 행이면 그 금액을 적는다. */
+  note: string;
+};
 
 export type PdfTaxFlow = {
   pretaxLabel: string;
@@ -158,8 +165,8 @@ export function buildPdfTaxFlow(
       totalLabel: "연간 절세 효과",
       totalSavingManwon: savingManwon,
       rows: [
-        { label: "전략 전",        afterTaxManwon: baselineAfter,  taxManwon: baselineTax     },
-        { label: "절세 전략 적용",  afterTaxManwon,                  taxManwon: actualTaxManwon },
+        { label: "전략 전",        afterTaxManwon: baselineAfter,  taxManwon: baselineTax,     note: "기준" },
+        { label: "절세 전략 적용",  afterTaxManwon,                  taxManwon: actualTaxManwon, note: "절세 적용" },
       ],
     };
   }
@@ -177,11 +184,38 @@ export function buildPdfTaxFlow(
       totalLabel: "연간 절세 효과",
       totalSavingManwon: totalSaving,
       rows: [
-        { label: "현재 포트폴리오", afterTaxManwon: beforeAfter, taxManwon: beforeTax },
-        { label: "절세 제안 적용",  afterTaxManwon: afterAfter,  taxManwon: afterTax  },
+        { label: "현재 포트폴리오", afterTaxManwon: beforeAfter, taxManwon: beforeTax, note: "기준" },
+        { label: "절세 제안 적용",  afterTaxManwon: afterAfter,  taxManwon: afterTax,  note: "절세 적용" },
       ],
     };
   }
   return null;
 }
 
+
+/**
+ * 백엔드 흐름 데이터가 없을 때 화면과 같은 프론트 계산을 같은 shape 으로 돌려준다.
+ *
+ * 예전에는 여기서 null 을 돌려 리포트의 세금 효과 비교 표가 통째로 "분석 후
+ * 확인할 수 있습니다" 로 비었다. 데모 픽스처에는 portfolioTax·taxOptimizer 가
+ * 없으므로 시연에서는 늘 그 상태였다.
+ */
+export function pdfTaxFlowFromDerived(derived: TaxFlowRows | null): PdfTaxFlow {
+  if (!derived) return null;
+  return {
+    pretaxLabel: derived.pretaxLabel,
+    totalLabel: derived.totalLabel,
+    totalSavingManwon: derived.totalSavingManwon,
+    rows: derived.rows.map((r, i) => ({
+      label: r.name,
+      afterTaxManwon: r.afterTax,
+      taxManwon: r.tax,
+      note:
+        r.refund > 0
+          ? `세액공제 +${r.refund.toLocaleString()}만`
+          : i === 0
+            ? "기준"
+            : "전환",
+    })),
+  };
+}

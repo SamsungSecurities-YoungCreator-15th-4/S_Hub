@@ -157,3 +157,99 @@ export function useTaxFlow(): TaxFlowInput | null {
     creditRefundManwon: plan.pensionSavingManwon,
   };
 }
+
+/** 흐름 막대 한 줄 — 세후 수익 / 금융소득세 / 세액공제 환급(만원). */
+export interface TaxFlowRow {
+  name: string;
+  afterTax: number;
+  tax: number;
+  refund: number;
+}
+
+/** 총액을 세목으로 쪼갠 값. 세 항이 그대로 더해져 금융소득이 된다. */
+export interface TaxFlowBreakdown {
+  financialManwon: number;
+  pretaxGainManwon: number;
+  /** 전환으로 늘어난 금융소득세 — 금융소득에서 빠지는 몫이라 부호가 뒤집힌다. */
+  switchTaxManwon: number;
+  /** ISA 가 도로 깎은 금융소득세. switchTax − isaCut 이 실제 세금 증가분이다. */
+  isaCutManwon: number;
+  refundManwon: number;
+}
+
+export interface TaxFlowRows {
+  rows: TaxFlowRow[];
+  breakdown: TaxFlowBreakdown;
+  /** 현재 대비 1년치 차이(만원) = 금융소득 + 근로소득세 환급. */
+  totalSavingManwon: number;
+  pretaxLabel: string;
+  totalLabel: string;
+}
+
+/**
+ * 흐름 막대 세 줄과 세목 분해.
+ *
+ * 화면(TaxWaterfall)과 리포트가 같은 함수를 부른다. 막대와 분해 줄이 서로 다른
+ * 식으로 구해지면 "세전 = 세후 + 세금" 이 화면 안에서 어긋난다.
+ */
+export function deriveTaxFlowRows(flow: TaxFlowInput): TaxFlowRows {
+  const { aumManwon: aum, current, selected } = flow;
+  const pct = (v: number) => Math.round((aum * v) / 100);
+
+  const curAfter = pct(current.afterTaxReturnPct);
+  const curTax = pct(current.expectedReturnPct) - curAfter;
+  const selAfter = pct(selected.afterTaxReturnPct);
+  const selTax = pct(selected.expectedReturnPct) - selAfter;
+
+  const isaSaving = Math.round(flow.financialTaxSavingManwon);
+  const refund = Math.round(flow.creditRefundManwon);
+
+  const rows: TaxFlowRow[] = [
+    { name: "현재", afterTax: curAfter, tax: curTax, refund: 0 },
+    { name: selected.name, afterTax: selAfter, tax: selTax, refund: 0 },
+    {
+      // ISA 절감은 금융소득세를 직접 깎으므로 세후 수익으로 넘어간다.
+      name: "+ 절세 제안",
+      afterTax: selAfter + isaSaving,
+      tax: Math.max(selTax - isaSaving, 0),
+      refund,
+    },
+  ];
+
+  /*
+   * 세 값을 막대에서 직접 뺀다. 전환 이익과 ISA 절감을 따로 더하면 세금 조각에
+   * 걸린 하한(Math.max(selTax - isaSaving, 0))을 지나쳐 화면과 어긋날 수 있다.
+   * 이렇게 두면 세전 = 세후 + 세금 이 막대와 항상 같은 값으로 맞는다.
+   */
+  const financialManwon = rows[2].afterTax - rows[0].afterTax;
+  const taxDeltaManwon = rows[2].tax - rows[0].tax;
+  const switchTaxManwon = rows[1].tax - rows[0].tax;
+
+  return {
+    rows,
+    breakdown: {
+      financialManwon,
+      pretaxGainManwon: financialManwon + taxDeltaManwon,
+      switchTaxManwon,
+      // 차액으로 구한다. 이렇게 두면 세전 − 전환세금 + ISA 가 늘 금융소득과 맞는다.
+      isaCutManwon: switchTaxManwon - taxDeltaManwon,
+      refundManwon: refund,
+    },
+    totalSavingManwon: financialManwon + refund,
+    pretaxLabel: `${selected.name} 기준 · 자산 ${(aum / 10000).toFixed(1)}억`,
+    /*
+     * "손에 남는 돈" 은 세후 수익 전체로 읽혀 총액처럼 보였다. 이 값은 현재
+     * 포트폴리오를 그대로 뒀을 때와 견준 1년치 차이다.
+     *
+     * 고객 앞에서 그대로 읽는 화면이라 다른 라벨과 같은 명사구·존대 어투로
+     * 맞춘다("연간 절세 효과", "3대 절세계좌 활용 시 예상 추가 절감").
+     * "따지면" 은 따져 묻는 말로 들리고 "남는 돈"·"순증" 은 총액으로 읽히거나
+     * 어려웠다. "세후 기준" 이 이 카드의 핵심을, "기대" 가 추정치임을 말한다 —
+     * 위 지표 카드가 이미 "세후 수익률" 이라 용어도 이어진다.
+     *
+     * "연간" 은 빼지 않는다 — 금융소득도 세액공제도 매년 되풀이되는 금액인데
+     * 기간이 없으면 한 번 받는 돈으로 읽힌다.
+     */
+    totalLabel: "세후 기준 연간 기대 효과",
+  };
+}
