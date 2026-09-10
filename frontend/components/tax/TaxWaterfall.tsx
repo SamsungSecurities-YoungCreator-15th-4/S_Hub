@@ -312,7 +312,7 @@ export default function TaxWaterfall({
         사이드바가 행 높이를 정하므로 이쪽이 따라 줄어야 카드가 그 아래로
         비어져 나오지 않는다. 상한은 종전 높이라 더 커지지는 않는다.
       */}
-      <div className={flow ? "min-h-32 max-h-64 flex-1" : "h-32"}>
+      <div className={flow ? "min-h-32 max-h-56 flex-1" : "h-32"}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={data}
