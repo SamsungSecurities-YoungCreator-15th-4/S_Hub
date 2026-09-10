@@ -26,7 +26,7 @@ export type AdviceCard = (typeof TAX_ADVICE.cards)[number] & {
 export function deriveAdviceCards(
   plan: AllocationPlan | null,
   liveCards: StressTaxStrategyCard[] | null,
-): { cards: AdviceCard[]; totalSaving: string } {
+): { cards: AdviceCard[]; totalSaving: string; totalLabel: string } {
   const liveByKey = new Map(liveCards?.map((card) => [card.key, card]) ?? []);
 
   /*
@@ -176,5 +176,5 @@ export function deriveAdviceCards(
       ? `약 +${fmtSaving(massTotalManwon)}만원`
       : TAX_ADVICE.totalSaving;
 
-  return { cards, totalSaving };
+  return { cards, totalSaving, totalLabel: TAX_ADVICE.totalLabel };
 }

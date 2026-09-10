@@ -4,7 +4,7 @@
  *
  * 목적: PDF 템플릿(PbPdf·ClientPdf)의 절세 JSX를 그대로 두고 데이터 소스만 교체하기 위함.
  *   - TAX_EFFECT  → buildPdfTaxEffect(taxOptimizer)
- *   - TAX_ADVICE  → buildPdfTaxAdvice(taxOptimizer)
+ *   - 절세 제안 카드는 여기서 만들지 않는다 — 화면과 같은 lib/taxAdviceCards.ts 를 쓴다.
  * live 데이터가 없으면(미분석·데모 폴백) 각 필드를 mock 값으로 폴백한다.
  *
  * 주의(추적성): live로 연결되는 값은 모두 calculate 응답(tax_optimizer)의 실제 수치다.
@@ -14,7 +14,7 @@
  *   - account_cards → 계좌 활용도(used/limit). 캡션 문구는 mock 유지.
  *   - flow(세금 흐름 3행 표)는 calculate에 3분할 소스가 없어 mock 유지 — 백엔드 분할 노출 후 연결 예정(TODO).
  */
-import { TAX_ADVICE, TAX_EFFECT } from "@/lib/mockData";
+import { TAX_EFFECT } from "@/lib/mockData";
 import type { PortfolioTaxResponse, StressTaxData } from "@/lib/api/types";
 
 // selectedPortfolioId("current"|"a"|"b") → tax_optimizer 맵 키
@@ -185,39 +185,3 @@ export function buildPdfTaxFlow(
   return null;
 }
 
-/** TAX_ADVICE(절세 제안) shape으로 변환. 카드별 계산값은 기존 ISA·연금 전략에서 가져온다. */
-export function buildPdfTaxAdvice(
-  taxOptimizer: StressTaxData | null,
-): typeof TAX_ADVICE {
-  const live = taxOptimizer?.strategy_cards;
-  if (!live?.cards?.length) return TAX_ADVICE;
-
-  const liveByKey = new Map(live.cards.map((card) => [card.key, card]));
-  const cards = TAX_ADVICE.cards.map((base) => {
-      const lc = liveByKey.get(base.sourceKey);
-      const saving =
-        base.savingRole === "included"
-          ? lc?.applicable && lc.combined_contribution_manwon > 0
-            ? base.saving
-            : ""
-          : lc?.applicable && lc.combined_contribution_manwon > 0
-          ? `+${lc.combined_contribution_manwon.toLocaleString()}만원`
-          : "";
-      return {
-        ...base,
-        saving,
-      };
-    });
-
-  const combinedTotalManwon = ["isa", "pension_credit"].reduce(
-    (sum, key) =>
-      sum + (liveByKey.get(key)?.combined_contribution_manwon ?? 0),
-    0,
-  );
-
-  return {
-    ...TAX_ADVICE,
-    cards,
-    totalSaving: `+${combinedTotalManwon.toLocaleString()}만원`,
-  };
-}

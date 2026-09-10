@@ -10,6 +10,8 @@ import {
 } from "@/lib/stressScenarios";
 import { DISCLAIMERS, IPS_CONFLICTS } from "@/lib/mock/symphonyReport";
 import { useDashboardStore } from "@/lib/store";
+import { useTaxPlan } from "@/lib/taxPlan";
+import { deriveAdviceCards } from "@/lib/taxAdviceCards";
 import { useViewedPortfolio } from "@/lib/viewedPortfolio";
 import { formatSharpe } from "@/lib/sharpe";
 import {
@@ -18,7 +20,6 @@ import {
 } from "@/lib/pdfPortfolioData";
 import {
   buildPdfTaxEffect,
-  buildPdfTaxAdvice,
   extractTaxOptimizerEntry,
   buildPdfTaxFlow,
   extractPortfolioTaxEntry,
@@ -1095,7 +1096,16 @@ function TaxPage() {
     selectedPortfolioId,
   );
   const taxEffect = buildPdfTaxEffect(taxOptimizerEntry);
-  const taxAdvice = buildPdfTaxAdvice(taxOptimizerEntry);
+  /*
+   * 카드와 총액은 화면(절세 제안 탭)과 같은 함수를 부른다. 예전에는 리포트만
+   * mockData 를 읽어, 화면이 "약 +97만원" 을 말할 때 여기에는 자리표시 문구인
+   * "분석 후 계산" 이 인쇄됐다.
+   */
+  const { plan } = useTaxPlan();
+  const taxAdvice = deriveAdviceCards(
+    plan,
+    taxOptimizerEntry?.strategy_cards?.cards ?? null,
+  );
   const portfolioTaxMap = useDashboardStore((s) => s.portfolioTax);
   const aumEokwon = C.aumEokwon ?? 0;
   const portfolioTaxEntry = extractPortfolioTaxEntry(
@@ -1653,6 +1663,19 @@ function TaxPage() {
                   {card.title}
                 </span>
               </div>
+              {/* 배분 요약 — 화면 카드의 첫 줄과 같은 문장이다. */}
+              {card.summary && (
+                <p
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 800,
+                    color: TEXT,
+                    margin: "0 0 5px 0",
+                  }}
+                >
+                  {card.summary}
+                </p>
+              )}
               <p
                 style={{
                   fontSize: 11,
