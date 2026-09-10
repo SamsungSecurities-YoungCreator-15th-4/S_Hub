@@ -16,12 +16,12 @@ const ASSUMPTION_LINES = (
   targetReturnPct: number,
   horizonYears: number,
 ): string[] => [
-  `${needYears}년 뒤 가용액은 납입 원금만 — 운용수익 미반영`,
+  `${needYears}년 뒤 가용액은 납입 원금만: 운용수익 미반영`,
   // IPS 가 비어 있으면 목표수익률이 0 으로 내려온다. 0% 라고 적으면 거짓이라
   // 숫자 없이 말한다.
   targetReturnPct > 0
-    ? `목표수익률 ${targetReturnPct}%는 ${horizonYears}년 은퇴자산 기준 — 단기 자금에 적용하지 않음`
-    : `목표수익률은 장기 은퇴자산 기준 — 단기 자금에 적용하지 않음`,
+    ? `목표수익률 ${targetReturnPct}%는 ${horizonYears}년 은퇴자산 기준: 단기 자금에 적용하지 않음`
+    : `목표수익률은 장기 은퇴자산 기준: 단기 자금에 적용하지 않음`,
   "기존 보유자산은 매도 시점 평가손익에 좌우돼 미포함 (IPS 상 국내 반도체주 비중이 큼)",
   "연금계좌는 연금저축 단독 한도 600만원을 채운 뒤 나머지를 IRP 로 배분",
   // 화면 금액을 만원 단위로 반올림하므로 유도는 여기서 들고 있는다.
@@ -37,11 +37,11 @@ const ASSUMPTION_LINES = (
     남긴다. 안정 추구 비중에 가중하면 2.4% 근처가 나오므로 3% 는 다소 높은 쪽이다.
     자산군별 소득수익률이 붙으면 이 줄과 상수를 함께 걷어낸다.
   */
-  "같은 시점 시장값 — 국고채 3년 3.91%(2026-09-09) · 코스피 배당수익률 0.92%(2026-05)",
-  `ISA 비과세 ${ASSUMPTIONS.isaGeneralTaxFreeManwon}만원(서민형 ${ASSUMPTIONS.isaSeogminTaxFreeManwon}만원)은 계약기간 통산에 한 번 — 연 단위 화면이라 의무보유 ${ASSUMPTIONS.isaMandatoryHoldingYears}년으로 나눠 반영`,
-  "계좌 내 손익 통산·만기까지의 과세이연은 미반영 — 둘 다 절감액을 키우는 쪽이라 이 값은 보수적",
+  "같은 시점 시장값: 국고채 3년 3.91%(2026-09-09) · 코스피 배당수익률 0.92%(2026-05)",
+  `ISA 비과세 ${ASSUMPTIONS.isaGeneralTaxFreeManwon}만원(서민형 ${ASSUMPTIONS.isaSeogminTaxFreeManwon}만원)은 계약기간 통산에 한 번: 연 단위 화면이라 의무보유 ${ASSUMPTIONS.isaMandatoryHoldingYears}년으로 나눠 반영`,
+  "계좌 내 손익 통산·만기까지의 과세이연은 미반영: 둘 다 절감액을 키우는 쪽이라 이 값은 보수적",
   "국내 상장주식 매매차익은 원래 비과세라 ISA 실익은 이보다 작을 수 있음",
-  "세액공제는 산출세액을 넘을 수 없으나 그 한도는 미반영 — 낼 세금이 적으면 과대계산",
+  "세액공제는 산출세액을 넘을 수 없으나 그 한도는 미반영: 낼 세금이 적으면 과대계산",
   "납입한도·세액공제율·의무보유기간·비과세 한도는 2026년 법정 기준",
 ];
 
@@ -133,7 +133,7 @@ export default function ContributionSplit({
           연 납입여력 {fmt(budgetManwon)}만원
         </p>
         <span className="text-[11px] font-semibold text-muted-foreground">
-          연금은 만 55세까지 {plan.pension.lockupYears}년 잠깁니다
+          연금은 {plan.pension.lockupYears}년 뒤, 만 55세부터 받을 수 있습니다
         </span>
       </div>
 
@@ -266,7 +266,7 @@ export default function ContributionSplit({
             </p>
             <p className="mt-0.5 text-[12px] font-semibold text-muted-foreground">
               {maxPensionKeepingNeed != null
-                ? `연금 상한 ${fmt(maxPensionKeepingNeed)}만원 · 더 넣으면 ${needLabel}이 모자랍니다`
+                ? `연금 상한 ${fmt(maxPensionKeepingNeed)}만원`
                 : `연금 한도까지 ${fmt(sliderMax - plan.pensionManwon)}만원 남았습니다`}
             </p>
           </>

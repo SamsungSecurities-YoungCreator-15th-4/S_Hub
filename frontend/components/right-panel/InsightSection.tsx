@@ -116,7 +116,7 @@ export default function InsightSection() {
         <Input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="예: 재무제표, RAG 문서, 분석 결과 요약"
+          placeholder="예: 기업 재무제표, 포트폴리오 분석 결과 요약"
           className="h-8 text-[13px] md:text-[13px]"
           disabled={loading || beforeAnalysis}
           title={
@@ -165,7 +165,7 @@ export default function InsightSection() {
               <p className="text-[13px] font-medium text-muted-foreground">
                 {beforeAnalysis
                   ? "분석 후 인사이트를 조회할 수 있습니다"
-                  : "질문을 입력하세요"}
+                  : "질문을 입력합니다."}
               </p>
             ) : isEmpty ? (
               <p className="text-[13px] font-medium text-muted-foreground">

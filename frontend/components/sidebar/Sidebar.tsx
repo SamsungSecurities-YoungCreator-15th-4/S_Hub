@@ -110,7 +110,6 @@ export default function Sidebar() {
     addCustomer,
     setCustomers,
     transcript,
-    transcriptSource,
     sttStatus,
     sttNote,
     setTranscript,
@@ -764,7 +763,6 @@ export default function Sidebar() {
         <Card className="gap-0 p-3">
           <div className="mb-2 flex items-center justify-between">
             <p className="text-[14px] font-bold">상담 내역</p>
-            <DataSourceBadge source={transcriptSource} note={sttNote} />
           </div>
           <div className="flex max-h-[150px] flex-col gap-1.5 overflow-y-auto pr-0.5">
             {transcript.length === 0 ? (
@@ -858,7 +856,7 @@ export default function Sidebar() {
               />
             </div>
           </IpsRow>
-          <IpsRow k="Tax" sub="세제">
+          <IpsRow k="Tax" sub="세금">
             <Input
               value={ips.tax}
               onChange={(e) => setIps({ tax: e.target.value })}
@@ -879,13 +877,13 @@ export default function Sidebar() {
               className="h-6 text-[13px] md:text-[13px]"
             />
           </IpsRow>
-          <IpsRow k="Unique" sub="특수" last alignTop>
+          <IpsRow k="Unique" sub="특이사항" last alignTop>
             <textarea
               value={ips.unique ?? ""}
               onChange={(e) => setIps({ unique: e.target.value })}
               rows={5}
               className="w-full resize-none rounded-md border border-input bg-white px-3 py-1.5 text-[13px] font-medium text-foreground shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              placeholder="특이사항 입력..."
+              placeholder="특이사항 입력"
             />
           </IpsRow>
         </Card>
